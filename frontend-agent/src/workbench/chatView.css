@@ -1,0 +1,418 @@
+.cl-chatView {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    /* Prefer flex sizing over percentage heights to avoid relying on ancestor
+       height being explicitly set. This keeps the composer visible even when
+       the message list grows large. */
+    flex: 1;
+}
+
+.cl-chatTopBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.cl-timeline {
+    margin-top: 8px;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 10px 10px 12px;
+    border: 1px solid #f0f0f0;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.cl-timelineTopOverlay {
+    position: sticky;
+    top: 8px;
+    height: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.cl-timelineTopPill {
+    pointer-events: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid #e5e7eb;
+    background: rgba(255, 255, 255, 0.92);
+    color: rgba(0, 0, 0, 0.65);
+    font-size: 12px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.cl-msgRow {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin: 6px 0;
+    min-width: 0;
+}
+
+.cl-msgRow.is-groupStart {
+    margin-top: 12px;
+}
+
+.cl-msgRow.is-groupContinue {
+    margin-top: 4px;
+}
+
+.cl-msgRow.is-agent {
+    justify-content: flex-end;
+}
+
+.cl-msgRow.is-customer {
+    justify-content: flex-start;
+}
+
+.cl-msgCol {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+}
+
+.cl-msgRow.is-agent .cl-msgCol {
+    align-items: flex-end;
+}
+
+.cl-msgRow.is-customer .cl-msgCol {
+    align-items: flex-start;
+}
+
+.cl-msgHeader {
+    font-size: 12px;
+    line-height: 1.1;
+    color: rgba(0, 0, 0, 0.45);
+    width: 100%;
+    display: flex;
+}
+
+.cl-msgRow.is-agent .cl-msgHeader {
+    justify-content: flex-end;
+}
+
+.cl-msgRow.is-customer .cl-msgHeader {
+    justify-content: flex-start;
+}
+
+.cl-msgHeaderName {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.cl-bubbleWrap {
+    position: relative;
+    display: inline-flex;
+    max-width: min(680px, 100%);
+}
+
+.cl-readReceipt {
+    margin-top: 2px;
+    font-size: 12px;
+    line-height: 1.1;
+    color: rgba(0, 0, 0, 0.45);
+    user-select: none;
+}
+
+.cl-msgRow.is-agent .cl-readReceipt {
+    text-align: right;
+}
+
+.cl-bubble {
+    max-width: 100%;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    padding: 8px 10px;
+    background: #fff;
+}
+
+.cl-msgRow.is-agent .cl-bubble {
+    background: #e9f2ff;
+    border-color: #c7ddff;
+}
+
+/* Grouped bubble radius linking */
+.cl-msgRow.is-customer .cl-bubble {
+    border-radius: 10px 10px 10px 7px;
+}
+
+.cl-msgRow.is-agent .cl-bubble {
+    border-radius: 10px 10px 7px 10px;
+}
+
+.cl-msgRow.is-customer.is-groupContinue .cl-bubble {
+    border-top-left-radius: 7px;
+}
+
+.cl-msgRow.is-agent.is-groupContinue .cl-bubble {
+    border-top-right-radius: 7px;
+}
+
+.cl-msgRow.is-customer:not(.is-groupEnd) .cl-bubble {
+    border-bottom-left-radius: 6px;
+}
+
+.cl-msgRow.is-agent:not(.is-groupEnd) .cl-bubble {
+    border-bottom-right-radius: 6px;
+}
+
+
+.cl-bubbleHeader {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.45);
+}
+
+.cl-bubbleHeaderName {
+    min-width: 0;
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cl-bubbleHeaderTime {
+    flex: none;
+}
+
+/* Hover-only timestamp (no layout shift) */
+.cl-msgTime {
+    position: absolute;
+    bottom: 6px;
+    font-size: 11px;
+    line-height: 1;
+    color: rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    transform: translateY(2px);
+    transition: opacity 120ms ease, transform 120ms ease;
+    user-select: none;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.cl-msgRow.is-customer .cl-msgTime {
+    left: calc(100% + 8px);
+}
+
+.cl-msgRow.is-agent .cl-msgTime {
+    right: calc(100% + 8px);
+}
+
+.cl-msgRow:hover .cl-msgTime {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@media (hover: none) {
+    .cl-msgTime {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.cl-bubbleBody {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 14px;
+    line-height: 1.35;
+    color: rgba(0, 0, 0, 0.88);
+}
+
+.cl-attachmentRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    font-size: 13px;
+    flex-wrap: wrap;
+}
+
+.cl-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    user-select: none;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: rgba(0, 0, 0, 0.75);
+    flex: 0 0 28px;
+}
+
+.cl-msgRow.is-agent .cl-avatar {
+    background: #e9f2ff;
+    border-color: #c7ddff;
+    color: rgba(0, 0, 0, 0.8);
+}
+
+.cl-avatarSpacer {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+}
+
+.cl-systemRow {
+    display: flex;
+    justify-content: center;
+    margin: 12px 0;
+}
+
+.cl-systemPill {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    background: #f5f5f5;
+    border: 1px solid #e5e7eb;
+    color: rgba(0, 0, 0, 0.55);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+}
+
+.cl-composer {
+    margin-top: 10px;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.cl-newMsgBar {
+    margin-top: 8px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    border-radius: 10px;
+    padding: 6px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+.cl-newMsgBarMain {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 0;
+    background: transparent;
+    padding: 4px 6px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.cl-newMsgBarMain:hover {
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+}
+
+.cl-newMsgDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #ff4d4f;
+    flex: 0 0 8px;
+}
+
+.cl-newMsgText {
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.78);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cl-newMsgBarActions {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.cl-composerBody {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 12px;
+    background: #fff;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.cl-composerInput {
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+.cl-composerInput textarea {
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 0;
+    background: transparent;
+}
+
+.cl-composerFooter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 2px 0;
+}
+
+.cl-composerFooterLeft {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.cl-composerActions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.cl-composerFooterRight {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: none;
+}
+
+.cl-composerHint {
+    font-size: 12px;
+    color: rgba(15, 23, 42, 0.55);
+}
+
+.cl-modeHint {
+    margin-top: 6px;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.45);
+}

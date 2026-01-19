@@ -1,0 +1,239 @@
+:root {
+    --lc-bg: #ffffff;
+    --lc-muted: rgba(17, 24, 39, 0.7);
+    --lc-border: rgba(17, 24, 39, 0.12);
+    --lc-border-strong: rgba(17, 24, 39, 0.18);
+    --lc-shadow: 0 16px 40px rgba(2, 6, 23, 0.08);
+    --lc-radius: 10px;
+    --lc-radius-sm: 8px;
+    --lc-primary: #111827;
+}
+
+.lcLogin {
+    min-height: 100vh;
+    background: var(--lc-bg);
+    display: flex;
+    flex-direction: column;
+}
+
+.lcLoginTopbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px;
+}
+
+.lcBrand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: #111827;
+}
+
+.lcBrandLogo {
+    width: 116px;
+    height: auto;
+    display: block;
+}
+
+.lcTopbarAction {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--lc-border);
+    background: #fff;
+    color: #111827;
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+}
+
+.lcTopbarAction:hover {
+    border-color: var(--lc-border-strong);
+}
+
+.lcLoginMain {
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px 28px;
+    flex: 1;
+}
+
+.lcPanel {
+    width: 100%;
+    max-width: 420px;
+}
+
+.lcTitle {
+    margin: 0;
+    font-size: 26px;
+    line-height: 32px;
+    font-weight: 700;
+    color: #111827;
+    text-align: center;
+}
+
+.lcSubtitle {
+    margin: 8px 0 0;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--lc-muted);
+    text-align: center;
+}
+
+.lcProviders {
+    margin-top: 18px;
+    display: grid;
+    gap: 10px;
+}
+
+.lcProviderBtn {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border: 1px solid var(--lc-border);
+    background: #fff;
+    color: #111827;
+    height: 44px;
+    border-radius: var(--lc-radius);
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.lcProviderBtn:hover {
+    border-color: var(--lc-border-strong);
+}
+
+.lcProviderIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.lcSeparator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 18px 0;
+    color: var(--lc-muted);
+    font-size: 12px;
+}
+
+.lcSeparator::before,
+.lcSeparator::after {
+    content: "";
+    height: 1px;
+    background: rgba(17, 24, 39, 0.12);
+    flex: 1;
+}
+
+.lcForm {
+    display: grid;
+    gap: 12px;
+}
+
+.lcFieldLabelRow {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.lcLabel {
+    font-size: 12px;
+    color: rgba(17, 24, 39, 0.8);
+    font-weight: 600;
+}
+
+.lcLink {
+    font-size: 12px;
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.lcLink:hover {
+    text-decoration: underline;
+}
+
+.lcInput {
+    width: 100%;
+    height: 44px;
+    border-radius: var(--lc-radius);
+    border: 1px solid rgba(17, 24, 39, 0.14);
+    padding: 0 12px;
+    font-size: 14px;
+    outline: none;
+    background: #fff;
+}
+
+.lcInput:focus {
+    border-color: rgba(37, 99, 235, 0.5);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.lcPasswordWrap {
+    position: relative;
+}
+
+.lcPasswordToggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 0;
+    background: transparent;
+    padding: 6px;
+    color: rgba(17, 24, 39, 0.6);
+    cursor: pointer;
+}
+
+.lcPrimary {
+    width: 100%;
+    height: 44px;
+    border-radius: var(--lc-radius);
+    border: 1px solid rgba(17, 24, 39, 0.9);
+    background: #111827;
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.lcPrimary:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.lcBelow {
+    margin-top: 16px;
+    text-align: center;
+    color: rgba(17, 24, 39, 0.7);
+    font-size: 13px;
+}
+
+.lcFooter {
+    padding: 18px 16px 26px;
+    text-align: center;
+    color: rgba(17, 24, 39, 0.45);
+    font-size: 12px;
+}
+
+@media (max-width: 480px) {
+    .lcLoginTopbar {
+        padding: 14px 14px;
+    }
+
+    .lcBrandLogo {
+        width: 104px;
+    }
+
+    .lcLoginMain {
+        padding: 28px 14px 18px;
+    }
+}

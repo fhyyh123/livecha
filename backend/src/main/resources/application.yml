@@ -1,0 +1,85 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: chatlive-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:prod}
+  mail:
+    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          ssl:
+            trust: ${SPRING_MAIL_SSL_TRUST:smtp.gmail.com}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/chatlive}
+    username: ${SPRING_DATASOURCE_USERNAME:chatlive}
+    password: ${SPRING_DATASOURCE_PASSWORD:chatlive}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+app:
+  brand:
+    name: ${APP_BRAND_NAME:LiveCha}
+  onboarding:
+    # Base URL used to generate links in invite emails.
+    # Set this to your deployed frontend domain, e.g. https://my.example.com
+    frontend-base-url: ${APP_ONBOARDING_FRONTEND_BASE_URL:http://localhost:5173}
+    # If true, backend includes raw invite links in API responses (dev only).
+    dev-return-links: ${APP_ONBOARDING_DEV_RETURN_LINKS:false}
+  email:
+    # 生产环境建议开启；dev/test 默认关闭（只会 log，不会真的发）
+    enabled: ${APP_EMAIL_ENABLED:true}
+    # 发件人地址（不填则默认用 spring.mail.username）
+    from: ${APP_EMAIL_FROM:}
+  jwt:
+    secret: ${JWT_SECRET:dev-secret-change-me-please-32bytes-min}
+    access-ttl-seconds: ${JWT_ACCESS_TTL_SECONDS:7200}
+  assignment:
+    strategy: ${ASSIGNMENT_STRATEGY:round_robin}
+  conversation:
+    inactivity-archive:
+      enabled: ${APP_CONVERSATION_INACTIVITY_ARCHIVE_ENABLED:true}
+      # Close conversations if last_msg_at is older than this threshold.
+      minutes: ${APP_CONVERSATION_INACTIVITY_ARCHIVE_MINUTES:60}
+      # How frequently to scan.
+      scan-interval-ms: ${APP_CONVERSATION_INACTIVITY_ARCHIVE_SCAN_INTERVAL_MS:60000}
+      # Max conversations to archive per scan per tenant.
+      batch-size: ${APP_CONVERSATION_INACTIVITY_ARCHIVE_BATCH_SIZE:50}
+  widget:
+    # 用于“站点管理页生成 snippet”的对外地址（可指向 nginx/CDN 域名）
+    # 例如：https://cdn.example.com 或 https://app.example.com
+    public-script-base-url: ${WIDGET_PUBLIC_SCRIPT_BASE_URL:}
+    # iframe 访客页地址（通常是前端域名的 /visitor/embed）
+    public-embed-url: ${WIDGET_PUBLIC_EMBED_URL:http://localhost:5173/visitor/embed}
+  s3:
+    enabled: ${S3_ENABLED:false}
+    internal-endpoint: ${S3_INTERNAL_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${S3_PUBLIC_ENDPOINT:http://localhost:9000}
+    region: ${S3_REGION:us-east-1}
+    access-key: ${S3_ACCESS_KEY:minio}
+    secret-key: ${S3_SECRET_KEY:minio123456}
+    bucket: ${S3_BUCKET:chatlive}
+    path-style-access: ${S3_PATH_STYLE_ACCESS:true}
+    presign-ttl-seconds: ${S3_PRESIGN_TTL_SECONDS:600}
+    max-upload-bytes: ${S3_MAX_UPLOAD_BYTES:20971520}
+

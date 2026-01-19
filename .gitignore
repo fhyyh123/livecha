@@ -1,0 +1,59 @@
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- Secrets / env ----
+.env
+.env.*
+!.env.example
+!.env.prod.example
+
+# ---- Java / Maven / Spring ----
+**/target/
+**/*.log
+**/hs_err_pid*
+**/.classpath
+**/.project
+**/.settings/
+
+# Maven wrapper (keep the scripts/jar if you have them; ignore local state)
+**/.mvn/wrapper/maven-wrapper.properties
+**/.mvn/wrapper/maven-wrapper.jar
+**/.mvn/wrapper/MavenWrapperDownloader.java
+
+# ---- Node / Vite ----
+**/node_modules/
+**/dist/
+**/.vite/
+**/.turbo/
+**/.cache/
+**/.eslintcache
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+
+# ---- Large artifacts ----
+**/*.tar
+**/*.tar.gz
+**/*.tgz
+**/*.zip
+
+# ---- IDEs ----
+.idea/
+*.iml
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# ---- Git / misc ----
+*.swp
+*.swo
+
+# ---- Repo-specific ----
+backend/target/
+backend/.mvn/wrapper/
+

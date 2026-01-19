@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChatLive Widget Demo</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        background: #f8fafc;
+        color: #0f172a;
+      }
+      .wrap {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 32px 16px;
+      }
+      .card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.04);
+      }
+      code {
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        padding: 2px 6px;
+        border-radius: 8px;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+      input {
+        width: 320px;
+        max-width: 100%;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid #cbd5e1;
+        outline: none;
+      }
+      button {
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid #0f172a;
+        background: #0f172a;
+        color: #fff;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      button.secondary {
+        background: #fff;
+        color: #0f172a;
+      }
+      .hint {
+        margin-top: 12px;
+        color: #475569;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+      .ok {
+        color: #16a34a;
+        font-weight: 700;
+      }
+      .warn {
+        color: #b45309;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h1 style="margin: 0 0 6px">ChatLive Widget Demo</h1>
+        <div class="hint">
+          这是一个最小端到端演示页：当前页面加载后端托管的 <code>/chatlive/widget.js</code>，它会创建一个右下角按钮并注入 iframe，iframe 指向前端访客页
+          <code>/visitor/embed</code>。
+        </div>
+
+        <div class="row">
+          <input id="siteKey" placeholder="site_key" value="pk_demo_change_me" />
+          <input id="embedUrl" placeholder="embedUrl" value="http://localhost:5173/visitor/embed" />
+        </div>
+
+        <div class="row">
+          <button id="mount">挂载 Widget</button>
+          <button id="unmount" class="secondary">卸载</button>
+        </div>
+
+        <div class="row">
+          <button id="open" class="secondary">Open</button>
+          <button id="close" class="secondary">Close</button>
+          <button id="toggle" class="secondary">Toggle</button>
+          <input id="theme" type="color" value="#2563eb" title="theme color" style="width: 56px; padding: 6px" />
+          <button id="applyTheme" class="secondary">Set Theme</button>
+        </div>
+
+        <div class="hint">
+          <div>未读数：<span id="unread" class="warn">0</span></div>
+        </div>
+
+        <div class="hint">
+          <div><span class="ok">推荐</span>：用 HTTP server 打开本页（不要用 file://），这样 <code>origin</code> 能正确变成你的站点域名。</div>
+          <div style="margin-top: 6px">
+            例如：<code>cd docs && python3 -m http.server 4173</code> 然后打开
+            <code>http://localhost:4173/demo.html</code>
+          </div>
+          <div style="margin-top: 6px">
+            如果你的后端不在 8080 / 前端不在 5173，请按实际修改上面的 <code>embedUrl</code>。
+          </div>
+          <div style="margin-top: 6px">
+            注意：后端 allowlist 采用“精确 host”匹配；演示默认使用 localhost。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Prefer backend-served widget asset (same as admin snippet output). -->
+    <script src="http://localhost:8088/chatlive/widget.js"></script>
+    <script>
+      var unreadEl = document.getElementById('unread');
+
+      function mount() {
+        var siteKey = document.getElementById('siteKey').value.trim();
+        var embedUrl = document.getElementById('embedUrl').value.trim();
+
+        // For file:// fallback only; recommended to serve over http.
+        var origin = window.location.origin && window.location.origin !== 'null' ? null : 'http://localhost:4173';
+
+        ChatLiveWidget.init({
+          siteKey: siteKey,
+          embedUrl: embedUrl,
+          origin: origin,
+          autoHeight: true,
+          themeColor: document.getElementById('theme').value,
+        });
+
+        ChatLiveWidget.onUnread(function (e) {
+          if (!unreadEl) return;
+          unreadEl.textContent = String((e && e.unread) || 0);
+        });
+      }
+
+      function unmount() {
+        ChatLiveWidget.destroy();
+      }
+
+      document.getElementById('mount').addEventListener('click', mount);
+      document.getElementById('unmount').addEventListener('click', unmount);
+
+      document.getElementById('open').addEventListener('click', function () {
+        ChatLiveWidget.open();
+      });
+      document.getElementById('close').addEventListener('click', function () {
+        ChatLiveWidget.close();
+      });
+      document.getElementById('toggle').addEventListener('click', function () {
+        ChatLiveWidget.toggle();
+      });
+      document.getElementById('applyTheme').addEventListener('click', function () {
+        var c = document.getElementById('theme').value;
+        ChatLiveWidget.setTheme(c);
+      });
+
+      // Auto-mount for convenience.
+      mount();
+    </script>
+  </body>
+</html>

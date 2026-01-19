@@ -1,0 +1,679 @@
+{
+  "app": {
+    "name": "ChatLive",
+    "agentConsole": "坐席台"
+  },
+  "nav": {
+    "conversations": "会话",
+    "archives": "档案",
+    "sites": "站点",
+    "invites": "邀请",
+    "team": "团队",
+    "modeChats": "会话",
+    "modeArchives": "档案",
+    "modeTeam": "团队",
+    "modeInvites": "邀请",
+    "modeSettings": "设置",
+    "modeHome": "主页"
+  },
+  "settings": {
+    "menu": {
+      "chatSettings": "聊天设置",
+      "chatAssignment": "会话分配",
+      "transcriptForwarding": "聊天记录转发",
+      "fileSharing": "文件共享",
+      "inactivityTimeouts": "不活跃超时",
+      "security": "安全",
+      "trustedDomains": "受信任的域名",
+      "bannedCustomers": "禁止的访客",
+      "loginSettings": "登录设置",
+      "channels": "渠道",
+      "installOnlineChat": "安装在线聊天",
+      "helpdeskEmail": "帮助台发送的电子邮件",
+      "facebookMessenger": "Facebook Messenger",
+      "appleMessages": "苹果信息",
+      "chatPage": "聊天页面",
+      "widget": "网站小部件",
+      "customize": "定制",
+      "language": "语言",
+      "availability": "可用性",
+      "welcomeScreen": "欢迎屏幕"
+    }
+  },
+  "inactivityTimeouts": {
+      "title": "不活跃超时",
+      "hint": "配置会话何时显示“空闲”（仅看访客不发消息），以及会话何时会被系统自动归档（长时间无消息）。",
+      "adminOnlyHint": "仅管理员可设置",
+    "visitorIdleEnabled": {
+      "label": "启用空闲提示"
+    },
+      "visitorIdleMinutes": {
+        "label": "访客不发消息多久后显示空闲（分钟）",
+        "help": "只有访客消息会重置空闲计时，客服消息不会重置。"
+      },
+    "inactivityArchiveEnabled": {
+      "label": "启用自动归档"
+    },
+      "inactivityArchiveMinutes": {
+        "label": "多久无消息后自动归档（分钟）",
+        "help": "后端定时任务会按此阈值自动关闭会话。"
+      },
+      "common": {
+        "required": "必填"
+      }
+  },
+  "archives": {
+    "title": "档案",
+    "myArchives": "档案（{{count}}）"
+  },
+  "common": {
+    "refresh": "刷新",
+    "open": "打开",
+    "loading": "加载中",
+    "loadAgain": "再次加载",
+    "backToLogin": "返回登录",
+    "submit": "提交",
+    "cancel": "取消",
+    "retry": "重试",
+    "download": "下载",
+    "back": "返回",
+    "save": "保存",
+    "apply": "应用",
+    "reset": "重置",
+    "add": "添加",
+    "delete": "删除",
+    "language": "语言",
+    "english": "English",
+    "chinese": "中文"
+    ,
+    "loadFailed": "加载失败",
+    "saveFailed": "保存失败",
+    "saved": "已保存"
+  },
+  "profile": {
+    "title": "个人资料",
+    "owner": "拥有者",
+    "agent": "坐席",
+    "changeAvatar": "更换头像",
+    "noJobTitle": "—",
+    "details": "详情",
+    "fullName": "姓名",
+    "fullNamePlaceholder": "输入姓名",
+    "email": "邮箱",
+    "changePassword": "修改密码",
+    "jobTitle": "职位",
+    "jobTitlePlaceholder": "输入职位",
+    "chatLimit": "并发上限",
+    "chatLimitHint": "3 对新手最合适",
+    "assignToGroups": "分配到分组",
+    "assignToGroupsPlaceholder": "输入分组",
+    "findGroup": "查找分组",
+    "findGroupBuiltIn": "请使用左侧搜索",
+    "memberOfGroups": "加入 {{count}} 个分组",
+    "noGroups": "暂无分组"
+  },
+  "auth": {
+    "username": "用户名",
+    "password": "密码",
+    "email": "邮箱"
+  },
+  "login": {
+    "brandAria": "LiveCha",
+    "signupFree": "免费注册",
+    "welcomeBack": "欢迎回来",
+    "subtitle": "登录你的账号",
+    "google": "使用 Google 登录",
+    "microsoft": "使用 Microsoft 登录",
+    "apple": "使用 Apple 登录",
+    "or": "或",
+    "businessEmail": "工作邮箱",
+    "emailPlaceholder": "name@work-email.com",
+    "password": "密码",
+    "passwordPlaceholder": "12 个字符或以上",
+    "forgotPassword": "忘记密码？",
+    "loginWithEmail": "使用邮箱登录",
+    "loggingIn": "登录中...",
+    "noAccountLine": "没有账号？",
+    "signUp": "去注册",
+    "customSso": "使用自定义 SSO 登录",
+    "poweredBy": "powered by Master-Lee|",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码"
+  },
+  "signup": {
+    "password": "密码",
+    "logIn": "登录",
+    "getStarted": "免费开始使用",
+    "noCreditCard": "无需信用卡",
+    "google": "使用 Google 注册",
+    "microsoft": "使用 Microsoft 注册",
+    "apple": "使用 Apple 注册",
+    "or": "或",
+    "businessEmail": "工作邮箱",
+    "emailPlaceholder": "name@work-email.com",
+    "signUpWithEmail": "使用邮箱注册",
+    "passwordPlaceholder": "设置密码",
+    "passwordInvalid": "请满足以上密码规则。",
+    "reqMin12": "至少 12 位",
+    "reqUpper": "包含大写字母",
+    "reqNumber": "包含数字",
+    "reqSpecial": "包含特殊字符",
+    "mobilePhone": "手机号码",
+    "country": "国家/地区",
+    "phonePlaceholder": "012-345 6789",
+    "phoneRequired": "请输入手机号码",
+    "phoneInvalid": "请输入有效的手机号码",
+    "createAccount": "创建账号",
+    "creating": "创建中...",
+    "alreadyHave": "已有账号？",
+    "termsPrefix": "继续即表示你同意",
+    "terms": "服务条款",
+    "and": "和",
+    "privacy": "隐私政策"
+  },
+  "verifyEmailCode": {
+    "title": "请查收邮箱",
+    "subtitle": "我们已向你的邮箱发送 6 位验证码。",
+    "subtitleWithEmail": "我们已向 {{email}} 发送 6 位验证码。",
+    "codeAria": "邮箱验证码（6 位）",
+    "missingAuth": "请先登录（或完成注册）后再输入验证码。",
+    "verify": "验证",
+    "verifying": "验证中...",
+    "resend": "重新发送验证码",
+    "openInbox": "打开邮箱",
+    "verified": "验证成功，正在跳转..."
+  },
+  "welcome": {
+    "progressAria": "引导步骤 {{step}} / {{total}}",
+    "continue": "继续",
+    "back": "返回",
+    "skip": "跳过",
+    "refresh": "刷新",
+    "name": {
+      "title": "你好，你叫什么名字？",
+      "subtitle": "客户和你的团队会看到这个名字。",
+      "placeholder": "你的名字"
+    },
+    "website": {
+      "title": "个性化你的体验",
+      "subtitle": "我们会基于你的网站公开内容创建一个 chatbot。",
+      "placeholder": "your-website.com"
+    },
+    "installation": {
+      "title": "现在就把 LiveCha 用在你的网站上",
+      "subtitle": "把代码粘贴到每个页面的 </body> 之前。",
+      "missingSite": "缺少站点信息，请先完成网站步骤。",
+      "codeTitle": "手动添加代码",
+      "installed": "已安装（近期有上报）",
+      "notInstalled": "尚未验证安装：请添加 snippet 并访问你的网站。",
+      "lastPage": "最近页面：{{page}}"
+    },
+    "integrations": {
+      "title": "你还想通过哪些渠道连接客户？",
+      "subtitle": "选择你希望使用的渠道。",
+      "options": {
+        "messenger": "Messenger",
+        "whatsapp": "WhatsApp",
+        "sms": "短信",
+        "telegram": "Telegram"
+      }
+    },
+    "companySize": {
+      "title": "你的公司规模是？",
+      "subtitle": "我们会根据规模为你定制体验。",
+      "justMe": "只有我"
+    },
+    "team": {
+      "title": "邀请你的团队",
+      "subtitle": "让团队一起提供更好的服务。",
+      "hint": "输入团队邮箱（可选）",
+      "placeholder": "例如：team.member@gmail.com",
+      "send": "发送邀请",
+      "finish": "完成",
+      "sent": "已发送邀请：{{count}}"
+    }
+  },
+  "acceptInvite": {
+    "title": "接受邀请",
+    "missingToken": "缺少 token 参数",
+    "setPassword": "设置登录密码",
+    "passwordMin": "至少 12 位",
+    "passwordInvalid": "请满足密码强度要求。",
+    "action": "完成并登录"
+  },
+  "invites": {
+    "title": "坐席邀请",
+    "email": "邮箱",
+    "role": "角色",
+    "send": "发送邀请",
+    "created": "已创建邀请：{{email}} ({{role}})",
+    "devAcceptLink": "开发模式：接受邀请链接",
+    "modal": {
+      "title": "邀请成员加入 ChatLive",
+      "emailAddresses": "邮箱",
+      "role": "角色",
+      "emailPlaceholder": "例如：agent@company.com",
+      "invalidEmail": "邮箱格式不正确",
+      "copyInviteLink": "复制邀请链接",
+      "sendInvites": "发送邀请",
+      "noEmailsTitle": "没有可发送的邀请",
+      "noEmailsDesc": "请至少输入一个邮箱。",
+      "sentTitle": "已发送",
+      "sentDesc": "已发送邀请：{{count}}",
+      "created": "已创建邀请",
+      "acceptLink": "接受链接",
+      "copyUnavailableTitle": "暂无可复制的链接",
+      "copyUnavailableDesc": "请先发送邀请（开发模式会返回接受链接）。",
+      "copiedTitle": "已复制",
+      "copyFailedTitle": "复制失败"
+    }
+  },
+  "conversations": {
+    "title": "会话",
+    "skeletonHint": "这是坐席台骨架页：下一步可以在这里接入 WS、消息列表与输入框。",
+    "visitor": "访客：{{name}} {{email}}"
+  },
+  "onboarding": {
+    "siteWizard": {
+      "title": "创建第一个站点（向导）",
+      "emailNotVerifiedWarning": "邮箱未验证：建议先完成验证（开发模式看后端日志的 email_out）。",
+      "siteCreatedSuccess": "站点创建成功",
+      "nextStep": "下一步：把下面 snippet 放到你的网站里，然后去「站点管理」继续配置。",
+      "openSites": "打开站点管理",
+      "goAgentConsole": "去坐席台",
+      "form": {
+        "siteName": {
+          "label": "站点名称",
+          "placeholder": "例如：官网"
+        },
+        "allowlistDomain": {
+          "label": "允许嵌入域名（可选，host）",
+          "placeholder": "例如：example.com 或 localhost"
+        },
+        "themeColor": {
+          "label": "主题色（可选）",
+          "placeholder": "#2563eb"
+        },
+        "welcomeText": {
+          "label": "欢迎语（可选）",
+          "placeholder": "你好！有什么可以帮你？"
+        },
+        "submit": "创建站点"
+      }
+    }
+  },
+  "team": {
+    "title": "团队",
+    "subtitle": "管理坐席与客服组",
+    "adminOnlyHint": "仅管理员可操作",
+    "tabs": {
+      "agents": "坐席",
+      "groups": "客服组"
+    },
+    "searchAgent": "搜索坐席...",
+    "you": "我",
+    "columns": {
+      "name": "姓名",
+      "role": "角色",
+      "status": "状态"
+    },
+    "role": {
+      "owner": "Owner",
+      "agent": "Agent"
+    },
+    "status": {
+      "online": "在线",
+      "away": "不接受聊天",
+      "offline": "离线",
+      "busy": "忙碌"
+    },
+    "chatLimitShort": "上限：{{n}}",
+    "canAccept": "可接入：{{v}}",
+    "yes": "是",
+    "no": "否",
+    "details": "详情",
+    "comingSoon": "敬请期待",
+    "sections": {
+      "groups": "客服组",
+      "workingHours": "工作时间",
+      "performance": "绩效"
+    },
+    "fields": {
+      "userId": "用户ID",
+      "status": "状态",
+      "chatLimit": "并发上限"
+    },
+    "chatLimitModalTitle": "聊天上限",
+    "concurrentChats": "并发聊天",
+    "acceptingChats": "接受聊天",
+    "notAcceptingChats": "不接受聊天",
+    "logOut": "退出登录",
+    "actions": {
+      "editProfile": "编辑资料",
+      "changeChatLimit": "修改聊天上限",
+      "viewAgentReports": "查看坐席报表"
+    },
+    "maxConcurrent": "最大并发",
+    "capacity": "进行中：{{active}}，剩余：{{remaining}}",
+    "groupStatusShort": "{{accepting}}/{{total}} 接受聊天",
+    "otherAgentHint": "只能修改自己的接入状态与并发上限。",
+    "noAgents": "暂无坐席",
+    "addNewAgent": "添加新坐席",
+
+    "groupsTitle": "客服组",
+    "selectGroup": "请选择一个客服组",
+    "membersHint": "在抽屉中管理组成员。",
+    "createGroup": "创建客服组",
+    "manageMembers": "成员",
+    "enabled": "启用",
+    "disabled": "禁用",
+    "groupName": "组名",
+    "groupNameRequired": "请输入组名",
+    "groupNamePlaceholder": "例如：售前",
+    "groupEnabled": "启用",
+    "membersTitle": "成员 — {{name}}",
+    "members": "成员",
+    "addMember": "添加成员",
+    "selectAgent": "选择坐席",
+    "weight": "权重",
+
+    "loadFailedTitle": "加载团队数据失败",
+    "updateFailedTitle": "更新失败",
+    "membersLoadFailedTitle": "加载成员失败",
+    "memberUpdateFailedTitle": "更新成员失败",
+    "memberRemoveFailedTitle": "移除成员失败",
+    "createGroupFailedTitle": "创建客服组失败"
+  },
+  "workbench": {
+    "agent": "客服",
+    "customer": "客户",
+    "newMessage": "新消息",
+    "newMessageOne": "条新消息",
+    "newMessageMany": "条新消息",
+    "from": "来自：{{who}}",
+    "view": "视图",
+    "chats": "聊天",
+    "myChats": "我的会话（{{count}}）",
+    "sort": {
+      "newest": "最新",
+      "oldest": "最早"
+    },
+    "searchConversations": "搜索会话...",
+    "showingLast": "显示最近 {{shown}} / {{total}}",
+    "showEarlier": "显示更早",
+    "loadOlder": "加载更早",
+    "status": {
+      "assigned": "已指派",
+      "queued": "排队",
+      "open": "打开",
+      "closed": "已关闭"
+    },
+    "starredOnly": "只看星标",
+    "unread": "未读 {{count}}",
+    "aria": {
+      "star": "设为星标",
+      "unstar": "取消星标"
+    },
+    "selectConversation": "请选择一个会话",
+    "peerTyping": "对方正在输入...",
+    "peerRead": "对方已读",
+    "readReceipt": "已读",
+    "closed": "已关闭",
+    "starred": "已星标",
+    "star": "星标",
+    "unstar": "取消星标",
+    "httpFetch": "HTTP 拉取",
+    "claim": "认领",
+    "claimFailedTitle": "接入失败",
+    "claimFailedDetail": "该会话可能已被其他坐席接入，请稍后刷新再试。",
+    "reopen": "重开",
+    "close": "结束",
+    "quickReplies": "快捷回复",
+    "readUpToHere": "对方已读到这里",
+    "system": {
+      "started": "开始",
+      "idle": "空闲 - {{minutes}} 分钟未活动",
+      "archived": "已归档",
+      "archivedInactivity": "已归档 - {{minutes}} 分钟未活动",
+      "reopened": "已重开",
+      "assigned": "已指派给 {{to}}",
+      "assignedGeneric": "已指派",
+      "claimed": "{{by}} 已接入",
+      "claimedGeneric": "已接入",
+      "transferred": "已转接：{{from}} → {{to}}",
+      "transferredTo": "已转接给 {{to}}",
+      "transferredGeneric": "已转接",
+      "generic": "系统事件：{{key}}"
+    },
+    "messagePlaceholder": "输入消息...",
+    "send": "发送",
+    "sendAttachment": "发附件",
+    "composer": {
+      "mode": {
+        "message": "消息",
+        "private": "私有",
+        "system": "系统"
+      },
+      "shiftEnterHint": "Shift+Enter 换行",
+      "emoji": "表情",
+      "notSupported": "该消息类型暂未接入（当前仅做 UI 预留）",
+      "notSupportedPlaceholder": "该类型暂未接入，先切回「消息」发送..."
+    },
+    "userInfo": "用户信息",
+    "tabs": {
+      "profile": "资料",
+      "details": "详情",
+      "copilot": "Copilot"
+    },
+    "copilotComingSoon": "Copilot 面板（敬请期待）",
+    "copilotHint": "后续将为 {{id}} 提供建议回复、摘要与可执行动作。",
+    "noConversationSelected": "未选择会话",
+    "conversationId": "会话ID：",
+    "technicalInfo": "技术信息",
+    "statusLabel": "状态：{{status}}",
+    "channelLabel": "渠道：{{channel}}",
+    "assignedLabel": "指派：{{assigned}}",
+    "transferAssign": "转接/指派",
+    "transferTo": "转接给...",
+    "selectAgent": "选择坐席...",
+    "visitor": "访客",
+    "visitorName": "姓名：{{name}}",
+    "visitorEmail": "邮箱：{{email}}",
+    "customerUsername": "用户名：{{username}}",
+    "customerId": "用户ID：",
+    "customerPhone": "手机：{{phone}}",
+    "customerEmail": "邮箱：{{email}}",
+    "noVisitorProfile": "暂无访客资料",
+    "tags": "标签",
+    "addTags": "添加标签",
+    "note": "备注（仅自己可见）",
+    "notePlaceholder": "记录要点、上下文...",
+    "create": "新建",
+    "searchQuickReplies": "搜索快捷回复...",
+    "insert": "插入",
+    "createQuickReply": "新建快捷回复",
+    "titlePlaceholder": "标题",
+    "contentPlaceholder": "内容"
+  },
+  "sites": {
+    "title": "安装在线聊天",
+    "subtitle": "把一段代码粘贴到你的网站，几分钟完成安装。",
+    "adminOnlyHint": "仅管理员可操作",
+    "selectSite": "站点",
+    "selectSitePlaceholder": "选择一个 site",
+    "manualInstall": {
+      "title": "手动安装（推荐）",
+      "desc": "复制下面代码并粘贴到你网站的"
+    },
+    "copyCode": "复制代码",
+    "copied": "已复制到剪贴板",
+    "copyFailed": "复制失败",
+    "copyFailedDesc": "请手动复制上方代码块。",
+    "verifyHint": "安装后访问你的网站，系统会通过以下路径上报最后一次加载信息：",
+    "statusCard": {
+      "title": "安装状态",
+      "refresh": "刷新",
+      "installed": "已安装",
+      "notInstalled": "未验证",
+      "lastSeenAt": "最后上报时间：",
+      "origin": "来源：",
+      "page": "页面："
+    },
+    "advanced": {
+      "title": "高级选项",
+      "scriptUrls": "脚本地址",
+      "scriptRecommended": "版本化脚本（推荐）：",
+      "scriptStable": "稳定脚本：",
+      "embedUrl": "Embed URL：",
+      "spaInstall": "SPA/NPM 安装",
+      "spaHint": "适用于 React/Vue/Next/Vite 等前端项目：把下面代码放到你的入口处（确保只执行一次）。",
+      "copySpa": "复制 SPA 代码"
+    },
+    "help": {
+      "title": "需要帮助？",
+      "trustedDomains": "配置受信任的域名",
+      "widgetCustomize": "定制 Widget 外观"
+    },
+    "spaSnippet": {
+      "comment1": "React/Vue/任意 SPA：在页面初始化时动态加载 ChatLive widget 脚本",
+      "comment2": "注意：建议只加载一次（例如放在 App 根组件 useEffect 或路由入口）。"
+    }
+  },
+  "widgetCustomize": {
+    "title": "网站小部件定制",
+    "adminOnlyHint": "仅管理员可操作",
+    "selectSite": "站点",
+    "selectSitePlaceholder": "选择一个 site",
+    "widgetConfig": {
+      "title": "Widget 配置（站点级）",
+      "hint": "这里的配置会影响访客端行为。",
+      "allowAnonymous": {
+        "label": "允许匿名",
+        "tooltip": "关闭后，访客创建会话前必须提供 name 或 email"
+      },
+      "themeColor": {
+        "label": "主题色（可选）",
+        "tooltip": "示例：#2563eb。会同步到按钮与 iframe 内页。",
+        "placeholder": "#2563eb"
+      },
+      "welcomeText": {
+        "label": "欢迎语（可选）",
+        "placeholder": "你好！有什么可以帮你？"
+      }
+    },
+    "cookieStrategy": {
+      "title": "visitor_id Cookie 策略（可选）",
+      "hint": "用于跨子域持久化 visitor_id。若要跨子域，请填写 cookie_domain（例如 .example.com）。"
+    },
+    "cookieDomain": {
+      "label": "cookie_domain（可选）",
+      "tooltip": "例如 .example.com；留空则不设置 Domain。",
+      "placeholder": ".example.com"
+    },
+    "cookieSameSite": {
+      "label": "cookie_samesite（可选）",
+      "tooltip": "默认 Lax。跨站第三方嵌入通常需要 None + https。",
+      "placeholder": "Lax / Strict / None"
+    }
+  },
+  "trustedDomains": {
+    "title": "受信任的域名",
+    "subtitle": "通过创建受信任域名列表，防止小部件被未授权的网站加载。",
+    "adminOnlyHint": "仅管理员可操作",
+    "selectSite": "站点",
+    "selectSitePlaceholder": "选择一个 site",
+    "manageTitle": "管理域名",
+    "tabs": {
+      "trusted": "已受信任 ({{count}})",
+      "detected": "已检测到 ({{count}})"
+    },
+    "trusted": {
+      "description": "你的代码只会在下列域名上工作。",
+      "inputPlaceholder": "yourdomain.com",
+      "addToTrusted": "添加到受信任",
+      "table": {
+        "domain": "域名",
+        "addedBy": "添加者",
+        "date": "日期"
+      }
+    },
+    "detected": {
+      "lastSeen": "最近上报：{{time}}",
+      "noRecentActivity": "暂无近期安装活动。",
+      "addToTrusted": "添加到受信任",
+      "source": {
+        "origin": "Origin",
+        "pageUrl": "Page URL"
+      },
+      "table": {
+        "domain": "域名",
+        "source": "来源",
+        "date": "日期"
+      }
+    }
+  },
+  "conversationChat": {
+    "title": "会话",
+    "ws": "WS",
+    "wsStatus": {
+      "connected": "已连接",
+      "disconnected": "已断开"
+    },
+    "httpFetch": "HTTP 拉取",
+    "messagePlaceholder": "输入消息...",
+    "send": "发送",
+    "sendAttachment": "发附件"
+  },
+  "visitorEmbed": {
+    "missingSiteKey": "缺少参数 site_key",
+    "missingSiteKeyDetail": "请检查 iframe URL 是否包含 ?site_key=...",
+    "identityRequiredTitle": "需要身份信息",
+    "identityRequiredDetail": "该站点关闭匿名，请提供 name 或 email 至少一个。",
+    "originNotAllowedTitle": "来源域名不允许",
+    "originNotAllowedDetail": "请联系站点管理员把当前域名加入 allowlist。",
+    "invalidResponseTitle": "服务响应异常",
+    "invalidResponseDetail": "服务返回格式不符合预期。",
+    "requestFailed": "请求失败",
+    "bootstrapFailed": "初始化失败",
+    "createFailed": "创建会话失败",
+    "sendFailed": "发送失败",
+    "loadFailed": "加载失败",
+    "minimize": "最小化",
+    "minimizeAria": "最小化聊天窗口",
+    "backAria": "返回",
+    "retry": "重试",
+    "nameOptional": "name（可选）",
+    "emailOptional": "email（可选）",
+    "startConversation": "开始对话",
+    "leaveContactTitle": "留下联系方式（可选）",
+    "leaveContactOk": "提交并关闭",
+    "leaveContactCancel": "跳过并关闭",
+    "leaveContactHint": "方便我们在你离开页面后继续跟进（至少填写 name 或 email 之一）。",
+    "identityError": "请至少填写 name 或 email（也可以选择跳过）。",
+    "conversationLabel": "会话：{{id}}",
+    "recovered": "（已恢复）",
+    "created": "（新建）",
+    "noMessages": "暂无消息",
+    "headerTitle": "在线客服",
+    "wsStatus": {
+      "connected": "已连接",
+      "connecting": "连接中",
+      "offline": "离线"
+    },
+    "unread": "· {{count}} 未读",
+    "typing": "· 对方正在输入…",
+    "unsupportedContent": "[不支持的内容：{{type}}]",
+    "attach": {
+      "addFile": "添加文件",
+      "add": "添加",
+      "uploadFile": "上传文件",
+      "sendScreenshot": "发送截图",
+      "emoji": "表情"
+    },
+    "composer": {
+      "placeholder": "输入消息...",
+      "send": "发送",
+      "enterContentHint": "请输入内容"
+    }
+  }
+}

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChatLive Snippet Demo</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        background: #f8fafc;
+        color: #0f172a;
+      }
+      .card {
+        max-width: 860px;
+        margin: 0 auto;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 18px;
+      }
+      code {
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        padding: 2px 6px;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1 style="margin: 0 0 8px">ChatLive 最小生产 Snippet 演示</h1>
+      <div style="line-height: 1.6; color: #334155">
+        本页只用<strong>一行</strong> <code>&lt;script&gt;</code> 即可挂载 widget（右下角）。
+        <div style="margin-top: 8px">
+          你可以在浏览器控制台查看：<code>window.ChatLiveWidget</code>
+        </div>
+      </div>
+    </div>
+
+    <!-- One-line production snippet demo (page served from docs/ via http.server; widget script served by backend via :8088) -->
+    <script
+      defer
+      src="http://localhost:8088/chatlive/widget.js"
+      data-chatlive-site-key="pk_demo_change_me"
+      data-chatlive-embed-url="http://localhost:5173/visitor/embed"
+      data-chatlive-auto-height="true"
+      data-chatlive-theme-color="#2563eb"
+      data-chatlive-cookie-samesite="Lax"
+    ></script>
+  </body>
+</html>

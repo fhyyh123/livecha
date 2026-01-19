@@ -1,0 +1,109 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-chatlive}
+      POSTGRES_USER: ${POSTGRES_USER:-chatlive}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6380}:6379"
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me}
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    volumes:
+      - ./minio/cors.json:/cors.json:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
+      mc mb -p local/$$S3_BUCKET || true &&
+      mc cors set local/$$S3_BUCKET /cors.json || true
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me}
+      S3_BUCKET: ${S3_BUCKET:-chatlive}
+
+  app:
+    image: chatlive-backend:${CHATLIVE_BACKEND_IMAGE_TAG:-prod-20260115-175753}
+    pull_policy: never
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-chatlive}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-chatlive}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+
+      # Email (SMTP) - used for verification emails & invites
+      APP_EMAIL_ENABLED: "${APP_EMAIL_ENABLED:-false}"
+      APP_EMAIL_FROM: ${APP_EMAIL_FROM:-}
+      APP_BRAND_NAME: ${APP_BRAND_NAME:-LiveCha}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp.gmail.com}
+      SPRING_MAIL_PORT: "${SPRING_MAIL_PORT:-587}"
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      SPRING_MAIL_SSL_TRUST: ${SPRING_MAIL_SSL_TRUST:-smtp.gmail.com}
+
+      # MUST CHANGE in production (>= 32 bytes)
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-please-32bytes-min}
+
+      # Snippet generation + iframe embed URL (set to your public domain)
+      WIDGET_PUBLIC_SCRIPT_BASE_URL: ${WIDGET_PUBLIC_SCRIPT_BASE_URL:-}
+      WIDGET_PUBLIC_EMBED_URL: ${WIDGET_PUBLIC_EMBED_URL:-https://app.example.com/visitor/embed}
+
+      # Onboarding links in emails (accept-invite)
+      APP_ONBOARDING_FRONTEND_BASE_URL: ${APP_ONBOARDING_FRONTEND_BASE_URL:-}
+      APP_ONBOARDING_DEV_RETURN_LINKS: "${APP_ONBOARDING_DEV_RETURN_LINKS:-false}"
+
+      # Attachments (MinIO / S3)
+      S3_ENABLED: "${S3_ENABLED:-true}"
+      S3_INTERNAL_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-http://minio:9000}
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-https://s3.example.com}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minio}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-change-me}
+      S3_BUCKET: ${S3_BUCKET:-chatlive}
+      S3_PATH_STYLE_ACCESS: "${S3_PATH_STYLE_ACCESS:-true}"
+      S3_PRESIGN_TTL_SECONDS: "${S3_PRESIGN_TTL_SECONDS:-600}"
+      S3_MAX_UPLOAD_BYTES: "${S3_MAX_UPLOAD_BYTES:-20971520}"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  minio_data:

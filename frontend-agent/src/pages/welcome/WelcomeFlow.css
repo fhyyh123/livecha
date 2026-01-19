@@ -1,0 +1,99 @@
+.lcWelcome {
+  min-height: 100vh;
+  background: #fff;
+}
+
+.lcWelcomeInner {
+  max-width: 980px;
+  margin: 0 auto;
+  /* LiveChat-like spacing: keep content a bit lower on the page.
+     Use a responsive top padding so small screens don't get cramped. */
+  padding: clamp(96px, 30vh, 300px) 16px 72px;
+}
+
+.lcWelcomeTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.lcWelcomeDots {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.lcWelcomeDot {
+  width: 26px;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 999px;
+}
+
+.lcWelcomeDotActive {
+  background: #111827;
+}
+
+.lcWelcomeStepText {
+  margin-left: 8px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.lcWelcomeTitle {
+  font-size: 44px;
+  line-height: 1.06;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.02em;
+  color: #111827;
+}
+
+.lcWelcomeSubtitle {
+  margin-top: 8px;
+  margin-bottom: 22px;
+  color: #6b7280;
+  font-size: 15px;
+}
+
+.lcWelcomeCard {
+  max-width: 720px;
+}
+
+.lcWelcomeInput {
+  height: 52px;
+  font-size: 16px;
+}
+
+.lcWelcomePrimary {
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 10px;
+}
+
+.lcWelcomeLinkRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.lcWelcomeLinkBtn {
+  border: none;
+  background: transparent;
+  color: #111827;
+  cursor: pointer;
+  padding: 6px 8px;
+}
+
+.lcWelcomeLinkBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.lcWelcomeCode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.45;
+}

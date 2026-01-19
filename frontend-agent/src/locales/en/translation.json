@@ -1,0 +1,682 @@
+{
+  "app": {
+    "name": "ChatLive",
+    "agentConsole": "Agent Console"
+  },
+  "nav": {
+    "conversations": "Conversations",
+    "archives": "Archives",
+    "sites": "Sites",
+    "invites": "Invites",
+    "team": "Team",
+    "modeChats": "Chats",
+    "modeArchives": "Archives",
+    "modeTeam": "Team",
+    "modeInvites": "Invites",
+    "modeSettings": "Settings",
+    "modeHome": "Home"
+  },
+  "settings": {
+    "menu": {
+      "chatSettings": "Chat settings",
+      "chatAssignment": "Chat assignment",
+      "transcriptForwarding": "Transcript forwarding",
+      "fileSharing": "File sharing",
+      "inactivityTimeouts": "Inactivity timeouts",
+      "security": "Security",
+      "trustedDomains": "Trusted domains",
+      "bannedCustomers": "Banned customers",
+      "loginSettings": "Login settings",
+      "channels": "Channels",
+      "installOnlineChat": "Install online chat",
+      "helpdeskEmail": "Help desk emails",
+      "facebookMessenger": "Facebook Messenger",
+      "appleMessages": "Apple Messages",
+      "chatPage": "Chat page",
+      "widget": "Website widget",
+      "customize": "Customize",
+      "language": "Language",
+      "availability": "Availability",
+      "welcomeScreen": "Welcome screen"
+    }
+  },
+  "inactivityTimeouts": {
+    "title": "Inactivity timeouts",
+    "hint": "Configure when a chat is considered idle (visitor inactivity) and when chats are automatically archived (long inactivity).",
+    "adminOnlyHint": "Admin only",
+    "visitorIdleEnabled": {
+      "label": "Enable idle marker"
+    },
+    "visitorIdleMinutes": {
+      "label": "Show idle marker after (minutes)",
+      "help": "Only visitor messages reset this timer."
+    },
+    "inactivityArchiveEnabled": {
+      "label": "Enable auto-archive"
+    },
+    "inactivityArchiveMinutes": {
+      "label": "Auto-archive after (minutes)",
+      "help": "Backend scheduler uses this to close chats after long inactivity."
+    },
+    "common": {
+      "required": "Required"
+    }
+  },
+  "archives": {
+    "title": "Archives",
+    "myArchives": "Archives ({{count}})"
+  },
+  "common": {
+    "refresh": "Refresh",
+    "open": "Open",
+    "loading": "Loading",
+    "loadAgain": "Load again",
+    "backToLogin": "Back to login",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "download": "Download",
+    "back": "Back",
+    "save": "Save",
+    "apply": "Apply",
+    "reset": "Reset",
+    "add": "Add",
+    "delete": "Delete",
+    "language": "Language",
+    "english": "English",
+    "chinese": "Chinese"
+    ,
+    "loadFailed": "Load failed",
+    "saveFailed": "Save failed",
+    "saved": "Saved"
+  },
+  "profile": {
+    "title": "Profile",
+    "owner": "Owner",
+    "agent": "Agent",
+    "changeAvatar": "Change avatar",
+    "noJobTitle": "—",
+    "details": "Details",
+    "fullName": "Full name",
+    "fullNamePlaceholder": "Your name",
+    "email": "Email",
+    "changePassword": "Change password",
+    "jobTitle": "Job title",
+    "jobTitlePlaceholder": "Job title",
+    "chatLimit": "Chat limit",
+    "chatLimitHint": "3 is optimal for rookies",
+    "assignToGroups": "Assign to groups",
+    "assignToGroupsPlaceholder": "Enter groups",
+    "findGroup": "Find group",
+    "findGroupBuiltIn": "Use the left search",
+    "memberOfGroups": "Member of {{count}} group",
+    "memberOfGroups_plural": "Member of {{count}} groups",
+    "noGroups": "No groups"
+  },
+  "auth": {
+    "username": "Username",
+    "password": "Password",
+    "email": "Email"
+  },
+  "login": {
+    "brandAria": "LiveCha",
+    "signupFree": "Sign up free",
+    "welcomeBack": "Welcome back",
+    "subtitle": "Log in to your account",
+    "google": "Log in with Google",
+    "microsoft": "Log in with Microsoft",
+    "apple": "Log in with Apple",
+    "or": "or",
+    "businessEmail": "Business email",
+    "emailPlaceholder": "name@work-email.com",
+    "password": "Password",
+    "passwordPlaceholder": "12 characters or more",
+    "forgotPassword": "Forgot password?",
+    "loginWithEmail": "Log in with email",
+    "loggingIn": "Logging in...",
+    "noAccountLine": "Don't have an account?",
+    "signUp": "Sign up",
+    "customSso": "Log in with custom SSO",
+    "poweredBy": "powered by Master-Lee|",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
+  },
+  "signup": {
+    "password": "Password",
+    "logIn": "Log in",
+    "getStarted": "Get started for free",
+    "noCreditCard": "No credit card needed",
+    "google": "Sign up with Google",
+    "microsoft": "Sign up with Microsoft",
+    "apple": "Sign up with Apple",
+    "or": "or",
+    "businessEmail": "Business email",
+    "emailPlaceholder": "name@work-email.com",
+    "signUpWithEmail": "Sign up with email",
+    "passwordPlaceholder": "Set your password",
+    "passwordInvalid": "Please meet all password requirements.",
+    "reqMin12": "At least 12 characters",
+    "reqUpper": "Uppercase letter",
+    "reqNumber": "Number",
+    "reqSpecial": "Special character",
+    "mobilePhone": "Mobile phone number",
+    "country": "Country",
+    "phonePlaceholder": "012-345 6789",
+    "phoneRequired": "Phone number is required",
+    "phoneInvalid": "Please enter a valid phone number",
+    "createAccount": "Create an account",
+    "creating": "Creating...",
+    "alreadyHave": "Already have an account?",
+    "termsPrefix": "You agree to our",
+    "terms": "Terms of Use",
+    "and": "and",
+    "privacy": "Privacy Policy"
+  },
+  "verifyEmailCode": {
+    "title": "Check your email",
+    "subtitle": "We sent a 6-digit verification code to your email.",
+    "subtitleWithEmail": "We sent a 6-digit verification code to {{email}}.",
+    "codeAria": "6-digit email verification code",
+    "missingAuth": "Please log in (or finish signup) before entering the code.",
+    "verify": "Verify",
+    "verifying": "Verifying...",
+    "resend": "Resend code",
+    "openInbox": "Open inbox",
+    "verified": "Verified. Redirecting..."
+  },
+  "welcome": {
+    "progressAria": "Welcome step {{step}} of {{total}}",
+    "continue": "Continue",
+    "back": "Back",
+    "skip": "Skip",
+    "refresh": "Refresh",
+    "name": {
+      "title": "Hi, what’s your name?",
+      "subtitle": "This is how customers and your team will see you.",
+      "placeholder": "Your name"
+    },
+    "website": {
+      "title": "Personalize your experience",
+      "subtitle": "We’ll create a chatbot based on your website’s public content.",
+      "placeholder": "your-website.com"
+    },
+    "installation": {
+      "title": "Start using LiveCha on your website now",
+      "subtitle": "Add the code before the </body> tag on every page.",
+      "missingSite": "Missing site. Please complete the website step first.",
+      "codeTitle": "Add the code manually",
+      "installed": "Installed (recent reports)",
+      "notInstalled": "Not verified yet. Add the snippet and visit your website.",
+      "lastPage": "Last page: {{page}}"
+    },
+    "integrations": {
+      "title": "How else would you like to connect with your customers?",
+      "subtitle": "Select the channels you’d like to use.",
+      "options": {
+        "messenger": "Messenger",
+        "whatsapp": "WhatsApp",
+        "sms": "SMS",
+        "telegram": "Telegram"
+      }
+    },
+    "companySize": {
+      "title": "What’s your company size?",
+      "subtitle": "We’ll tailor LiveChat to fit your business needs.",
+      "justMe": "Just me"
+    },
+    "team": {
+      "title": "Invite your team",
+      "subtitle": "Get your team on board to deliver top-notch service.",
+      "hint": "Enter team emails (optional)",
+      "placeholder": "Eg. team.member@gmail.com",
+      "send": "Send invites",
+      "finish": "Finish",
+      "sent": "Invites sent: {{count}}"
+    }
+  },
+  "acceptInvite": {
+    "title": "Accept invite",
+    "missingToken": "Missing token parameter",
+    "setPassword": "Set login password",
+    "passwordMin": "At least 12 characters",
+    "passwordInvalid": "Please meet all password requirements.",
+    "action": "Finish and login"
+  },
+  "invites": {
+    "title": "Agent invites",
+    "email": "Email",
+    "role": "Role",
+    "send": "Send invite",
+    "created": "Invite created: {{email}} ({{role}})",
+    "devAcceptLink": "Dev mode: accept invite link",
+    "modal": {
+      "title": "Invite people to ChatLive",
+      "emailAddresses": "Email addresses",
+      "role": "Role",
+      "emailPlaceholder": "Eg. chatting.agent@gmail.com",
+      "invalidEmail": "Invalid email",
+      "copyInviteLink": "Copy invite link",
+      "sendInvites": "Send invites",
+      "noEmailsTitle": "Nothing to send",
+      "noEmailsDesc": "Enter at least one email address.",
+      "sentTitle": "Invites sent",
+      "sentDesc": "Invites sent: {{count}}",
+      "created": "Created invites",
+      "acceptLink": "Accept link",
+      "copyUnavailableTitle": "Invite link unavailable",
+      "copyUnavailableDesc": "Send an invite first (dev mode provides an accept link).",
+      "copiedTitle": "Copied",
+      "copyFailedTitle": "Copy failed"
+    }
+  },
+  "conversations": {
+    "title": "Conversations",
+    "skeletonHint": "This is a console skeleton page. Next step: integrate WS, message list and input box.",
+    "visitor": "Visitor: {{name}} {{email}}"
+  },
+  "onboarding": {
+    "siteWizard": {
+      "title": "Create your first site (wizard)",
+      "emailNotVerifiedWarning": "Email not verified: we recommend verifying first (dev mode: check backend logs email_out).",
+      "siteCreatedSuccess": "Site created",
+      "nextStep": "Next: add the snippet to your site, then go to Site management to continue configuration.",
+      "openSites": "Open site management",
+      "goAgentConsole": "Go to agent console",
+      "form": {
+        "siteName": {
+          "label": "Site name",
+          "placeholder": "e.g. Website"
+        },
+        "allowlistDomain": {
+          "label": "Allowed embed domain (optional, host)",
+          "placeholder": "e.g. example.com or localhost"
+        },
+        "themeColor": {
+          "label": "Theme color (optional)",
+          "placeholder": "#2563eb"
+        },
+        "welcomeText": {
+          "label": "Welcome text (optional)",
+          "placeholder": "Hi! How can we help?"
+        },
+        "submit": "Create site"
+      }
+    }
+  },
+  "team": {
+    "title": "Team",
+    "subtitle": "Manage agents and groups",
+      "adminOnlyHint": "Admin only",
+    "tabs": {
+      "agents": "Agents",
+      "groups": "Groups"
+    },
+    "searchAgent": "Search agents...",
+    "you": "You",
+    "columns": {
+      "name": "Name",
+      "role": "Role",
+      "status": "Status"
+    },
+    "role": {
+      "owner": "Owner",
+      "agent": "Agent"
+    },
+    "status": {
+      "online": "Online",
+      "away": "Away",
+      "offline": "Offline",
+      "busy": "Busy"
+    },
+    "chatLimitShort": "Limit: {{n}}",
+    "canAccept": "Can accept: {{v}}",
+    "yes": "Yes",
+    "no": "No",
+    "details": "Details",
+    "comingSoon": "Coming soon",
+    "sections": {
+      "groups": "Groups",
+      "workingHours": "Working hours",
+      "performance": "Performance"
+    },
+    "fields": {
+      "userId": "User ID",
+      "status": "Status",
+      "chatLimit": "Chat limit"
+    },
+    "chatLimitModalTitle": "Chats limit",
+    "concurrentChats": "concurrent chats",
+    "acceptingChats": "Accepting chats",
+    "notAcceptingChats": "Not accepting chats",
+    "logOut": "Log out",
+    "actions": {
+      "editProfile": "Edit profile",
+      "changeChatLimit": "Change chat limit",
+      "viewAgentReports": "View agent reports"
+    },
+    "maxConcurrent": "Max concurrent",
+    "capacity": "Active: {{active}}, Remaining: {{remaining}}",
+    "groupStatusShort": "{{accepting}}/{{total}} accepting chats",
+    "otherAgentHint": "Only you can change your accepting chats and limit.",
+    "noAgents": "No agents",
+    "addNewAgent": "Add new agent",
+
+    "groupsTitle": "Skill groups",
+    "selectGroup": "Select a group",
+    "membersHint": "Manage group members in the drawer.",
+    "createGroup": "Create group",
+    "manageMembers": "Members",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "groupName": "Group name",
+    "groupNameRequired": "Please enter group name",
+    "groupNamePlaceholder": "e.g. Sales",
+    "groupEnabled": "Enabled",
+    "membersTitle": "Members — {{name}}",
+    "members": "Members",
+    "addMember": "Add member",
+    "selectAgent": "Select an agent",
+    "weight": "Weight",
+
+    "loadFailedTitle": "Failed to load team data",
+    "updateFailedTitle": "Update failed",
+    "membersLoadFailedTitle": "Failed to load members",
+    "memberUpdateFailedTitle": "Failed to update member",
+    "memberRemoveFailedTitle": "Failed to remove member",
+    "createGroupFailedTitle": "Failed to create group"
+  },
+  "workbench": {
+    "agent": "Agent",
+    "customer": "Customer",
+    "newMessage": "New message",
+    "newMessageOne": "new message",
+    "newMessageMany": "new messages",
+    "from": "From: {{who}}",
+    "view": "View",
+    "chats": "Chats",
+    "myChats": "My chats ({{count}})",
+    "sort": {
+      "newest": "Newest",
+      "oldest": "Oldest"
+    },
+    "searchConversations": "Search conversations...",
+    "showingLast": "Showing last {{shown}} / {{total}}",
+    "showEarlier": "Show earlier",
+    "loadOlder": "Load older",
+    "status": {
+      "assigned": "Assigned",
+      "queued": "Queued",
+      "open": "Open",
+      "closed": "Closed"
+    },
+    "starredOnly": "Starred only",
+    "unread": "Unread {{count}}",
+    "aria": {
+      "star": "Star",
+      "unstar": "Unstar"
+    },
+    "selectConversation": "Please select a conversation",
+    "peerTyping": "Visitor is typing...",
+    "peerRead": "Read",
+    "readReceipt": "Read",
+    "closed": "Closed",
+    "starred": "Starred",
+    "star": "Star",
+    "unstar": "Unstar",
+    "httpFetch": "HTTP fetch",
+    "claim": "Claim",
+    "claimFailedTitle": "Unable to accept",
+    "claimFailedDetail": "This conversation may have been accepted by another agent. Please refresh and try again.",
+    "reopen": "Reopen",
+    "close": "Close",
+    "quickReplies": "Quick replies",
+    "readUpToHere": "Read up to here",
+    "system": {
+      "started": "Started",
+      "idle": "Idle - {{minutes}} min inactivity",
+      "archived": "Archived",
+      "archivedBy": "Archived by {{by}}",
+      "archivedInactivity": "Archived - {{minutes}} min inactivity",
+      "reopened": "Reopened",
+      "reopenedBy": "Reopened by {{by}}",
+      "assigned": "Assigned to {{to}}",
+      "assignedGeneric": "Assigned",
+      "claimed": "Claimed by {{by}}",
+      "claimedGeneric": "Claimed",
+      "transferred": "Transferred: {{from}} → {{to}}",
+      "transferredTo": "Transferred to {{to}}",
+      "transferredGeneric": "Transferred",
+      "generic": "System event: {{key}}"
+    },
+    "messagePlaceholder": "Type a message...",
+    "send": "Send",
+    "sendAttachment": "Send file",
+    "composer": {
+      "mode": {
+        "message": "Message",
+        "private": "Private",
+        "system": "System"
+      },
+      "shiftEnterHint": "Shift+Enter for newline",
+      "emoji": "Emoji",
+      "notSupported": "This message type is not wired yet (UI placeholder)",
+      "notSupportedPlaceholder": "Not wired yet. Switch back to Message to send..."
+    },
+    "userInfo": "User info",
+    "tabs": {
+      "profile": "Profile",
+      "details": "Details",
+      "copilot": "Copilot"
+    },
+    "copilotComingSoon": "Copilot panel (coming soon)",
+    "copilotHint": "Future: suggested replies, summaries, and actions for {{id}}.",
+    "noConversationSelected": "No conversation selected",
+    "conversationId": "Conversation ID: ",
+    "technicalInfo": "Technical info",
+    "statusLabel": "Status: {{status}}",
+    "channelLabel": "Channel: {{channel}}",
+    "assignedLabel": "Assigned: {{assigned}}",
+    "transferAssign": "Transfer / assign",
+    "transferTo": "Transfer to...",
+    "selectAgent": "Select an agent...",
+    "visitor": "Visitor",
+    "visitorName": "Name: {{name}}",
+    "visitorEmail": "Email: {{email}}",
+    "customerUsername": "Username: {{username}}",
+    "customerId": "User ID: ",
+    "customerPhone": "Phone: {{phone}}",
+    "customerEmail": "Email: {{email}}",
+    "noVisitorProfile": "No visitor profile",
+    "tags": "Tags",
+    "addTags": "Add tags",
+    "note": "Notes (private)",
+    "notePlaceholder": "Write key points / context...",
+    "create": "Create",
+    "searchQuickReplies": "Search quick replies...",
+    "insert": "Insert",
+    "createQuickReply": "Create quick reply",
+    "titlePlaceholder": "Title",
+    "contentPlaceholder": "Content"
+  },
+  "sites": {
+    "title": "Install live chat",
+    "subtitle": "Paste a snippet into your website and get installed in minutes.",
+    "adminOnlyHint": "Admin only",
+    "selectSite": "Site",
+    "selectSitePlaceholder": "Select a site",
+    "manualInstall": {
+      "title": "Manual install (recommended)",
+      "desc": "Copy the snippet below and paste it near the end of"
+    },
+    "copyCode": "Copy code",
+    "copied": "Copied to clipboard",
+    "copyFailed": "Copy failed",
+    "copyFailedDesc": "Please manually copy the code above.",
+    "verifyHint": "After installing, visit your website. We verify via reports to:",
+    "statusCard": {
+      "title": "Installation status",
+      "refresh": "Refresh",
+      "installed": "Installed",
+      "notInstalled": "Not verified",
+      "lastSeenAt": "Last seen at:",
+      "origin": "Origin:",
+      "page": "Page:"
+    },
+    "advanced": {
+      "title": "Advanced",
+      "scriptUrls": "Script URLs",
+      "scriptRecommended": "Versioned script (recommended):",
+      "scriptStable": "Stable script:",
+      "embedUrl": "Embed URL:",
+      "spaInstall": "SPA/NPM install",
+      "spaHint": "For React/Vue/Next/Vite projects: put the code below in your entry (make sure it runs only once).",
+      "copySpa": "Copy SPA code"
+    },
+    "help": {
+      "title": "Need help?",
+      "trustedDomains": "Configure trusted domains",
+      "widgetCustomize": "Customize widget appearance"
+    },
+    "spaSnippet": {
+      "comment1": "React/Vue/any SPA: dynamically load ChatLive widget script on page init",
+      "comment2": "Note: load only once (e.g. in App root useEffect or router entry)."
+    }
+  },
+  "widgetCustomize": {
+    "title": "Website widget customization",
+    "adminOnlyHint": "Admin only",
+    "selectSite": "Site",
+    "selectSitePlaceholder": "Select a site",
+    "widgetConfig": {
+      "title": "Widget config (site-level)",
+      "hint": "These settings affect visitor behavior.",
+      "allowAnonymous": {
+        "label": "Allow anonymous",
+        "tooltip": "When disabled, visitors must provide name or email before creating a conversation"
+      },
+      "themeColor": {
+        "label": "Theme color (optional)",
+        "tooltip": "Example: #2563eb. Syncs to the button and inside the iframe.",
+        "placeholder": "#2563eb"
+      },
+      "welcomeText": {
+        "label": "Welcome text (optional)",
+        "placeholder": "Hi! How can we help?"
+      }
+    },
+    "cookieStrategy": {
+      "title": "visitor_id cookie strategy (optional)",
+      "hint": "Used to persist visitor_id across subdomains. For subdomains, set cookie_domain (e.g. .example.com)."
+    },
+    "cookieDomain": {
+      "label": "cookie_domain (optional)",
+      "tooltip": "e.g. .example.com; leave empty to not set Domain.",
+      "placeholder": ".example.com"
+    },
+    "cookieSameSite": {
+      "label": "cookie_samesite (optional)",
+      "tooltip": "Default is Lax. Cross-site third-party embeds usually require None + https.",
+      "placeholder": "Lax / Strict / None"
+    }
+  },
+  "trustedDomains": {
+    "title": "Trusted domains",
+    "subtitle": "Protect your widget from being added to unauthorized sites by creating a list of trusted domains.",
+    "adminOnlyHint": "Admin only",
+    "selectSite": "Site",
+    "selectSitePlaceholder": "Select a site",
+    "manageTitle": "Manage domains",
+    "tabs": {
+      "trusted": "Trusted ({{count}})",
+      "detected": "Detected ({{count}})"
+    },
+    "trusted": {
+      "description": "Your code will only work on domains listed below.",
+      "inputPlaceholder": "yourdomain.com",
+      "addToTrusted": "Add to trusted",
+      "table": {
+        "domain": "Domain",
+        "addedBy": "Added by",
+        "date": "Date"
+      }
+    },
+    "detected": {
+      "lastSeen": "Last seen: {{time}}",
+      "noRecentActivity": "No recent installation activity.",
+      "addToTrusted": "Add to trusted",
+      "source": {
+        "origin": "Origin",
+        "pageUrl": "Page URL"
+      },
+      "table": {
+        "domain": "Domain",
+        "source": "Source",
+        "date": "Date"
+      }
+    }
+  },
+  "conversationChat": {
+    "title": "Conversation",
+    "ws": "WS",
+    "wsStatus": {
+      "connected": "connected",
+      "disconnected": "disconnected"
+    },
+    "httpFetch": "HTTP fetch",
+    "messagePlaceholder": "Type a message...",
+    "send": "Send",
+    "sendAttachment": "Send file"
+  },
+  "visitorEmbed": {
+    "missingSiteKey": "Missing parameter site_key",
+    "missingSiteKeyDetail": "Please check the iframe URL includes ?site_key=...",
+    "identityRequiredTitle": "Identity required",
+    "identityRequiredDetail": "Anonymous is disabled. Please provide at least name or email.",
+    "originNotAllowedTitle": "Origin not allowed",
+    "originNotAllowedDetail": "Please ask the site admin to add current domain to allowlist.",
+    "invalidResponseTitle": "Invalid server response",
+    "invalidResponseDetail": "Server returned an unexpected format.",
+    "requestFailed": "Request failed",
+    "bootstrapFailed": "Initialization failed",
+    "createFailed": "Failed to create conversation",
+    "sendFailed": "Send failed",
+    "loadFailed": "Load failed",
+    "minimize": "Minimize",
+    "minimizeAria": "Minimize chat window",
+    "backAria": "Back",
+    "retry": "Retry",
+    "nameOptional": "name (optional)",
+    "emailOptional": "email (optional)",
+    "startConversation": "Start conversation",
+    "leaveContactTitle": "Leave contact (optional)",
+    "leaveContactOk": "Submit and close",
+    "leaveContactCancel": "Skip and close",
+    "leaveContactHint": "So we can follow up after you leave (at least name or email).",
+    "identityError": "Please fill at least name or email (or you can skip).",
+    "conversationLabel": "Conversation: {{id}}",
+    "recovered": "(recovered)",
+    "created": "(new)",
+    "noMessages": "No messages",
+    "headerTitle": "Text Support",
+    "wsStatus": {
+      "connected": "Connected",
+      "connecting": "Connecting",
+      "offline": "Offline"
+    },
+    "unread": "· {{count}} unread",
+    "typing": "· typing…",
+    "unsupportedContent": "[unsupported: {{type}}]",
+    "attach": {
+      "addFile": "Add file",
+      "add": "Add",
+      "uploadFile": "Upload file",
+      "sendScreenshot": "Send screenshot",
+      "emoji": "Emoji"
+    },
+    "composer": {
+      "placeholder": "Write a message...",
+      "send": "Send",
+      "enterContentHint": "Type something"
+    }
+  }
+}
