@@ -1,5 +1,5 @@
 import { Avatar, Button, Divider, Dropdown, Input, List, Select, Space, Switch, Tag, Typography } from "antd";
-import { DownOutlined, RightOutlined, StarFilled, StarOutlined } from "@ant-design/icons";
+import { DownOutlined, RightOutlined, RollbackOutlined, StarFilled, StarOutlined } from "@ant-design/icons";
 import { MoreOutlined } from "@ant-design/icons";
 import VirtualList from "rc-virtual-list";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -235,7 +235,9 @@ export function ConversationListPaneView({
                                 const isSelected = Boolean(selectedId && c.id === selectedId);
                                 const unread = Number(c.unread_count || 0);
                                 const title = getPrimaryTitle(c, anonymousEnabled, t);
-                                const subtitle = (String(c.last_message_text || "").trim()) || (c.subject || "-");
+                                const lastMsgText = String(c.last_message_text || "").trim();
+                                const lastFromAgent = String(c.last_message_sender_type || "") === "agent";
+                                const subtitleText = lastMsgText || (c.subject || "-");
 
                                 const avatarBg = avatarBgForConversation(c, title);
                                 const avatarText = avatarTextFromTitle(title, t);
@@ -338,7 +340,17 @@ export function ConversationListPaneView({
                                                 </Space>
 
                                                 <Typography.Text type="secondary" ellipsis style={{ fontSize: 12 }}>
-                                                    {subtitle || "-"}
+                                                    {lastFromAgent && lastMsgText ? (
+                                                        <RollbackOutlined
+                                                            aria-hidden
+                                                            style={{
+                                                                fontSize: 12,
+                                                                marginRight: 6,
+                                                                color: "rgba(0,0,0,0.45)",
+                                                            }}
+                                                        />
+                                                    ) : null}
+                                                    {subtitleText || "-"}
                                                 </Typography.Text>
                                             </Space>
                                         </div>
