@@ -18,7 +18,6 @@ export type ConversationHeaderProps = {
     onOpenContextPanel: () => void;
 
     onToggleStar: () => void;
-    onClose: () => Promise<void>;
     onReopen: () => Promise<void>;
 
     onOpenQuickReplies: () => void;
@@ -34,7 +33,6 @@ export function ConversationHeader(props: ConversationHeaderProps) {
         anonymousEnabled = false,
         onOpenContextPanel,
         onToggleStar,
-        onClose,
         onReopen,
         onOpenQuickReplies,
     } = props;
@@ -79,11 +77,7 @@ export function ConversationHeader(props: ConversationHeaderProps) {
                     <Button size="small" danger onClick={onReopen}>
                         {t("workbench.reopen")}
                     </Button>
-                ) : (
-                    <Button size="small" danger onClick={onClose}>
-                        {t("workbench.close")}
-                    </Button>
-                )}
+                ) : null}
 
                 <Button size="small" onClick={onOpenQuickReplies}>
                     {t("workbench.quickReplies")}

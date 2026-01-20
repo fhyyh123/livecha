@@ -400,6 +400,17 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
         void openConversationAsync(conversationId);
     }
 
+    async function closeConversationFromList(conversationId: string) {
+        await closeConversation(conversationId);
+
+        // Selection is route-scoped; after closing the current one, clear the stage by
+        // navigating back to the list route.
+        if (selectedId && conversationId === selectedId) {
+            const qs = searchParams.toString();
+            nav(qs ? `${routeBase}?${qs}` : routeBase);
+        }
+    }
+
     async function toggleStar(conversationId: string, next: boolean) {
         try {
             await setStarred(conversationId, next);
@@ -449,6 +460,8 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
                             onToggleStar={toggleStar}
                             showTransfer={!isArchives}
                             onOpenTransfer={openTransfer}
+                            showClose={!isArchives}
+                            onCloseConversation={closeConversationFromList}
                         />
                     </ConversationListPane>
                 }
@@ -486,15 +499,6 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
                                             onToggleStar={() => {
                                                 if (!selectedId) return;
                                                 toggleStar(selectedId, !detail?.starred);
-                                            }}
-                                            onClose={async () => {
-                                                if (!selectedId) return;
-                                                await closeConversation(selectedId);
-
-                                                // Selection is route-scoped; after closing, clear the stage by
-                                                // navigating back to the list route.
-                                                const qs = searchParams.toString();
-                                                nav(qs ? `${routeBase}?${qs}` : routeBase);
                                             }}
                                             onReopen={async () => {
                                                 if (!selectedId) return;

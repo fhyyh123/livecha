@@ -1,5 +1,5 @@
 import { Avatar, Button, Divider, Dropdown, Input, List, Select, Space, Switch, Tag, Typography } from "antd";
-import { DownOutlined, RightOutlined, RollbackOutlined, StarFilled, StarOutlined } from "@ant-design/icons";
+import { CloseOutlined, DownOutlined, RightOutlined, RollbackOutlined, StarFilled, StarOutlined } from "@ant-design/icons";
 import { MoreOutlined } from "@ant-design/icons";
 import VirtualList from "rc-virtual-list";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -36,6 +36,9 @@ export type ConversationListPaneViewProps = {
 
     onOpenConversation: (conversationId: string) => void;
     onToggleStar: (conversationId: string, next: boolean) => void;
+
+    showClose?: boolean;
+    onCloseConversation?: (conversationId: string) => void | Promise<void>;
 
     showTransfer?: boolean;
     onOpenTransfer?: (conversationId: string) => void;
@@ -111,6 +114,8 @@ export function ConversationListPaneView({
     selectedId,
     onOpenConversation,
     onToggleStar,
+    showClose = true,
+    onCloseConversation,
     showTransfer = true,
     onOpenTransfer,
 }: ConversationListPaneViewProps) {
@@ -302,6 +307,8 @@ export function ConversationListPaneView({
 
                                 const canTransfer = Boolean(showTransfer && onOpenTransfer && c.status !== "closed");
                                 const showItemMenu = canTransfer && ((hoveredId === c.id) || isSelected);
+                                const canClose = Boolean(showClose && onCloseConversation && c.status !== "closed");
+                                const showCloseBtn = canClose && ((hoveredId === c.id) || isSelected);
                                 const itemMenuItems = canTransfer
                                     ? [
                                           {
@@ -366,39 +373,57 @@ export function ConversationListPaneView({
                                                     </div>
 
                                                     <Space size={2}>
-                                                <Typography.Text type="secondary" style={{ fontSize: 12, width: 44, textAlign: "right" }}>
-                                                    {freshness}
-                                                </Typography.Text>
+                                                        <Typography.Text type="secondary" style={{ fontSize: 12, width: 44, textAlign: "right" }}>
+                                                            {freshness}
+                                                        </Typography.Text>
 
-                                                <Button
-                                                    size="small"
-                                                    type="text"
-                                                    aria-label={c.starred ? t("workbench.aria.unstar") : t("workbench.aria.star")}
-                                                    icon={c.starred ? <StarFilled /> : <StarOutlined />}
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        onToggleStar(c.id, !c.starred);
-                                                    }}
-                                                />
-
-                                                {showItemMenu ? (
-                                                    <Dropdown menu={{ items: itemMenuItems }} trigger={["click"]} placement="bottomRight">
                                                         <Button
                                                             size="small"
                                                             type="text"
-                                                            aria-label="More"
-                                                            icon={<MoreOutlined />}
+                                                            aria-label={c.starred ? t("workbench.aria.unstar") : t("workbench.aria.star")}
+                                                            icon={c.starred ? <StarFilled /> : <StarOutlined />}
                                                             onClick={(e) => {
                                                                 e.preventDefault();
                                                                 e.stopPropagation();
+                                                                onToggleStar(c.id, !c.starred);
                                                             }}
                                                         />
-                                                    </Dropdown>
-                                                ) : (
-                                                    // keep layout stable
-                                                    <span style={{ width: 28 }} />
-                                                )}
+
+                                                        {showItemMenu ? (
+                                                            <Dropdown menu={{ items: itemMenuItems }} trigger={["click"]} placement="bottomRight">
+                                                                <Button
+                                                                    size="small"
+                                                                    type="text"
+                                                                    aria-label="More"
+                                                                    icon={<MoreOutlined />}
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                    }}
+                                                                />
+                                                            </Dropdown>
+                                                        ) : (
+                                                            // keep layout stable
+                                                            <span style={{ width: 28 }} />
+                                                        )}
+
+                                                        {showCloseBtn ? (
+                                                            <Button
+                                                                size="small"
+                                                                type="text"
+                                                                danger
+                                                                aria-label={t("workbench.close")}
+                                                                icon={<CloseOutlined />}
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    void onCloseConversation?.(c.id);
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            // keep layout stable
+                                                            <span style={{ width: 28 }} />
+                                                        )}
                                                     </Space>
                                                 </Space>
 
