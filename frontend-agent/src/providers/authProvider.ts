@@ -1,5 +1,6 @@
 import type { AuthBindings } from "@refinedev/core";
-import { http, setToken, TOKEN_STORAGE_KEY } from "./http";
+import { getToken, http, setToken, TOKEN_STORAGE_KEY } from "./http";
+import { getMeCached } from "./meCache";
 
 const SESSION_STORAGE_KEY = "chatlive.agent.session_id" as const;
 const HEARTBEAT_INTERVAL_KEY = "chatlive.agent.heartbeat_interval" as const;
@@ -125,9 +126,10 @@ export const authProvider: AuthBindings = {
     },
 
     getIdentity: async () => {
+        if (!getToken()) return null;
         try {
-            const res = await http.get<MeResponse>("/api/v1/auth/me");
-            const me = res.data;
+            const me = (await getMeCached()) as MeResponse | null;
+            if (!me) return null;
             return {
                 id: me.user_id || "me",
                 name: me.username || me.user_id || "me",
@@ -140,9 +142,10 @@ export const authProvider: AuthBindings = {
     },
 
     getPermissions: async () => {
+        if (!getToken()) return null;
         try {
-            const res = await http.get<MeResponse>("/api/v1/auth/me");
-            return res.data?.role || null;
+            const me = (await getMeCached()) as MeResponse | null;
+            return me?.role || null;
         } catch {
             return null;
         }

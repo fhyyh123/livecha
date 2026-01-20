@@ -15,12 +15,12 @@ import { useTranslation } from "react-i18next";
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 
 import { authProvider } from "./providers/authProvider";
-import { http } from "./providers/http";
+import { AUTH_CHANGED_EVENT, getToken, http } from "./providers/http";
 import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
 import { VerifyEmailCodePage } from "./pages/VerifyEmailCodePage";
 import { AcceptInvitePage } from "./pages/AcceptInvitePage";
-import { Authenticated } from "@refinedev/core";
+import { Authenticated, useCan } from "@refinedev/core";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { WsAutoConnect } from "./components/WsAutoConnect";
 import { accessControlProvider } from "./providers/accessControlProvider";
@@ -55,10 +55,44 @@ type MeResponse = {
   email_verified?: boolean;
 };
 
+function RequireCan({
+  resource,
+  children,
+}: {
+  resource: string;
+  children: React.ReactNode;
+}) {
+  const { data, isLoading } = useCan({ resource, action: "list" });
+  if (isLoading) return null;
+  if (!data?.can) return <CatchAllNavigate to="/" />;
+  return <>{children}</>;
+}
+
 function RequireEmailVerified({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<"loading" | "verified" | "unverified">("loading");
+  const [authTick, setAuthTick] = useState(0);
 
   useEffect(() => {
+    const onAuthChanged = () => setAuthTick((x) => x + 1);
+    try {
+      globalThis.window?.addEventListener(AUTH_CHANGED_EVENT, onAuthChanged);
+    } catch {
+      // ignore
+    }
+    return () => {
+      try {
+        globalThis.window?.removeEventListener(AUTH_CHANGED_EVENT, onAuthChanged);
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    // In case this component gets mounted before login completes, avoid calling
+    // /auth/me with no token.
+    const token = getToken();
+    if (!token) return;
     let mounted = true;
     http
       .get<MeResponse>("/api/v1/auth/me")
@@ -75,8 +109,9 @@ function RequireEmailVerified({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [authTick]);
 
+  if (!getToken()) return null;
   if (status === "loading") return null;
   if (status === "unverified") return <CatchAllNavigate to="/verify-email-code" />;
   return <>{children}</>;
@@ -89,28 +124,8 @@ function App() {
   // We intentionally keep this as a plain (non-hook) computation.
   const isVisitorEmbed = typeof window !== "undefined" && window.location.pathname.startsWith("/visitor/embed");
 
-  const [meRole, setMeRole] = useState<string>("");
-
-  useEffect(() => {
-    if (isVisitorEmbed) return;
-    let mounted = true;
-    http
-      .get<{ role?: string }>("/api/v1/auth/me")
-      .then((res) => {
-        if (!mounted) return;
-        setMeRole(String(res.data?.role || ""));
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setMeRole("");
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [isVisitorEmbed]);
-
   const resources = useMemo(() => {
-    const list = [
+    return [
       {
         name: "conversations",
         list: "/conversations",
@@ -126,25 +141,18 @@ function App() {
         list: "/team",
         meta: { label: t("nav.team") },
       },
+      {
+        name: "sites",
+        list: "/sites",
+        meta: { label: t("nav.sites") },
+      },
+      {
+        name: "invites",
+        list: "/invites",
+        meta: { label: t("nav.invites") },
+      },
     ];
-
-    if (meRole === "admin") {
-      list.splice(1, 0,
-        {
-          name: "sites",
-          list: "/sites",
-          meta: { label: t("nav.sites") },
-        },
-        {
-          name: "invites",
-          list: "/invites",
-          meta: { label: t("nav.invites") },
-        },
-      );
-    }
-
-    return list;
-  }, [meRole, t]);
+  }, [t]);
 
   // Embed-only mode: do not mount Refine/auth providers to avoid /auth/me requests.
   if (isVisitorEmbed) {
@@ -315,9 +323,11 @@ function App() {
               <Route
                 path="/sites"
                 element={
-                  <Suspense fallback={<RouteFallback />}>
-                    <SitesPage />
-                  </Suspense>
+                  <RequireCan resource="sites">
+                    <Suspense fallback={<RouteFallback />}>
+                      <SitesPage />
+                    </Suspense>
+                  </RequireCan>
                 }
               />
               <Route
@@ -355,9 +365,11 @@ function App() {
               <Route
                 path="/invites"
                 element={
-                  <Suspense fallback={<RouteFallback />}>
-                    <InvitesPage />
-                  </Suspense>
+                  <RequireCan resource="invites">
+                    <Suspense fallback={<RouteFallback />}>
+                      <InvitesPage />
+                    </Suspense>
+                  </RequireCan>
                 }
               />
               <Route

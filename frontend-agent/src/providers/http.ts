@@ -1,6 +1,7 @@
 import axios from "axios";
 
 export const TOKEN_STORAGE_KEY = "chatlive.agent.token" as const;
+export const AUTH_CHANGED_EVENT = "chatlive:auth-changed" as const;
 
 export function getToken() {
     return localStorage.getItem(TOKEN_STORAGE_KEY) || "";
@@ -9,9 +10,21 @@ export function getToken() {
 export function setToken(token: string) {
     if (!token) {
         localStorage.removeItem(TOKEN_STORAGE_KEY);
+        // Notify listeners (same-tab) that auth state changed.
+        // StorageEvent does not fire in the same document.
+        try {
+            globalThis.window?.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+        } catch {
+            // ignore
+        }
         return;
     }
     localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    try {
+        globalThis.window?.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+    } catch {
+        // ignore
+    }
 }
 
 function base64UrlDecodeToUtf8(input: string) {
@@ -21,7 +34,6 @@ function base64UrlDecodeToUtf8(input: string) {
     const padLen = (4 - (normalized.length % 4)) % 4;
     const padded = normalized + "=".repeat(padLen);
     // atob is available in browsers; this app is client-only.
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     const atobFn = globalThis.atob;
     if (typeof atobFn !== "function") return "";
     return atobFn(padded);

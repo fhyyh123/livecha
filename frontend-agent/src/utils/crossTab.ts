@@ -11,7 +11,6 @@ const BC_NAME = "chatlive-agent";
 const STORAGE_KEY = "chatlive.agent.x-tab-event";
 
 function safeRandomId() {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
@@ -21,7 +20,6 @@ function safeNow() {
 
 function tryPostBroadcastChannel(evt: CrossTabEvent) {
     try {
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (typeof globalThis.BroadcastChannel !== "function") return;
         const bc = new BroadcastChannel(BC_NAME);
         bc.postMessage(evt);
@@ -91,7 +89,6 @@ export function subscribeCrossTabEvents(onEvent: (evt: CrossTabEvent) => void) {
 
     // BroadcastChannel
     try {
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (typeof globalThis.BroadcastChannel === "function") {
             const bc = new BroadcastChannel(BC_NAME);
             bc.onmessage = (e) => handle(parseEvent(e.data));

@@ -254,6 +254,37 @@ function scheduleInboxRefresh() {
     }, 250);
 }
 
+function saveSessionToStorage(payload: Record<string, unknown>) {
+    const sessionId = String(payload.session_id ?? "");
+    if (!sessionId) return;
+    try {
+        localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
+        if (typeof payload.heartbeat_interval_seconds === "number") {
+            localStorage.setItem(HEARTBEAT_INTERVAL_KEY, String(payload.heartbeat_interval_seconds));
+        }
+        if (typeof payload.heartbeat_ttl_seconds === "number") {
+            localStorage.setItem(HEARTBEAT_TTL_KEY, String(payload.heartbeat_ttl_seconds));
+        }
+    } catch {
+        // ignore
+    }
+}
+
+function clearUnreadBadge(conversationId: string) {
+    if (!conversationId) return;
+    useChatStore.setState((st) => ({
+        conversations: st.conversations.map((c) => (c.id === conversationId ? { ...c, unread_count: 0 } : c)),
+    }));
+}
+
+function applyInboxSubscriptions(list: Conversation[]) {
+    try {
+        ensureWs().setSubscriptions(list.map((c) => c.id));
+    } catch {
+        // ignore
+    }
+}
+
 function getWsUrl() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
     const sessionId = localStorage.getItem("chatlive.agent.session_id") || "";
@@ -490,20 +521,7 @@ function handleWsEvent(e: WsInboundEvent) {
 
     if (e.type === "SESSION") {
         const obj = e as Record<string, unknown>;
-        const sessionId = String(obj.session_id ?? "");
-        if (sessionId) {
-            try {
-                localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
-                if (typeof obj.heartbeat_interval_seconds === "number") {
-                    localStorage.setItem(HEARTBEAT_INTERVAL_KEY, String(obj.heartbeat_interval_seconds));
-                }
-                if (typeof obj.heartbeat_ttl_seconds === "number") {
-                    localStorage.setItem(HEARTBEAT_TTL_KEY, String(obj.heartbeat_ttl_seconds));
-                }
-            } catch {
-                // ignore
-            }
-        }
+        saveSessionToStorage(obj);
         return;
     }
 
@@ -547,7 +565,7 @@ function handleWsEvent(e: WsInboundEvent) {
 
         // Keep list preview/status in sync with system events (LiveChat-like).
         if (eventKey === "idle") {
-            const activityAt = Number((dataObj as any).activity_at ?? 0);
+            const activityAt = Number(dataObj["activity_at"] ?? 0);
             useChatStore.setState((st) => ({
                 conversations: st.conversations.map((c) =>
                     c.id !== convId
@@ -563,8 +581,8 @@ function handleWsEvent(e: WsInboundEvent) {
         }
 
         if (eventKey === "archived") {
-            const reason = String((dataObj as any).reason ?? "").trim();
-            const minsRaw = Number((dataObj as any).inactivity_minutes ?? 0);
+            const reason = String(dataObj["reason"] ?? "").trim();
+            const minsRaw = Number(dataObj["inactivity_minutes"] ?? 0);
             const mins = Number.isFinite(minsRaw) && minsRaw > 0 ? Math.floor(minsRaw) : null;
             useChatStore.setState((st) => ({
                 conversations: st.conversations.map((c) =>
@@ -592,9 +610,7 @@ function handleWsEvent(e: WsInboundEvent) {
         if (!convId) return;
 
         // Server has persisted last_read_msg_id for this user; clear list unread badge.
-        useChatStore.setState((st) => ({
-            conversations: st.conversations.map((c) => (c.id === convId ? { ...c, unread_count: 0 } : c)),
-        }));
+        clearUnreadBadge(convId);
         return;
     }
 
@@ -723,9 +739,7 @@ function handleWsEvent(e: WsInboundEvent) {
             const myId = getCurrentUserId();
             const senderId = String(obj.sender_id ?? "");
             if (myId && senderId && senderId === myId) {
-                useChatStore.setState((st) => ({
-                    conversations: st.conversations.map((c) => (c.id === convId ? { ...c, unread_count: 0 } : c)),
-                }));
+                clearUnreadBadge(convId);
             }
             return;
         }
@@ -819,8 +833,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             });
 
             // Subscribe to current inbox list for notifications.
-            const ws = ensureWs();
-            ws.setSubscriptions(list.map((c) => c.id));
+            applyInboxSubscriptions(list);
         } finally {
             set({ conversationsLoading: false });
         }
@@ -842,7 +855,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             }
             const res = await http.get<Conversation[]>("/api/v1/conversations", { params });
             const list = Array.isArray(res.data) ? res.data : [];
-            ensureWs().setSubscriptions(list.map((c) => c.id));
+            applyInboxSubscriptions(list);
         } catch {
             // best-effort: keep WS connected even if inbox bootstrap fails
         }
@@ -903,9 +916,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         if (id) {
             // Optimistic: entering a conversation clears its badge.
-            set((st) => ({
-                conversations: st.conversations.map((c) => (c.id === id ? { ...c, unread_count: 0 } : c)),
-            }));
+            clearUnreadBadge(id);
         }
     },
 
@@ -1028,9 +1039,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         });
 
         // optimistic clear
-        set((st) => ({
-            conversations: st.conversations.map((c) => (c.id === conversationId ? { ...c, unread_count: 0 } : c)),
-        }));
+        clearUnreadBadge(conversationId);
     },
 
     sendTyping: (conversationId, isTyping) => {
@@ -1080,13 +1089,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         // Optimistic: once transferred away, it should disappear from current agent inbox.
         set((st) => {
             const nextConversations = st.conversations.filter((c) => c.id !== conversationId);
-            // Update WS subscriptions to match the new inbox list and proactively UNSUB this conversation.
-            try {
-                ensureWs().setSubscriptions(nextConversations.map((c) => c.id));
-                ensureWs().unsubscribe(conversationId);
-            } catch {
-                // ignore
-            }
+            // Update WS subscriptions to match the new inbox list.
+            applyInboxSubscriptions(nextConversations);
 
             return {
                 conversations: nextConversations,
@@ -1190,7 +1194,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 // - A tab broadcasts CONV_READ when it sends MSG_READ.
 // - Other tabs update localReadByConversationId and clear unread_count (if present in list).
 try {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (typeof window !== "undefined") {
         subscribeCrossTabEvents((evt: CrossTabEvent) => {
             if (evt.type !== "CONV_READ") return;

@@ -27,8 +27,8 @@ export function getCachedInactivityTimeouts(): InactivityTimeoutsDto {
                 ? parsed.inactivity_archive_enabled
                 : DEFAULT_INACTIVITY_TIMEOUTS.inactivity_archive_enabled;
 
-        const v = Number((parsed as any).visitor_idle_minutes);
-        const a = Number((parsed as any).inactivity_archive_minutes);
+        const v = Number(parsed.visitor_idle_minutes ?? 0);
+        const a = Number(parsed.inactivity_archive_minutes ?? 0);
         return {
             visitor_idle_enabled: vEnabled,
             visitor_idle_minutes: Number.isFinite(v) && v > 0 ? v : DEFAULT_INACTIVITY_TIMEOUTS.visitor_idle_minutes,

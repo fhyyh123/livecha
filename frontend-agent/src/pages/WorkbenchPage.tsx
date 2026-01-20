@@ -122,7 +122,6 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
     });
 
 
-
     useEffect(() => {
         try {
             localStorage.setItem("chatlive:contextTab", contextTab);
@@ -243,7 +242,7 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
                     return t("workbench.system.started");
                 }
                 if (key === "idle") {
-                    const minutes = Number((data as any).idle_minutes ?? (data as any).minutes ?? 0);
+                    const minutes = Number((data["idle_minutes"] ?? data["minutes"]) ?? 0);
                     return minutes > 0 ? t("workbench.system.idle", { minutes }) : t("workbench.system.generic", { key });
                 }
                 if (key === "assigned") {
@@ -377,26 +376,28 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [qrOpen, qrQuery]);
 
-    function openConversation(conversationId: string) {
-        void (async () => {
-            const conv = conversations.find((c) => c.id === conversationId);
-            if (conv?.status === "queued" && !conv.assigned_agent_user_id) {
-                try {
-                    await claimConversation(conversationId);
-                } catch {
-                    notification.error({
-                        message: t("workbench.claimFailedTitle"),
-                        description: t("workbench.claimFailedDetail"),
-                        placement: "bottomRight",
-                        duration: 3,
-                    });
-                    return;
-                }
+    async function openConversationAsync(conversationId: string) {
+        const conv = conversations.find((c) => c.id === conversationId);
+        if (conv?.status === "queued" && !conv.assigned_agent_user_id) {
+            try {
+                await claimConversation(conversationId);
+            } catch {
+                notification.error({
+                    message: t("workbench.claimFailedTitle"),
+                    description: t("workbench.claimFailedDetail"),
+                    placement: "bottomRight",
+                    duration: 3,
+                });
+                return;
             }
+        }
 
-            selectConversation(conversationId);
-            nav(`${routeBase}/${encodeURIComponent(conversationId)}`);
-        })();
+        selectConversation(conversationId);
+        nav(`${routeBase}/${encodeURIComponent(conversationId)}`);
+    }
+
+    function openConversation(conversationId: string) {
+        void openConversationAsync(conversationId);
     }
 
     async function toggleStar(conversationId: string, next: boolean) {

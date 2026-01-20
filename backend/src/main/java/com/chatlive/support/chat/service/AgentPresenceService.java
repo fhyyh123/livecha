@@ -16,8 +16,8 @@ public class AgentPresenceService {
 
     public AgentPresenceService(
             AgentSessionRepository agentSessionRepository,
-            @Value("${app.agent.heartbeat.ttl-seconds:35}") long heartbeatTtlSeconds,
-            @Value("${app.agent.heartbeat.interval-seconds:10}") long heartbeatIntervalSeconds
+            @Value("${app.agent.heartbeat.ttl-seconds:45}") long heartbeatTtlSeconds,
+            @Value("${app.agent.heartbeat.interval-seconds:20}") long heartbeatIntervalSeconds
     ) {
         this.agentSessionRepository = agentSessionRepository;
         this.heartbeatTtlSeconds = heartbeatTtlSeconds;

@@ -12,12 +12,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 DATE_TAG="$(date +%Y%m%d-%H%M%S)"
-GIT_SHA=""
-if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  GIT_SHA="$(git rev-parse --short HEAD 2>/dev/null || true)"
-fi
-
-DEFAULT_TAG="prod-${DATE_TAG}${GIT_SHA:+-${GIT_SHA}}"
+DEFAULT_TAG="prod-${DATE_TAG}"
 TAG="${1:-$DEFAULT_TAG}"
 IMAGE="chatlive-backend:${TAG}"
 OUT_TAR="$SCRIPT_DIR/chatlive-backend_${TAG}.tar"
