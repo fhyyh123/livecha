@@ -97,6 +97,9 @@ public class AgentPresenceScheduler {
         var remaining = Math.max(0, maxC - assignedActive);
         var hasPresence = agentPresenceService.hasActiveSession(userId);
         var status = hasPresence ? profile.status() : "offline";
+        if (hasPresence && "offline".equals(status)) {
+            status = "online";
+        }
         var effective = ("online".equals(status) && remaining == 0) ? "busy" : status;
         var canAccept = "online".equals(status) && remaining > 0;
 

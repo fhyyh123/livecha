@@ -306,17 +306,25 @@ public class ConversationRepository {
         return list.stream().findFirst();
     }
 
-    public int closeConversation(String tenantId, String conversationId, String actorUserId) {
+    public int closeConversation(
+            String tenantId,
+            String conversationId,
+            String actorUserId,
+            String archivedReason,
+            Integer archivedInactivityMinutes
+    ) {
         var sql = """
                 update conversation
                 set status = 'closed',
-                    closed_at = now()
+                    closed_at = now(),
+                    last_archived_reason = ?,
+                    last_archived_inactivity_minutes = ?
                 where tenant_id = ?
                   and id = ?
                   and status <> 'closed'
                 """;
         // actorUserId reserved for future audit columns
-        return jdbcTemplate.update(sql, tenantId, conversationId);
+        return jdbcTemplate.update(sql, archivedReason, archivedInactivityMinutes, tenantId, conversationId);
     }
 
     public int reopenConversation(String tenantId, String conversationId, String actorUserId) {
@@ -324,6 +332,8 @@ public class ConversationRepository {
                 update conversation
                 set status = 'assigned',
                     closed_at = null,
+                                        last_archived_reason = null,
+                                        last_archived_inactivity_minutes = null,
                     assigned_agent_user_id = ?
                 where tenant_id = ?
                   and id = ?
@@ -343,6 +353,8 @@ public class ConversationRepository {
                 update conversation
                 set status = 'queued',
                     closed_at = null,
+                                        last_archived_reason = null,
+                                        last_archived_inactivity_minutes = null,
                     assigned_agent_user_id = null
                 where tenant_id = ?
                   and id = ?
@@ -448,6 +460,13 @@ public class ConversationRepository {
                    v.name as visitor_name, v.email as visitor_email,
                    false as starred,
                     0 as unread_count,
+                    extract(epoch from c.created_at)::bigint as created_at_epoch,
+                    extract(epoch from c.last_msg_at)::bigint as last_msg_at_epoch,
+                    extract(epoch from c.closed_at)::bigint as closed_at_epoch,
+                    extract(epoch from c.last_customer_msg_at)::bigint as last_customer_msg_at_epoch,
+                    extract(epoch from c.last_idle_event_at)::bigint as last_idle_event_at_epoch,
+                    c.last_archived_reason as last_archived_reason,
+                    c.last_archived_inactivity_minutes as last_archived_inactivity_minutes,
                     (
                         select m.sender_type
                         from message m
@@ -476,7 +495,6 @@ public class ConversationRepository {
                             order by m.created_at desc, m.id desc
                             limit 1
                         ) as last_message_created_at
-                        ,extract(epoch from c.last_msg_at)::bigint as last_msg_at_epoch
             from conversation c
             left join visitor v on v.id = c.visitor_id and v.site_id = c.site_id
             where c.tenant_id = ?
@@ -499,7 +517,14 @@ public class ConversationRepository {
                 rs.getString("last_message_sender_type"),
                 rs.getString("last_message_content_type"),
                 toLastMessagePreview(rs.getString("last_message_content_type"), rs.getString("last_message_content_json")),
-                rs.getLong("last_message_created_at") > 0 ? rs.getLong("last_message_created_at") : rs.getLong("last_msg_at_epoch")
+                rs.getLong("last_message_created_at") > 0 ? rs.getLong("last_message_created_at") : rs.getLong("last_msg_at_epoch"),
+                rs.getLong("created_at_epoch"),
+                rs.getLong("last_msg_at_epoch"),
+                rs.getObject("closed_at_epoch") == null ? null : rs.getLong("closed_at_epoch"),
+                rs.getObject("last_customer_msg_at_epoch") == null ? null : rs.getLong("last_customer_msg_at_epoch"),
+                rs.getObject("last_idle_event_at_epoch") == null ? null : rs.getLong("last_idle_event_at_epoch"),
+                rs.getString("last_archived_reason"),
+                rs.getObject("last_archived_inactivity_minutes") == null ? null : rs.getLong("last_archived_inactivity_minutes")
             ), tenantId, status);
         }
         sql += " order by last_msg_at desc limit 50";
@@ -518,7 +543,14 @@ public class ConversationRepository {
             rs.getString("last_message_sender_type"),
             rs.getString("last_message_content_type"),
             toLastMessagePreview(rs.getString("last_message_content_type"), rs.getString("last_message_content_json")),
-            rs.getLong("last_message_created_at") > 0 ? rs.getLong("last_message_created_at") : rs.getLong("last_msg_at_epoch")
+            rs.getLong("last_message_created_at") > 0 ? rs.getLong("last_message_created_at") : rs.getLong("last_msg_at_epoch"),
+            rs.getLong("created_at_epoch"),
+            rs.getLong("last_msg_at_epoch"),
+            rs.getObject("closed_at_epoch") == null ? null : rs.getLong("closed_at_epoch"),
+            rs.getObject("last_customer_msg_at_epoch") == null ? null : rs.getLong("last_customer_msg_at_epoch"),
+            rs.getObject("last_idle_event_at_epoch") == null ? null : rs.getLong("last_idle_event_at_epoch"),
+            rs.getString("last_archived_reason"),
+            rs.getObject("last_archived_inactivity_minutes") == null ? null : rs.getLong("last_archived_inactivity_minutes")
         ), tenantId);
     }
 
@@ -527,6 +559,13 @@ public class ConversationRepository {
         sql.append("select c.id, c.status, c.channel, c.subject, c.assigned_agent_user_id, ");
         sql.append("       c.site_id, c.visitor_id, v.name as visitor_name, v.email as visitor_email, ");
         sql.append("       coalesce(cm.starred, false) as starred ");
+        sql.append("     , extract(epoch from c.created_at)::bigint as created_at_epoch ");
+        sql.append("     , extract(epoch from c.last_msg_at)::bigint as last_msg_at_epoch ");
+        sql.append("     , extract(epoch from c.closed_at)::bigint as closed_at_epoch ");
+        sql.append("     , extract(epoch from c.last_customer_msg_at)::bigint as last_customer_msg_at_epoch ");
+        sql.append("     , extract(epoch from c.last_idle_event_at)::bigint as last_idle_event_at_epoch ");
+        sql.append("     , c.last_archived_reason as last_archived_reason ");
+        sql.append("     , c.last_archived_inactivity_minutes as last_archived_inactivity_minutes ");
         sql.append("     , coalesce((");
         sql.append("         select count(1) ");
         sql.append("         from message m ");
@@ -559,7 +598,6 @@ public class ConversationRepository {
         sql.append("        where m.tenant_id = c.tenant_id and m.conversation_id = c.id ");
         sql.append("        order by m.created_at desc, m.id desc limit 1");
         sql.append("     ) as last_message_created_at ");
-        sql.append("   , extract(epoch from c.last_msg_at)::bigint as last_msg_at_epoch ");
         sql.append("from conversation c ");
         sql.append("left join visitor v on v.id = c.visitor_id and v.site_id = c.site_id ");
         sql.append("left join conversation_mark cm on cm.tenant_id = c.tenant_id and cm.conversation_id = c.id and cm.user_id = ? ");
@@ -615,7 +653,14 @@ public class ConversationRepository {
             rs.getString("last_message_sender_type"),
             rs.getString("last_message_content_type"),
             toLastMessagePreview(rs.getString("last_message_content_type"), rs.getString("last_message_content_json")),
-            rs.getLong("last_message_created_at") > 0 ? rs.getLong("last_message_created_at") : rs.getLong("last_msg_at_epoch")
+            rs.getLong("last_message_created_at") > 0 ? rs.getLong("last_message_created_at") : rs.getLong("last_msg_at_epoch"),
+            rs.getLong("created_at_epoch"),
+            rs.getLong("last_msg_at_epoch"),
+            rs.getObject("closed_at_epoch") == null ? null : rs.getLong("closed_at_epoch"),
+            rs.getObject("last_customer_msg_at_epoch") == null ? null : rs.getLong("last_customer_msg_at_epoch"),
+            rs.getObject("last_idle_event_at_epoch") == null ? null : rs.getLong("last_idle_event_at_epoch"),
+            rs.getString("last_archived_reason"),
+            rs.getObject("last_archived_inactivity_minutes") == null ? null : rs.getLong("last_archived_inactivity_minutes")
         ), args.toArray());
     }
 
@@ -627,6 +672,13 @@ public class ConversationRepository {
         sql.append("select c.id, c.status, c.channel, c.subject, c.assigned_agent_user_id, ");
         sql.append("       c.site_id, c.visitor_id, v.name as visitor_name, v.email as visitor_email, ");
         sql.append("       coalesce(cm.starred, false) as starred ");
+        sql.append("     , extract(epoch from c.created_at)::bigint as created_at_epoch ");
+        sql.append("     , extract(epoch from c.last_msg_at)::bigint as last_msg_at_epoch ");
+        sql.append("     , extract(epoch from c.closed_at)::bigint as closed_at_epoch ");
+        sql.append("     , extract(epoch from c.last_customer_msg_at)::bigint as last_customer_msg_at_epoch ");
+        sql.append("     , extract(epoch from c.last_idle_event_at)::bigint as last_idle_event_at_epoch ");
+        sql.append("     , c.last_archived_reason as last_archived_reason ");
+        sql.append("     , c.last_archived_inactivity_minutes as last_archived_inactivity_minutes ");
         sql.append("     , coalesce((");
         sql.append("         select count(1) ");
         sql.append("         from message m ");
@@ -659,7 +711,6 @@ public class ConversationRepository {
         sql.append("        where m.tenant_id = c.tenant_id and m.conversation_id = c.id ");
         sql.append("        order by m.created_at desc, m.id desc limit 1");
         sql.append("     ) as last_message_created_at ");
-        sql.append("   , extract(epoch from c.last_msg_at)::bigint as last_msg_at_epoch ");
         sql.append("from conversation c ");
         sql.append("left join visitor v on v.id = c.visitor_id and v.site_id = c.site_id ");
         sql.append("left join conversation_mark cm on cm.tenant_id = c.tenant_id and cm.conversation_id = c.id and cm.user_id = ? ");
@@ -693,7 +744,14 @@ public class ConversationRepository {
             rs.getString("last_message_sender_type"),
             rs.getString("last_message_content_type"),
                 toLastMessagePreview(rs.getString("last_message_content_type"), rs.getString("last_message_content_json")),
-                rs.getLong("last_message_created_at") > 0 ? rs.getLong("last_message_created_at") : rs.getLong("last_msg_at_epoch")
+                rs.getLong("last_message_created_at") > 0 ? rs.getLong("last_message_created_at") : rs.getLong("last_msg_at_epoch"),
+                rs.getLong("created_at_epoch"),
+                rs.getLong("last_msg_at_epoch"),
+                rs.getObject("closed_at_epoch") == null ? null : rs.getLong("closed_at_epoch"),
+                rs.getObject("last_customer_msg_at_epoch") == null ? null : rs.getLong("last_customer_msg_at_epoch"),
+                rs.getObject("last_idle_event_at_epoch") == null ? null : rs.getLong("last_idle_event_at_epoch"),
+                rs.getString("last_archived_reason"),
+                rs.getObject("last_archived_inactivity_minutes") == null ? null : rs.getLong("last_archived_inactivity_minutes")
         ), args.toArray());
     }
 
@@ -704,6 +762,13 @@ public class ConversationRepository {
                    v.name as visitor_name, v.email as visitor_email,
                    false as starred,
                     0 as unread_count,
+                    extract(epoch from c.created_at)::bigint as created_at_epoch,
+                    extract(epoch from c.last_msg_at)::bigint as last_msg_at_epoch,
+                    extract(epoch from c.closed_at)::bigint as closed_at_epoch,
+                    extract(epoch from c.last_customer_msg_at)::bigint as last_customer_msg_at_epoch,
+                    extract(epoch from c.last_idle_event_at)::bigint as last_idle_event_at_epoch,
+                    c.last_archived_reason as last_archived_reason,
+                    c.last_archived_inactivity_minutes as last_archived_inactivity_minutes,
                     (
                         select m.sender_type
                         from message m
@@ -732,7 +797,6 @@ public class ConversationRepository {
                             order by m.created_at desc, m.id desc
                             limit 1
                         ) as last_message_created_at
-                        ,extract(epoch from c.last_msg_at)::bigint as last_msg_at_epoch
             from conversation c
             left join visitor v on v.id = c.visitor_id and v.site_id = c.site_id
             where c.tenant_id = ? and c.customer_user_id = ?
@@ -755,7 +819,14 @@ public class ConversationRepository {
                 rs.getString("last_message_sender_type"),
                 rs.getString("last_message_content_type"),
                 toLastMessagePreview(rs.getString("last_message_content_type"), rs.getString("last_message_content_json")),
-                rs.getLong("last_message_created_at") > 0 ? rs.getLong("last_message_created_at") : rs.getLong("last_msg_at_epoch")
+                rs.getLong("last_message_created_at") > 0 ? rs.getLong("last_message_created_at") : rs.getLong("last_msg_at_epoch"),
+                rs.getLong("created_at_epoch"),
+                rs.getLong("last_msg_at_epoch"),
+                rs.getObject("closed_at_epoch") == null ? null : rs.getLong("closed_at_epoch"),
+                rs.getObject("last_customer_msg_at_epoch") == null ? null : rs.getLong("last_customer_msg_at_epoch"),
+                rs.getObject("last_idle_event_at_epoch") == null ? null : rs.getLong("last_idle_event_at_epoch"),
+                rs.getString("last_archived_reason"),
+                rs.getObject("last_archived_inactivity_minutes") == null ? null : rs.getLong("last_archived_inactivity_minutes")
             ), tenantId, customerUserId, status);
         }
         sql += " order by last_msg_at desc limit 50";
@@ -774,7 +845,14 @@ public class ConversationRepository {
             rs.getString("last_message_sender_type"),
             rs.getString("last_message_content_type"),
             toLastMessagePreview(rs.getString("last_message_content_type"), rs.getString("last_message_content_json")),
-            rs.getLong("last_message_created_at") > 0 ? rs.getLong("last_message_created_at") : rs.getLong("last_msg_at_epoch")
+            rs.getLong("last_message_created_at") > 0 ? rs.getLong("last_message_created_at") : rs.getLong("last_msg_at_epoch"),
+            rs.getLong("created_at_epoch"),
+            rs.getLong("last_msg_at_epoch"),
+            rs.getObject("closed_at_epoch") == null ? null : rs.getLong("closed_at_epoch"),
+            rs.getObject("last_customer_msg_at_epoch") == null ? null : rs.getLong("last_customer_msg_at_epoch"),
+            rs.getObject("last_idle_event_at_epoch") == null ? null : rs.getLong("last_idle_event_at_epoch"),
+            rs.getString("last_archived_reason"),
+            rs.getObject("last_archived_inactivity_minutes") == null ? null : rs.getLong("last_archived_inactivity_minutes")
         ), tenantId, customerUserId);
     }
 }

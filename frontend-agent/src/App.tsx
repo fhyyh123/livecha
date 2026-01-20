@@ -23,7 +23,6 @@ import { AcceptInvitePage } from "./pages/AcceptInvitePage";
 import { Authenticated } from "@refinedev/core";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { WsAutoConnect } from "./components/WsAutoConnect";
-import { AgentHeartbeat } from "./components/AgentHeartbeat";
 import { accessControlProvider } from "./providers/accessControlProvider";
 import { AppShell } from "./components/AppShell";
 
@@ -182,7 +181,6 @@ function App() {
             projectId: "chatlive",
           }}
         >
-          <AgentHeartbeat />
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />

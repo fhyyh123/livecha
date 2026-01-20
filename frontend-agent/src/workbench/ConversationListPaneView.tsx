@@ -5,6 +5,11 @@ import VirtualList from "rc-virtual-list";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { Conversation } from "../store/chatStore";
+import {
+    fetchInactivityTimeouts,
+    getCachedInactivityTimeouts,
+    type InactivityTimeoutsDto,
+} from "../providers/chatSettings";
 
 export type ConversationListPaneViewProps = {
     t: (key: string, options?: Record<string, unknown>) => string;
@@ -113,6 +118,22 @@ export function ConversationListPaneView({
     useEffect(() => {
         const id = window.setInterval(() => setNowMs(Date.now()), 1000);
         return () => window.clearInterval(id);
+    }, []);
+
+    const [inactivityCfg, setInactivityCfg] = useState<InactivityTimeoutsDto>(() => getCachedInactivityTimeouts());
+    useEffect(() => {
+        let mounted = true;
+        fetchInactivityTimeouts()
+            .then((cfg) => {
+                if (!mounted) return;
+                setInactivityCfg(cfg);
+            })
+            .catch(() => {
+                // best-effort
+            });
+        return () => {
+            mounted = false;
+        };
     }, []);
     const q = keyword.trim().toLowerCase();
     const filtered = useMemo(() => {
@@ -233,11 +254,48 @@ export function ConversationListPaneView({
                         >
                             {(c: Conversation) => {
                                 const isSelected = Boolean(selectedId && c.id === selectedId);
-                                const unread = Number(c.unread_count || 0);
+                                // UX: once the chat is opened/selected, the badge should disappear immediately.
+                                // Server-side unread_count may lag until MSG_READ/MSG_READ_OK roundtrip completes.
+                                const unread = isSelected ? 0 : Number(c.unread_count || 0);
                                 const title = getPrimaryTitle(c, anonymousEnabled, t);
                                 const lastMsgText = String(c.last_message_text || "").trim();
                                 const lastFromAgent = String(c.last_message_sender_type || "") === "agent";
-                                const subtitleText = lastMsgText || (c.subject || "-");
+
+                                const nowSec = Math.floor(nowMs / 1000);
+                                const createdAtSec = Number(c.created_at || 0);
+                                const lastCustomerAtSec = Number(c.last_customer_msg_at || 0);
+                                const lastIdleEventAtSec = Number(c.last_idle_event_at || 0);
+
+                                const customerActivityAtSec = (lastCustomerAtSec || createdAtSec || 0);
+                                const idleForMinutes = (() => {
+                                    if (!customerActivityAtSec) return 0;
+                                    return Math.max(1, Math.floor(Math.max(0, nowSec - customerActivityAtSec) / 60));
+                                })();
+
+                                const isIdle = (() => {
+                                    if (!inactivityCfg.visitor_idle_enabled) return false;
+                                    if (c.status === "closed") return false;
+                                    if (!lastIdleEventAtSec) return false;
+                                    if (!customerActivityAtSec) return false;
+                                    // Only show idle preview after the backend has emitted the idle system event.
+                                    // Backend guarantees: last_idle_event_at >= activity_at for the current inactivity period.
+                                    return lastIdleEventAtSec >= customerActivityAtSec;
+                                })();
+
+                                const archivedReason = String(c.last_archived_reason || "").trim();
+                                const archivedInactivityMinutes = Number(c.last_archived_inactivity_minutes || 0);
+                                const isArchivedInactivity = (() => {
+                                    if (!inactivityCfg.inactivity_archive_enabled) return false;
+                                    if (c.status !== "closed") return false;
+                                    if (!archivedReason.startsWith("inactivity_")) return false;
+                                    return archivedInactivityMinutes > 0;
+                                })();
+
+                                const subtitleText = isArchivedInactivity
+                                    ? t("workbench.system.archivedInactivity", { minutes: archivedInactivityMinutes })
+                                    : (isIdle
+                                        ? t("workbench.system.idle", { minutes: idleForMinutes })
+                                        : (lastMsgText || (c.subject || "-")));
 
                                 const avatarBg = avatarBgForConversation(c, title);
                                 const avatarText = avatarTextFromTitle(title, t);
@@ -295,7 +353,12 @@ export function ConversationListPaneView({
                                             <Space direction="vertical" size={2} style={{ flex: 1, minWidth: 0 }}>
                                                 <Space size={8} style={{ width: "100%", justifyContent: "space-between" }}>
                                                     <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                                                        <Typography.Text strong ellipsis style={{ minWidth: 0 }}>
+                                                        <Typography.Text
+                                                            strong
+                                                            ellipsis
+                                                            type={isIdle ? "secondary" : undefined}
+                                                            style={{ minWidth: 0 }}
+                                                        >
                                                             {title}
                                                         </Typography.Text>
                                                         <Tag>{c.channel}</Tag>
@@ -340,7 +403,7 @@ export function ConversationListPaneView({
                                                 </Space>
 
                                                 <Typography.Text type="secondary" ellipsis style={{ fontSize: 12 }}>
-                                                    {lastFromAgent && lastMsgText ? (
+                                                    {lastFromAgent && (Boolean(lastMsgText) || isIdle || isArchivedInactivity) ? (
                                                         <RollbackOutlined
                                                             aria-hidden
                                                             style={{

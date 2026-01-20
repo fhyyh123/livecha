@@ -193,10 +193,11 @@ public class ConversationService {
                 .orElseThrow(() -> new IllegalArgumentException("conversation_not_found"));
         ensureCanAccessConversation(claims, access);
 
-        // Idempotent: closing an already-closed conversation is OK.
-        conversationRepository.closeConversation(claims.tenantId(), conversationId, claims.userId());
-
         final String safeReason = (reason == null || reason.isBlank()) ? null : reason.trim();
+
+        // Idempotent: closing an already-closed conversation is OK.
+        // Persist reason for list rendering; do not infer inactivity minutes for manual close.
+        conversationRepository.closeConversation(claims.tenantId(), conversationId, claims.userId(), safeReason, null);
         afterCommit(() -> {
             ObjectNode data = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
             data.put("by_user_id", claims.userId());
@@ -225,11 +226,17 @@ public class ConversationService {
             throw new IllegalArgumentException("missing_conversation_id");
         }
 
-        // Idempotent.
-        conversationRepository.closeConversation(tenantId, conversationId, null);
-
         // Normalize minutes for stable UI wording.
         long safeMinutes = Math.max(1, Math.min(inactivityMinutes, 365L * 24 * 60));
+
+        // Idempotent.
+        conversationRepository.closeConversation(
+            tenantId,
+            conversationId,
+            null,
+            "inactivity_" + safeMinutes,
+            (int) safeMinutes
+        );
 
         afterCommit(() -> {
             ObjectNode data = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();

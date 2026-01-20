@@ -72,6 +72,9 @@ public class AgentController {
 
                 var hasPresence = agentPresenceService.hasActiveSession(claims.userId());
                 var status = hasPresence ? profile.status() : "offline";
+                if (hasPresence && "offline".equals(status)) {
+                        status = "online";
+                }
                 var effective = ("online".equals(status) && remaining == 0) ? "busy" : status;
 
                 var res = new AgentHeartbeatResponse(
@@ -267,8 +270,11 @@ public class AgentController {
         var assignedActive = assignmentService.getAssignedActiveCount(claims.tenantId(), claims.userId());
         var maxC = Math.max(1, profile.maxConcurrent());
         var remaining = Math.max(0, maxC - assignedActive);
-        var hasPresence = agentPresenceService.hasActiveSession(claims.userId());
-        var status = hasPresence ? profile.status() : "offline";
+                var hasPresence = agentPresenceService.hasActiveSession(claims.userId());
+                var status = hasPresence ? profile.status() : "offline";
+                if (hasPresence && "offline".equals(status)) {
+                        status = "online";
+                }
         var canAccept = "online".equals(status) && remaining > 0;
         var effective = ("online".equals(status) && remaining == 0) ? "busy" : status;
 
@@ -340,6 +346,9 @@ public class AgentController {
                 var remaining = Math.max(0, maxC - assignedActive);
                 var hasPresence = agentPresenceService.hasActiveSession(userId);
                 var status = hasPresence ? profile.status() : "offline";
+                if (hasPresence && "offline".equals(status)) {
+                        status = "online";
+                }
                 var effective = ("online".equals(status) && remaining == 0) ? "busy" : status;
                 var canAccept = "online".equals(status) && remaining > 0;
 

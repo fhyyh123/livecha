@@ -1,7 +1,8 @@
 import { create } from "zustand";
 
-import { http, getToken } from "../providers/http";
+import { http, getCurrentUserId, getToken } from "../providers/http";
 import { WsClient, type WsStatus, type WsInboundEvent } from "../ws/wsClient";
+import { broadcastConversationRead, subscribeCrossTabEvents, type CrossTabEvent } from "../utils/crossTab";
 
 export type Conversation = {
     id: string;
@@ -9,6 +10,16 @@ export type Conversation = {
     channel: string;
     subject?: string | null;
     assigned_agent_user_id?: string | null;
+
+    created_at?: number | null;
+    last_msg_at?: number | null;
+    closed_at?: number | null;
+
+    last_customer_msg_at?: number | null;
+    last_idle_event_at?: number | null;
+
+    last_archived_reason?: string | null;
+    last_archived_inactivity_minutes?: number | null;
 
     last_message_sender_type?: string | null;
     last_message_content_type?: string | null;
@@ -96,6 +107,11 @@ export type QuickReplyItem = {
     updated_at: number;
 };
 
+type LocalReadMark = {
+    last_read_msg_id: string;
+    at: number; // ms
+};
+
 type ChatState = {
     conversations: Conversation[];
     conversationsLoading: boolean;
@@ -119,6 +135,8 @@ type ChatState = {
     typingByConversationId: Record<string, boolean | undefined>;
     remoteLastReadByConversationId: Record<string, string | undefined>;
     remoteLastReadAtByConversationId: Record<string, number | undefined>;
+
+    localReadByConversationId: Record<string, LocalReadMark>;
 
     uploading: boolean;
 
@@ -169,6 +187,49 @@ type ChatState = {
 
     setDraft: (conversationId: string, draft: string) => void;
 };
+
+const LOCAL_READ_STORAGE_KEY = "chatlive.agent.localReadByConversationId";
+const LOCAL_READ_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function loadLocalReadMarks(): Record<string, LocalReadMark> {
+    try {
+        const raw = localStorage.getItem(LOCAL_READ_STORAGE_KEY);
+        if (!raw) return {};
+        const obj = JSON.parse(raw) as Record<string, unknown>;
+        const out: Record<string, LocalReadMark> = {};
+        const now = Date.now();
+        for (const [conversationId, v] of Object.entries(obj || {})) {
+            if (!conversationId) continue;
+            if (!v || typeof v !== "object") continue;
+            const vv = v as Record<string, unknown>;
+            const last = String(vv.last_read_msg_id ?? "");
+            const at = Number(vv.at ?? 0);
+            if (!last || !Number.isFinite(at) || at <= 0) continue;
+            if (now - at > LOCAL_READ_TTL_MS) continue;
+            out[conversationId] = { last_read_msg_id: last, at };
+        }
+        return out;
+    } catch {
+        return {};
+    }
+}
+
+function persistLocalReadMarks(map: Record<string, LocalReadMark>) {
+    try {
+        const now = Date.now();
+        const entries = Object.entries(map || {})
+            .filter(([, v]) => Boolean(v?.last_read_msg_id) && Number.isFinite(v.at) && v.at > 0)
+            .filter(([, v]) => now - v.at <= LOCAL_READ_TTL_MS)
+            .sort((a, b) => (b[1].at - a[1].at));
+
+        const bounded = entries.slice(0, 1000);
+        const obj: Record<string, LocalReadMark> = {};
+        for (const [k, v] of bounded) obj[k] = v;
+        localStorage.setItem(LOCAL_READ_STORAGE_KEY, JSON.stringify(obj));
+    } catch {
+        // ignore
+    }
+}
 
 let wsClient: WsClient | null = null;
 
@@ -449,14 +510,69 @@ function handleWsEvent(e: WsInboundEvent) {
         const convId = String(obj.conversation_id ?? "") || ensureWs().getSubscribedConversationId();
         if (!convId) return;
 
+        const eventKey = String(obj.event_key ?? "").trim();
+        const createdAtSec = Number(obj.created_at ?? 0);
+        const dataObj = asRecord(obj.data) ?? {};
+
         const evt = coerceConversationSystemEvent({
             id: obj.event_id,
-            event_key: obj.event_key,
-            created_at: obj.created_at,
-            data: obj.data,
+            event_key: eventKey,
+            created_at: createdAtSec,
+            data: dataObj,
         });
         if (!evt) return;
         addSystemEvents(convId, [evt]);
+
+        // Keep list preview/status in sync with system events (LiveChat-like).
+        if (eventKey === "idle") {
+            const activityAt = Number((dataObj as any).activity_at ?? 0);
+            useChatStore.setState((st) => ({
+                conversations: st.conversations.map((c) =>
+                    c.id !== convId
+                        ? c
+                        : {
+                              ...c,
+                              last_idle_event_at: createdAtSec > 0 ? createdAtSec : c.last_idle_event_at ?? null,
+                              // Best-effort: if list API didn't include last_customer_msg_at yet, patch it from event payload.
+                              last_customer_msg_at: activityAt > 0 ? activityAt : (c.last_customer_msg_at ?? null),
+                          },
+                ),
+            }));
+        }
+
+        if (eventKey === "archived") {
+            const reason = String((dataObj as any).reason ?? "").trim();
+            const minsRaw = Number((dataObj as any).inactivity_minutes ?? 0);
+            const mins = Number.isFinite(minsRaw) && minsRaw > 0 ? Math.floor(minsRaw) : null;
+            useChatStore.setState((st) => ({
+                conversations: st.conversations.map((c) =>
+                    c.id !== convId
+                        ? c
+                        : {
+                              ...c,
+                              status: "closed",
+                              closed_at: createdAtSec > 0 ? createdAtSec : (c.closed_at ?? null),
+                              last_archived_reason: reason || (c.last_archived_reason ?? null),
+                              last_archived_inactivity_minutes: mins ?? (c.last_archived_inactivity_minutes ?? null),
+                          },
+                ),
+            }));
+
+            // Refresh the current list (inbox or archives) so filters/status take effect.
+            scheduleInboxRefresh();
+        }
+        return;
+    }
+
+    if (e.type === "MSG_READ_OK") {
+        const obj = e as Record<string, unknown>;
+        const convId = String(obj.conversation_id ?? "") || ensureWs().getSubscribedConversationId();
+        if (!convId) return;
+
+        // Server has persisted last_read_msg_id for this user; clear list unread badge.
+        useChatStore.setState((st) => ({
+            conversations: st.conversations.map((c) => (c.id === convId ? { ...c, unread_count: 0 } : c)),
+        }));
         return;
     }
 
@@ -469,6 +585,23 @@ function handleWsEvent(e: WsInboundEvent) {
 
         // Scheme B: server supplies preview_text; apply it to the list immediately.
         patchConversationLastMessage(convId, msg);
+
+        // Keep activity timestamps in sync for list-level idle marker/preview.
+        // Only customer messages reset visitor inactivity timer.
+        const ts = Number(msg.created_at || 0);
+        if (ts > 0) {
+            useChatStore.setState((st) => ({
+                conversations: st.conversations.map((c) =>
+                    c.id !== convId
+                        ? c
+                        : {
+                              ...c,
+                              last_msg_at: ts,
+                              last_customer_msg_at: msg.sender_type === "customer" ? ts : (c.last_customer_msg_at ?? null),
+                          },
+                ),
+            }));
+        }
 
         // Unread + notification (best-effort): count customer messages for non-active conversations.
         const st = useChatStore.getState();
@@ -544,20 +677,37 @@ function handleWsEvent(e: WsInboundEvent) {
         const senderRole = typeof obj.sender_role === "string" ? obj.sender_role : "";
         const lastRead = String(obj.last_read_msg_id ?? "");
         if (!lastRead) return;
-        // Agent UI cares about visitor read state.
-        if (senderRole !== "visitor") return;
-        const readAtRaw = obj.read_at;
-        const readAt = typeof readAtRaw === "number" ? readAtRaw : Number(readAtRaw || 0);
-        useChatStore.setState((st) => ({
-            remoteLastReadByConversationId: {
-                ...st.remoteLastReadByConversationId,
-                [convId]: lastRead,
-            },
-            remoteLastReadAtByConversationId: {
-                ...st.remoteLastReadAtByConversationId,
-                ...(readAt > 0 ? { [convId]: readAt } : null),
-            },
-        }));
+
+        if (senderRole === "visitor") {
+            // Agent UI cares about visitor read state.
+            const readAtRaw = obj.read_at;
+            const readAt = typeof readAtRaw === "number" ? readAtRaw : Number(readAtRaw || 0);
+            useChatStore.setState((st) => ({
+                remoteLastReadByConversationId: {
+                    ...st.remoteLastReadByConversationId,
+                    [convId]: lastRead,
+                },
+                remoteLastReadAtByConversationId: {
+                    ...st.remoteLastReadAtByConversationId,
+                    ...(readAt > 0 ? { [convId]: readAt } : null),
+                },
+            }));
+            return;
+        }
+
+        if (senderRole === "agent") {
+            // Multi-tab: if another tab (same agent account) marked messages as read,
+            // clear the unread badge here as well.
+            const myId = getCurrentUserId();
+            const senderId = String(obj.sender_id ?? "");
+            if (myId && senderId && senderId === myId) {
+                useChatStore.setState((st) => ({
+                    conversations: st.conversations.map((c) => (c.id === convId ? { ...c, unread_count: 0 } : c)),
+                }));
+            }
+            return;
+        }
+
         return;
     }
 }
@@ -610,6 +760,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     remoteLastReadByConversationId: {},
     remoteLastReadAtByConversationId: {},
 
+    localReadByConversationId: loadLocalReadMarks(),
+
     uploading: false,
 
     agents: [],
@@ -635,7 +787,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 params.status = effectiveStatus;
             }
             const res = await http.get<Conversation[]>("/api/v1/conversations", { params });
-            const list = Array.isArray(res.data) ? res.data : [];
+            const raw = Array.isArray(res.data) ? res.data : [];
+            const localRead = get().localReadByConversationId;
+            const list = raw.map((c) => (localRead?.[c.id] ? { ...c, unread_count: 0 } : c));
             set({
                 conversations: list,
                 inboxStatus: effectiveStatus,
@@ -837,6 +991,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const ws = ensureWs();
         ws.sendRead(conversationId, lastReadMsgId);
 
+        // Cross-tab: broadcast immediately so other tabs clear their badges even
+        // if they are not subscribed to this conversation.
+        broadcastConversationRead(conversationId, lastReadMsgId);
+
+        // Persist local mark so unread won't re-appear after a list refresh.
+        set((st) => {
+            const next = {
+                ...st.localReadByConversationId,
+                [conversationId]: { last_read_msg_id: lastReadMsgId, at: Date.now() },
+            };
+            persistLocalReadMarks(next);
+            return { localReadByConversationId: next };
+        });
+
         // optimistic clear
         set((st) => ({
             conversations: st.conversations.map((c) => (c.id === conversationId ? { ...c, unread_count: 0 } : c)),
@@ -871,14 +1039,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (!conversationId) return;
         await http.post(`/api/v1/conversations/${encodeURIComponent(conversationId)}/close`, {});
         await get().loadConversationDetail(conversationId);
-        await get().refreshConversations(null, false);
+        await get().refreshConversations(get().inboxStatus, get().inboxStarredOnly);
     },
 
     reopenConversation: async (conversationId) => {
         if (!conversationId) return;
         await http.post(`/api/v1/conversations/${encodeURIComponent(conversationId)}/reopen`, {});
         await get().loadConversationDetail(conversationId);
-        await get().refreshConversations(null, false);
+        await get().refreshConversations(get().inboxStatus, get().inboxStarredOnly);
     },
 
     assignConversation: async (conversationId, agentUserId) => {
@@ -904,13 +1072,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
             };
         });
 
-        await get().refreshConversations(null, false);
+        await get().refreshConversations(get().inboxStatus, get().inboxStarredOnly);
     },
 
     claimConversation: async (conversationId) => {
         if (!conversationId) return;
         await http.post(`/api/v1/agent/conversations/${encodeURIComponent(conversationId)}/claim`, {});
-        await get().refreshConversations(null, false);
+        await get().refreshConversations(get().inboxStatus, get().inboxStarredOnly);
         await get().loadConversationDetail(conversationId);
     },
 
@@ -995,3 +1163,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
     },
 }));
+
+// Cross-tab: keep unread badges in sync across tabs/windows.
+// - A tab broadcasts CONV_READ when it sends MSG_READ.
+// - Other tabs update localReadByConversationId and clear unread_count (if present in list).
+try {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (typeof window !== "undefined") {
+        subscribeCrossTabEvents((evt: CrossTabEvent) => {
+            if (evt.type !== "CONV_READ") return;
+            const { conversationId, lastReadMsgId, at } = evt;
+            useChatStore.setState((st) => {
+                const nextMarks = {
+                    ...st.localReadByConversationId,
+                    [conversationId]: { last_read_msg_id: lastReadMsgId, at },
+                };
+                persistLocalReadMarks(nextMarks);
+                return {
+                    localReadByConversationId: nextMarks,
+                    conversations: st.conversations.map((c) => (c.id === conversationId ? { ...c, unread_count: 0 } : c)),
+                };
+            });
+        });
+    }
+} catch {
+    // ignore
+}

@@ -128,7 +128,11 @@ public class UserAccountRepository {
                     var sql = """
                         select u.id, u.type, u.username, u.email,
                                case
-                                   when coalesce(s.active_sessions, 0) > 0 then coalesce(p.status, 'offline')
+                                   when coalesce(s.active_sessions, 0) > 0 then
+                                       case
+                                           when p.status is null or p.status = 'offline' then 'online'
+                                           else p.status
+                                       end
                                    else 'offline'
                                end as agent_status,
                                p.max_concurrent

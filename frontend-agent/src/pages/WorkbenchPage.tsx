@@ -177,6 +177,24 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
     const meta = selectedId ? (metaByConversationId[selectedId] || null) : null;
     const metaLoading = selectedId ? Boolean(metaLoadingByConversationId[selectedId]) : false;
 
+    const renderContextPanel = () => (
+        <ContextPanelView
+            t={t}
+            tabKey={contextTab}
+            setTabKey={setContextTab}
+            selectedId={selectedId}
+            selected={selected}
+            detail={detail}
+            detailLoading={detailLoading}
+            meta={meta}
+            metaLoading={metaLoading}
+            anonymousEnabled={anonymousEnabled}
+            onSetTags={setTags}
+            onSetMetaLocal={setMetaLocal}
+            onSetNote={setNote}
+        />
+    );
+
     const messages = useMemo(
         () => (selectedId ? (messagesByConversationId[selectedId] || []) : []),
         [messagesByConversationId, selectedId],
@@ -259,7 +277,7 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
         }
 
         // Prefer backend CONV_EVENT archived; fallback to detail for older servers.
-        const hasArchivedEvent = events.some((e) => String(e.id).includes(":archived") || String(e.text) === t("workbench.system.archived"));
+        const hasArchivedEvent = wsEvents.some((e) => String(e.event_key || "") === "archived");
         const closedAt = Number(detail?.closed_at || 0);
         if (!hasArchivedEvent && detail?.status === "closed" && closedAt > 0) {
             events.push({
@@ -471,7 +489,6 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
                                             onClose={async () => {
                                                 if (!selectedId) return;
                                                 await closeConversation(selectedId);
-                                                await refreshConversations(inboxStatus, starredOnly);
 
                                                 // Selection is route-scoped; after closing, clear the stage by
                                                 // navigating back to the list route.
@@ -481,7 +498,6 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
                                             onReopen={async () => {
                                                 if (!selectedId) return;
                                                 await reopenConversation(selectedId);
-                                                await refreshConversations(inboxStatus, starredOnly);
 
                                                 if (isArchives) {
                                                     nav(`/conversations/${encodeURIComponent(selectedId)}`);
@@ -519,21 +535,7 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
                 panel={
                     isNarrow ? null : (
                         <ContextPanel width={360}>
-                            <ContextPanelView
-                                t={t}
-                                tabKey={contextTab}
-                                setTabKey={setContextTab}
-                                selectedId={selectedId}
-                                selected={selected}
-                                detail={detail}
-                                detailLoading={detailLoading}
-                                meta={meta}
-                                metaLoading={metaLoading}
-                                anonymousEnabled={anonymousEnabled}
-                                onSetTags={setTags}
-                                onSetMetaLocal={setMetaLocal}
-                                onSetNote={setNote}
-                            />
+                            {renderContextPanel()}
                         </ContextPanel>
                     )
                 }
@@ -547,21 +549,7 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
                 onClose={() => setContextDrawerOpen(false)}
                 destroyOnClose={false}
             >
-                <ContextPanelView
-                    t={t}
-                    tabKey={contextTab}
-                    setTabKey={setContextTab}
-                    selectedId={selectedId}
-                    selected={selected}
-                    detail={detail}
-                    detailLoading={detailLoading}
-                    meta={meta}
-                    metaLoading={metaLoading}
-                    anonymousEnabled={anonymousEnabled}
-                    onSetTags={setTags}
-                    onSetMetaLocal={setMetaLocal}
-                    onSetNote={setNote}
-                />
+                {renderContextPanel()}
             </Drawer>
 
             <Drawer
@@ -650,7 +638,6 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
                 onOk={async () => {
                     if (!transferConversationId || !transferAgentId) return;
                     await assignConversation(transferConversationId, transferAgentId);
-                    await refreshConversations(undefined, starredOnly);
                     if (id && id === transferConversationId) {
                         nav(routeBase, { replace: true });
                     }

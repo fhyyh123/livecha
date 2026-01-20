@@ -14,6 +14,39 @@ export function setToken(token: string) {
     localStorage.setItem(TOKEN_STORAGE_KEY, token);
 }
 
+function base64UrlDecodeToUtf8(input: string) {
+    const normalized = String(input || "")
+        .replace(/-/g, "+")
+        .replace(/_/g, "/");
+    const padLen = (4 - (normalized.length % 4)) % 4;
+    const padded = normalized + "=".repeat(padLen);
+    // atob is available in browsers; this app is client-only.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const atobFn = globalThis.atob;
+    if (typeof atobFn !== "function") return "";
+    return atobFn(padded);
+}
+
+export function getTokenSubject(token?: string) {
+    const raw = String(token || "").trim();
+    if (!raw) return "";
+    const parts = raw.split(".");
+    if (parts.length < 2) return "";
+    try {
+        const payloadJson = base64UrlDecodeToUtf8(parts[1]);
+        if (!payloadJson) return "";
+        const payload = JSON.parse(payloadJson) as Record<string, unknown>;
+        const sub = payload?.sub;
+        return typeof sub === "string" ? sub : "";
+    } catch {
+        return "";
+    }
+}
+
+export function getCurrentUserId() {
+    return getTokenSubject(getToken());
+}
+
 export const http = axios.create({
     baseURL: "/",
     timeout: 15000,

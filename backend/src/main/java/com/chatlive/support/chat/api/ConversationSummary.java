@@ -15,6 +15,13 @@ public record ConversationSummary(
         String last_message_sender_type,
         String last_message_content_type,
         String last_message_text,
-        long last_message_created_at
+        long last_message_created_at,
+        long created_at,
+        long last_msg_at,
+        Long closed_at,
+        Long last_customer_msg_at,
+        Long last_idle_event_at,
+        String last_archived_reason,
+        Long last_archived_inactivity_minutes
 ) {
 }
