@@ -120,6 +120,85 @@ cp .env.prod.example .env
 
 ---
 
+## 4.1 GeoIP（离线 MaxMind）与真实访客 IP 头部
+
+为了在坐席端右栏（Customer/客户分组）显示“地址/本地时间/地图”，后端会：
+
+- 从请求中解析“真实 client IP”（**仅用于离线定位，不会下发到前端，也不需要在 UI 展示**）
+- 使用离线 MaxMind GeoLite2 City 数据库（`.mmdb`）做 Geo 查询
+- 将结果写入 `visitor.geo_*` 字段，并在坐席端会话详情接口中下发（city/region/country/lat/lon/timezone 等）
+
+### A) 放置 GeoLite2 City mmdb
+
+1) 到 MaxMind 获取 **GeoLite2 City** 的 mmdb 文件（例如 `GeoLite2-City.mmdb`）。
+   - GeoLite2 需要遵循 MaxMind 的许可条款；建议在你的组织内网制品库/对象存储中分发该文件。
+
+2) 生产机放置到一个固定路径（示例）：
+
+```bash
+mkdir -p /opt/chatlive/geoip
+# 将 GeoLite2-City.mmdb 放到 /opt/chatlive/geoip/GeoLite2-City.mmdb
+```
+
+3) 通过环境变量告诉后端文件路径：
+
+- `APP_GEOIP_DB_PATH=/path/to/GeoLite2-City.mmdb`
+- （可选）`APP_GEOIP_REFRESH_TTL_SECONDS=21600`（默认 6 小时；用于控制多久刷新一次 visitor 的 geo 缓存）
+
+如果你用 Docker Compose 运行后端，推荐用 volume 挂载只读：
+
+```yaml
+services:
+  app:
+    environment:
+      APP_GEOIP_DB_PATH: /data/GeoLite2-City.mmdb
+      APP_GEOIP_REFRESH_TTL_SECONDS: 21600
+    volumes:
+      - /opt/chatlive/geoip/GeoLite2-City.mmdb:/data/GeoLite2-City.mmdb:ro
+```
+
+未配置 `APP_GEOIP_DB_PATH` 时，GeoIP 功能会自动禁用（不影响聊天主流程）。
+
+### B) 反向代理需要透传真实 client IP
+
+后端定位依赖以下头部之一（按优先级尝试）：
+
+- `X-Forwarded-For`（推荐，Nginx 最常见）
+- `X-Real-IP`
+- `Forwarded`（RFC 7239）
+
+仓库示例 Nginx 已包含：
+
+- `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`
+
+建议补充（可选）：
+
+```nginx
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+### C) 安全注意事项（重要）
+
+转发头（如 `X-Forwarded-For`）可能被客户端伪造。
+
+生产环境务必确保：
+
+- 后端服务不直接暴露公网，只允许来自你信任的反向代理/网关访问
+- 或在网关层移除客户端传入的 `X-Forwarded-*` / `Forwarded` 头，并由网关重新设置
+
+---
+
+## 4.2（可选）Google 地图 Key
+
+坐席端地图渲染使用 Google Maps Embed（iframe）。前端需要：
+
+- `VITE_GOOGLE_MAPS_API_KEY=...`
+
+注意：Key 需要启用相应 API（通常是 **Maps Embed API**），并配置域名/来源限制。
+
+---
+
 ## 5. GitHub Release 推荐流程
 
 ### 5.1 版本号与 tag

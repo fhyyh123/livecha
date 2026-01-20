@@ -6,6 +6,7 @@ import com.chatlive.support.chat.api.MessagePage;
 import com.chatlive.support.common.api.ApiResponse;
 import com.chatlive.support.publicchat.service.PublicConversationService;
 import com.chatlive.support.publicchat.service.PublicConversationQueryService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,17 +30,19 @@ public class PublicConversationController {
 
     @PostMapping("/conversations")
     public ApiResponse<CreateOrRecoverConversationResponse> createOrRecover(
+            HttpServletRequest request,
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody CreateOrRecoverConversationRequest req
     ) {
         var token = JwtService.extractBearerToken(authorization)
                 .orElseThrow(() -> new IllegalArgumentException("missing_token"));
         var claims = jwtService.parse(token);
-        return ApiResponse.ok(publicConversationService.createOrRecover(claims, req));
+        return ApiResponse.ok(publicConversationService.createOrRecover(request, claims, req));
     }
 
     @PostMapping("/conversations/{id}/messages")
     public ApiResponse<MessageItem> sendTextMessage(
+            HttpServletRequest request,
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @PathVariable("id") String conversationId,
             @Valid @RequestBody PublicSendTextMessageRequest req
@@ -47,11 +50,12 @@ public class PublicConversationController {
         var token = JwtService.extractBearerToken(authorization)
                 .orElseThrow(() -> new IllegalArgumentException("missing_token"));
         var claims = jwtService.parse(token);
-        return ApiResponse.ok(publicConversationService.sendText(claims, conversationId, req));
+        return ApiResponse.ok(publicConversationService.sendText(request, claims, conversationId, req));
     }
 
     @PostMapping("/conversations/{id}/messages/file")
     public ApiResponse<MessageItem> sendFileMessage(
+            HttpServletRequest request,
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @PathVariable("id") String conversationId,
             @Valid @RequestBody PublicSendFileMessageRequest req
@@ -59,7 +63,7 @@ public class PublicConversationController {
         var token = JwtService.extractBearerToken(authorization)
                 .orElseThrow(() -> new IllegalArgumentException("missing_token"));
         var claims = jwtService.parse(token);
-        return ApiResponse.ok(publicConversationService.sendFile(claims, conversationId, req));
+        return ApiResponse.ok(publicConversationService.sendFile(request, claims, conversationId, req));
     }
 
         @GetMapping("/conversations/{id}")

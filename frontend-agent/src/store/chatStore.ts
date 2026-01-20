@@ -84,6 +84,14 @@ export type ConversationDetail = {
         site_id?: string | null;
         name?: string | null;
         email?: string | null;
+
+        geo_country?: string | null;
+        geo_region?: string | null;
+        geo_city?: string | null;
+        geo_lat?: number | null;
+        geo_lon?: number | null;
+        geo_timezone?: string | null;
+        geo_updated_at?: number | null;
     } | null;
     starred?: boolean;
 };

@@ -468,6 +468,11 @@
       "notSupportedPlaceholder": "该类型暂未接入，先切回「消息」发送..."
     },
     "userInfo": "用户信息",
+    "contextSections": {
+      "additionalInfo": "附加信息",
+      "visitedPages": "访问页面",
+      "visitedPagesEmpty": "暂未接入访问轨迹（后续可从访客端埋点/会话事件接入）。"
+    },
     "tabs": {
       "profile": "资料",
       "details": "详情",
@@ -487,6 +492,9 @@
     "visitor": "访客",
     "visitorName": "姓名：{{name}}",
     "visitorEmail": "邮箱：{{email}}",
+    "visitorLocation": "位置：{{location}}",
+    "visitorLocalTime": "本地时间：{{time}}",
+    "openInGoogleMaps": "在 Google 地图中打开",
     "customerUsername": "用户名：{{username}}",
     "customerId": "用户ID：",
     "customerPhone": "手机：{{phone}}",

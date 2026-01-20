@@ -1,5 +1,6 @@
 server:
   port: 8080
+  forward-headers-strategy: framework
 
 spring:
   application:
@@ -71,6 +72,13 @@ app:
     public-script-base-url: ${WIDGET_PUBLIC_SCRIPT_BASE_URL:}
     # iframe 访客页地址（通常是前端域名的 /visitor/embed）
     public-embed-url: ${WIDGET_PUBLIC_EMBED_URL:http://localhost:5173/visitor/embed}
+
+  geoip:
+    # Absolute path to GeoLite2-City.mmdb (or other MaxMind City database).
+    # If empty, geo lookup is disabled.
+    db-path: ${APP_GEOIP_DB_PATH:}
+    # Refresh visitor geo if older than this (seconds). Default: 6 hours.
+    refresh-ttl-seconds: ${APP_GEOIP_REFRESH_TTL_SECONDS:21600}
   s3:
     enabled: ${S3_ENABLED:false}
     internal-endpoint: ${S3_INTERNAL_ENDPOINT:http://localhost:9000}

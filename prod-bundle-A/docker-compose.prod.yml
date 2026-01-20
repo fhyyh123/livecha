@@ -81,6 +81,11 @@ services:
       APP_ONBOARDING_FRONTEND_BASE_URL: ${APP_ONBOARDING_FRONTEND_BASE_URL:-}
       APP_ONBOARDING_DEV_RETURN_LINKS: "${APP_ONBOARDING_DEV_RETURN_LINKS:-false}"
 
+      # GeoIP (optional, offline MaxMind GeoLite2)
+      # If APP_GEOIP_DB_PATH is empty, geo enrichment is disabled.
+      APP_GEOIP_DB_PATH: ${APP_GEOIP_DB_PATH:-}
+      APP_GEOIP_REFRESH_TTL_SECONDS: "${APP_GEOIP_REFRESH_TTL_SECONDS:-21600}"
+
       # Attachments (MinIO / S3)
       S3_ENABLED: "${S3_ENABLED:-true}"
       S3_INTERNAL_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-http://minio:9000}
@@ -92,6 +97,10 @@ services:
       S3_PATH_STYLE_ACCESS: "${S3_PATH_STYLE_ACCESS:-true}"
       S3_PRESIGN_TTL_SECONDS: "${S3_PRESIGN_TTL_SECONDS:-600}"
       S3_MAX_UPLOAD_BYTES: "${S3_MAX_UPLOAD_BYTES:-20971520}"
+
+    # GeoLite2-City.mmdb mount (BaoTa panel host path)
+    volumes:
+      - /www/wwwroot/chatlive-deploy/GeoLite2-City_20260116/GeoLite2-City.mmdb:/data/GeoLite2-City.mmdb:ro
 
     depends_on:
       postgres:

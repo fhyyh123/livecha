@@ -471,6 +471,11 @@
       "notSupportedPlaceholder": "Not wired yet. Switch back to Message to send..."
     },
     "userInfo": "User info",
+    "contextSections": {
+      "additionalInfo": "Additional info",
+      "visitedPages": "Visited pages",
+      "visitedPagesEmpty": "Visited pages is not wired yet (future: visitor tracking / conversation events)."
+    },
     "tabs": {
       "profile": "Profile",
       "details": "Details",
@@ -490,6 +495,9 @@
     "visitor": "Visitor",
     "visitorName": "Name: {{name}}",
     "visitorEmail": "Email: {{email}}",
+    "visitorLocation": "Location: {{location}}",
+    "visitorLocalTime": "Local time: {{time}}",
+    "openInGoogleMaps": "Open in Google Maps",
     "customerUsername": "Username: {{username}}",
     "customerId": "User ID: ",
     "customerPhone": "Phone: {{phone}}",

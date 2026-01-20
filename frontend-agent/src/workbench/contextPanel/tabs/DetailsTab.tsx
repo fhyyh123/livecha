@@ -14,15 +14,17 @@ type Props = {
     onSetTags: (conversationId: string, tags: string[]) => Promise<void>;
     onSetMetaLocal: (conversationId: string, meta: ConversationMeta) => void;
     onSetNote: (conversationId: string, note: string) => Promise<void>;
+
+    embedded?: boolean;
 };
 
-export function DetailsTab({ t, selectedId, selected, meta, metaLoading, onSetTags, onSetMetaLocal, onSetNote }: Props) {
+export function DetailsTab({ t, selectedId, selected, meta, metaLoading, onSetTags, onSetMetaLocal, onSetNote, embedded = false }: Props) {
     if (!selectedId) {
         return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("workbench.noConversationSelected")} />;
     }
 
     return (
-        <Space direction="vertical" size={10} style={{ width: "100%", paddingTop: 4 }}>
+        <Space direction="vertical" size={10} style={{ width: "100%", paddingTop: embedded ? 0 : 4 }}>
             <Space direction="vertical" size={6} style={{ width: "100%" }}>
                 {selected ? (
                     <>

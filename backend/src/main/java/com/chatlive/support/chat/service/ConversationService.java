@@ -132,7 +132,20 @@ public class ConversationService {
         if (access.siteId() != null && !access.siteId().isBlank() && access.visitorId() != null && !access.visitorId().isBlank()) {
             var v = visitorRepository.findByIdAndSite(access.visitorId(), access.siteId()).orElse(null);
             if (v != null) {
-                visitor = new VisitorPublicProfile(v.id(), v.siteId(), v.name(), v.email());
+                var geoUpdatedAt = v.geoUpdatedAt() == null ? null : v.geoUpdatedAt().getEpochSecond();
+                visitor = new VisitorPublicProfile(
+                        v.id(),
+                        v.siteId(),
+                        v.name(),
+                        v.email(),
+                        v.geoCountry(),
+                        v.geoRegion(),
+                        v.geoCity(),
+                        v.geoLat(),
+                        v.geoLon(),
+                        v.geoTimezone(),
+                        geoUpdatedAt
+                );
             }
         }
 

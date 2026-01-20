@@ -127,11 +127,40 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
     const setStarredOnly = (next: boolean) => patchSearchParams({ starred: next ? "1" : "" });
     const [contextTab, setContextTab] = useState<string>(() => {
         try {
-            return localStorage.getItem("chatlive:contextTab") || "profile";
+            return localStorage.getItem("chatlive:contextTab") || "customer";
         } catch {
-            return "profile";
+            return "customer";
         }
     });
+
+    // Migrate legacy tab keys from the old icon-tabs UI.
+    useEffect(() => {
+        const raw = String(contextTab || "").trim();
+
+        if (raw === "profile") {
+            setContextTab("customer");
+            return;
+        }
+        if (raw === "details") {
+            setContextTab("additional");
+            return;
+        }
+
+        if (raw.startsWith("[")) {
+            try {
+                const arr = JSON.parse(raw) as unknown;
+                if (!Array.isArray(arr)) return;
+                const mapped = arr
+                    .map((x) => String(x || "").trim())
+                    .map((k) => (k === "profile" ? "customer" : k === "details" ? "additional" : k))
+                    .filter(Boolean);
+                const next = JSON.stringify(mapped);
+                if (next !== raw) setContextTab(next);
+            } catch {
+                // ignore
+            }
+        }
+    }, [contextTab]);
 
 
     useEffect(() => {

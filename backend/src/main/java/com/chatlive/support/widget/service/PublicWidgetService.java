@@ -1,6 +1,7 @@
 package com.chatlive.support.widget.service;
 
 import com.chatlive.support.auth.service.jwt.JwtService;
+import com.chatlive.support.common.geo.VisitorGeoUpdater;
 import com.chatlive.support.widget.api.WidgetBootstrapRequest;
 import com.chatlive.support.widget.api.WidgetBootstrapResponse;
 import com.chatlive.support.widget.api.WidgetConfigDto;
@@ -8,6 +9,7 @@ import com.chatlive.support.widget.repo.SiteDomainAllowlistRepository;
 import com.chatlive.support.widget.repo.SiteRepository;
 import com.chatlive.support.widget.repo.VisitorRepository;
 import com.chatlive.support.widget.repo.WidgetConfigRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +23,7 @@ public class PublicWidgetService {
     private final SiteDomainAllowlistRepository allowlistRepository;
     private final WidgetConfigRepository widgetConfigRepository;
     private final VisitorRepository visitorRepository;
+    private final VisitorGeoUpdater visitorGeoUpdater;
     private final JwtService jwtService;
     private final Duration visitorTtl;
 
@@ -29,6 +32,7 @@ public class PublicWidgetService {
             SiteDomainAllowlistRepository allowlistRepository,
             WidgetConfigRepository widgetConfigRepository,
             VisitorRepository visitorRepository,
+            VisitorGeoUpdater visitorGeoUpdater,
             JwtService jwtService,
             @Value("${app.jwt.visitor-ttl-seconds:7200}") long visitorTtlSeconds
     ) {
@@ -36,11 +40,12 @@ public class PublicWidgetService {
         this.allowlistRepository = allowlistRepository;
         this.widgetConfigRepository = widgetConfigRepository;
         this.visitorRepository = visitorRepository;
+        this.visitorGeoUpdater = visitorGeoUpdater;
         this.jwtService = jwtService;
         this.visitorTtl = Duration.ofSeconds(visitorTtlSeconds);
     }
 
-    public WidgetBootstrapResponse bootstrap(WidgetBootstrapRequest req) {
+    public WidgetBootstrapResponse bootstrap(HttpServletRequest request, WidgetBootstrapRequest req) {
         var host = extractHost(req.origin());
 
         var site = siteRepository.findByPublicKey(req.site_key())
@@ -76,6 +81,9 @@ public class PublicWidgetService {
         } else {
             visitorId = visitorRepository.createAnonymous(site.id());
         }
+
+        // Best-effort geo refresh (no IP stored or returned).
+        visitorGeoUpdater.refreshGeoIfNeeded(visitorId, site.id(), request);
 
         var token = jwtService.issueVisitorToken(visitorId, site.tenantId(), site.id(), visitorTtl);
 

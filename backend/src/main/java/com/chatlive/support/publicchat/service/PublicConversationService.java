@@ -6,6 +6,7 @@ import com.chatlive.support.chat.repo.ConversationRepository;
 import com.chatlive.support.chat.service.AssignmentService;
 import com.chatlive.support.chat.service.MessageService;
 import com.chatlive.support.chat.ws.WsBroadcaster;
+import com.chatlive.support.common.geo.VisitorGeoUpdater;
 import com.chatlive.support.publicchat.api.CreateOrRecoverConversationRequest;
 import com.chatlive.support.publicchat.api.CreateOrRecoverConversationResponse;
 import com.chatlive.support.publicchat.api.PublicSendFileMessageRequest;
@@ -13,6 +14,7 @@ import com.chatlive.support.publicchat.api.PublicSendTextMessageRequest;
 import com.chatlive.support.user.repo.UserAccountRepository;
 import com.chatlive.support.widget.repo.VisitorRepository;
 import com.chatlive.support.widget.repo.WidgetConfigRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -28,6 +30,7 @@ public class PublicConversationService {
     private final AssignmentService assignmentService;
     private final MessageService messageService;
     private final WsBroadcaster wsBroadcaster;
+    private final VisitorGeoUpdater visitorGeoUpdater;
 
     public PublicConversationService(
             WidgetConfigRepository widgetConfigRepository,
@@ -37,7 +40,8 @@ public class PublicConversationService {
             ConversationRepository conversationRepository,
             AssignmentService assignmentService,
             MessageService messageService,
-            WsBroadcaster wsBroadcaster
+            WsBroadcaster wsBroadcaster,
+            VisitorGeoUpdater visitorGeoUpdater
     ) {
         this.widgetConfigRepository = widgetConfigRepository;
         this.visitorRepository = visitorRepository;
@@ -47,12 +51,14 @@ public class PublicConversationService {
         this.assignmentService = assignmentService;
         this.messageService = messageService;
         this.wsBroadcaster = wsBroadcaster;
+        this.visitorGeoUpdater = visitorGeoUpdater;
     }
 
-    public com.chatlive.support.chat.api.MessageItem sendText(JwtClaims claims, String conversationId, PublicSendTextMessageRequest req) {
+    public com.chatlive.support.chat.api.MessageItem sendText(HttpServletRequest request, JwtClaims claims, String conversationId, PublicSendTextMessageRequest req) {
         if (claims == null || !"visitor".equals(claims.role())) {
             throw new IllegalArgumentException("forbidden");
         }
+        visitorGeoUpdater.refreshGeoIfNeeded(claims.userId(), claims.siteId(), request);
         if (conversationId == null || conversationId.isBlank()) {
             throw new IllegalArgumentException("missing_conversation_id");
         }
@@ -66,10 +72,11 @@ public class PublicConversationService {
         return res.item();
     }
 
-    public com.chatlive.support.chat.api.MessageItem sendFile(JwtClaims claims, String conversationId, PublicSendFileMessageRequest req) {
+    public com.chatlive.support.chat.api.MessageItem sendFile(HttpServletRequest request, JwtClaims claims, String conversationId, PublicSendFileMessageRequest req) {
         if (claims == null || !"visitor".equals(claims.role())) {
             throw new IllegalArgumentException("forbidden");
         }
+        visitorGeoUpdater.refreshGeoIfNeeded(claims.userId(), claims.siteId(), request);
         if (conversationId == null || conversationId.isBlank()) {
             throw new IllegalArgumentException("missing_conversation_id");
         }
@@ -83,7 +90,7 @@ public class PublicConversationService {
         return res.item();
     }
 
-    public CreateOrRecoverConversationResponse createOrRecover(JwtClaims claims, CreateOrRecoverConversationRequest req) {
+    public CreateOrRecoverConversationResponse createOrRecover(HttpServletRequest request, JwtClaims claims, CreateOrRecoverConversationRequest req) {
         if (claims == null || !"visitor".equals(claims.role())) {
             throw new IllegalArgumentException("forbidden");
         }
@@ -113,6 +120,9 @@ public class PublicConversationService {
             visitorRepository.createAnonymousWithId(claims.siteId(), visitorId);
         }
         visitorRepository.touchLastSeen(visitorId);
+
+        // Best-effort geo refresh (no IP stored or returned).
+        visitorGeoUpdater.refreshGeoIfNeeded(visitorId, claims.siteId(), request);
 
         // Persist identity fields if provided (even when anonymous is enabled)
         if ((name != null && !name.isBlank()) || (email != null && !email.isBlank())) {
