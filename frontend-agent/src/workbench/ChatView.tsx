@@ -38,6 +38,8 @@ export type ChatViewProps = {
     onDownload: (attachmentId?: string) => void;
     onOpenQuickReplies: () => void;
 
+    onReopen?: () => Promise<void> | void;
+
     onLoadOlder?: () => Promise<void> | void;
     canLoadOlder?: boolean;
     loadingOlder?: boolean;
@@ -136,6 +138,7 @@ export function ChatView({
     onSendText,
     onDownload,
     onOpenQuickReplies,
+    onReopen,
     onLoadOlder,
     canLoadOlder = false,
     loadingOlder = false,
@@ -424,6 +427,9 @@ export function ChatView({
 
     const agentLabel = useMemo(() => t("workbench.agent"), [t]);
 
+    const isClosed = String(detail?.status || "") === "closed";
+    const reopenDisabled = wsStatus !== "connected" || !onReopen;
+
     return (
         <>
             <div className="cl-chatView">
@@ -579,17 +585,32 @@ export function ChatView({
                     </div>
                 ) : null}
 
-                <ChatComposer
-                    t={t}
-                    draft={draft}
-                    setDraft={setDraft}
-                    wsStatus={wsStatus}
-                    conversationStatus={detail?.status}
-                    uploading={uploading}
-                    uploadProps={uploadProps}
-                    onSendText={onSendText}
-                    onOpenQuickReplies={onOpenQuickReplies}
-                />
+                {isClosed ? (
+                    <div className="cl-composer">
+                        <div className="cl-composerBody cl-archivedComposerBody">
+                            <Typography.Text type="secondary">{t("workbench.archivedComposerHint")}</Typography.Text>
+                            <Button
+                                type="primary"
+                                onClick={() => void onReopen?.()}
+                                disabled={reopenDisabled}
+                            >
+                                {t("workbench.openChat")}
+                            </Button>
+                        </div>
+                    </div>
+                ) : (
+                    <ChatComposer
+                        t={t}
+                        draft={draft}
+                        setDraft={setDraft}
+                        wsStatus={wsStatus}
+                        conversationStatus={detail?.status}
+                        uploading={uploading}
+                        uploadProps={uploadProps}
+                        onSendText={onSendText}
+                        onOpenQuickReplies={onOpenQuickReplies}
+                    />
+                )}
             </div>
         </>
     );

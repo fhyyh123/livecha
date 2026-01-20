@@ -416,6 +416,12 @@
       "unstar": "Unstar"
     },
     "selectConversation": "Please select a conversation",
+    "noConversationsTitle": "Add channels to reach more customers",
+    "noConversationsDesc": "Add more communication channels so customers can reach you wherever they are.",
+    "seeAllChannels": "See all channels",
+    "channelMessenger": "Facebook Messenger",
+    "channelWhatsApp": "WhatsApp",
+    "channelInstagram": "Instagram",
     "peerTyping": "Visitor is typing...",
     "peerRead": "Read",
     "readReceipt": "Read",
@@ -429,6 +435,8 @@
     "claimFailedDetail": "This conversation may have been accepted by another agent. Please refresh and try again.",
     "reopen": "Reopen",
     "close": "Close",
+    "openChat": "Open chat",
+    "archivedComposerHint": "This chat has been archived.",
     "quickReplies": "Quick replies",
     "readUpToHere": "Read up to here",
     "system": {

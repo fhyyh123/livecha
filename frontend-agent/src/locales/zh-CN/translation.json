@@ -415,6 +415,12 @@
       "unstar": "取消星标"
     },
     "selectConversation": "请选择一个会话",
+    "noConversationsTitle": "添加渠道，触达更多客户",
+    "noConversationsDesc": "添加更多沟通渠道，让客户随时随地联系到你。",
+    "seeAllChannels": "查看所有渠道",
+    "channelMessenger": "Facebook Messenger",
+    "channelWhatsApp": "WhatsApp",
+    "channelInstagram": "Instagram",
     "peerTyping": "对方正在输入...",
     "peerRead": "对方已读",
     "readReceipt": "已读",
@@ -428,6 +434,8 @@
     "claimFailedDetail": "该会话可能已被其他坐席接入，请稍后刷新再试。",
     "reopen": "重开",
     "close": "结束",
+    "openChat": "打开会话",
+    "archivedComposerHint": "该会话已归档。",
     "quickReplies": "快捷回复",
     "readUpToHere": "对方已读到这里",
     "system": {

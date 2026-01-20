@@ -292,9 +292,11 @@ export function ConversationListPaneView({
                                 const isArchivedInactivity = (() => {
                                     if (!inactivityCfg.inactivity_archive_enabled) return false;
                                     if (c.status !== "closed") return false;
-                                    if (!archivedReason.startsWith("inactivity_")) return false;
+                                    if (!archivedReason.startsWith("inactivity")) return false;
                                     return archivedInactivityMinutes > 0;
                                 })();
+
+                                const isStickyArchived = isArchivedInactivity && c.status === "closed";
 
                                 const subtitleText = isArchivedInactivity
                                     ? t("workbench.system.archivedInactivity", { minutes: archivedInactivityMinutes })
@@ -340,6 +342,7 @@ export function ConversationListPaneView({
                                             background: isSelected ? "rgba(0,0,0,0.04)" : (hoveredId === c.id ? "rgba(0,0,0,0.02)" : undefined),
                                             borderLeft: isSelected ? "3px solid #1677ff" : "3px solid transparent",
                                             borderBottom: "1px solid rgba(0,0,0,0.06)",
+                                            opacity: isStickyArchived ? 0.6 : 1,
                                         }}
                                         onMouseEnter={() => setHoveredId(c.id)}
                                         onMouseLeave={() => setHoveredId((prev) => (prev === c.id ? null : prev))}
@@ -369,6 +372,7 @@ export function ConversationListPaneView({
                                                             {title}
                                                         </Typography.Text>
                                                         <Tag>{c.channel}</Tag>
+                                                        {isStickyArchived ? <Tag color="default">{t("workbench.system.archived")}</Tag> : null}
                                                         {unread > 0 ? <Tag color="red">{t("workbench.unread", { count: unread })}</Tag> : null}
                                                     </div>
 

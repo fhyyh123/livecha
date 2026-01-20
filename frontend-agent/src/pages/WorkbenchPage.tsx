@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button, Card, Drawer, Divider, Empty, Grid, Input, List, Modal, Select, Space, Typography, notification } from "antd";
 import type { UploadProps } from "antd";
+import { InstagramOutlined, MessageOutlined, RightOutlined, WhatsAppOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { useChatStore } from "../store/chatStore";
 import { useSiteStore } from "../store/siteStore";
@@ -55,6 +56,9 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
 
         draftByConversationId,
 
+        stickyArchivedByConversationId,
+        clearStickyArchived,
+
         refreshConversations,
         selectConversation,
         loadConversationDetail,
@@ -90,6 +94,14 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentSiteId]);
+
+    // UX: auto-archived conversations are kept visible (greyed) while staying on this page.
+    // Clear the sticky cache when navigating away so returning/reloading won't keep them.
+    useEffect(() => {
+        return () => {
+            clearStickyArchived();
+        };
+    }, [clearStickyArchived]);
 
     const anonymousEnabled = Boolean(currentSiteId && widgetConfigBySiteId[currentSiteId]?.anonymous_enabled);
 
@@ -162,13 +174,18 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
             ? conversations.filter((c) => String(c.site_id || "") === currentSiteId)
             : conversations;
 
+        const stickyIdSet = new Set(Object.keys(stickyArchivedByConversationId || {}));
+
         if (isArchives) {
             return bySite.filter((c) => c.status === "closed");
         }
 
         // Inbox should not display closed conversations.
-        return bySite.filter((c) => c.status !== "closed");
-    }, [conversations, currentSiteId, isArchives]);
+        // Exception: keep inactivity auto-archived conversations visible (greyed) until page reload/navigation.
+        return bySite.filter((c) => c.status !== "closed" || stickyIdSet.has(c.id));
+    }, [conversations, currentSiteId, isArchives, stickyArchivedByConversationId]);
+
+    const showNoConversationsGuide = !isArchives && !conversationsLoading && visibleConversations.length === 0;
 
     const detail = selectedId ? (conversationDetailById[selectedId] || null) : null;
     const detailLoading = selectedId ? Boolean(conversationDetailLoadingById[selectedId]) : false;
@@ -429,6 +446,15 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
         window.open(url, "_blank");
     }
 
+    async function onReopenConversation() {
+        if (!selectedId) return;
+        await reopenConversation(selectedId);
+
+        if (isArchives) {
+            nav(`/conversations/${encodeURIComponent(selectedId)}`);
+        }
+    }
+
     function onSendText() {
         if (!selectedId) return;
         const text = draft.trim();
@@ -440,6 +466,7 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
     return (
         <Card bodyStyle={{ padding: 0 }}>
             <Workspace
+                minHeight="calc(100vh - 56px)"
                 left={
                     <ConversationListPane width={screens.xs ? 300 : 340}>
                         <ConversationListPaneView
@@ -468,7 +495,54 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
                 stage={
                     <ConversationStage
                         active={Boolean(selectedId)}
-                        empty={<Empty description={t("workbench.selectConversation")} />}
+                        empty={
+                            showNoConversationsGuide ? (
+                                <div style={{ width: "100%", maxWidth: 720, padding: 24 }}>
+                                    <div style={{ textAlign: "center", marginBottom: 24 }}>
+                                        <Typography.Title level={3} style={{ marginBottom: 8 }}>
+                                            {t("workbench.noConversationsTitle")}
+                                        </Typography.Title>
+                                        <Typography.Text type="secondary">{t("workbench.noConversationsDesc")}</Typography.Text>
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            display: "grid",
+                                            gridTemplateColumns: screens.xs ? "1fr" : "repeat(3, minmax(0, 1fr))",
+                                            gap: 16,
+                                            marginBottom: 16,
+                                        }}
+                                    >
+                                        <Card hoverable style={{ borderRadius: 12 }} bodyStyle={{ padding: 18 }}>
+                                            <Space size={12}>
+                                                <MessageOutlined style={{ fontSize: 22, color: "#0084FF" }} />
+                                                <Typography.Text strong>{t("workbench.channelMessenger")}</Typography.Text>
+                                            </Space>
+                                        </Card>
+                                        <Card hoverable style={{ borderRadius: 12 }} bodyStyle={{ padding: 18 }}>
+                                            <Space size={12}>
+                                                <WhatsAppOutlined style={{ fontSize: 22, color: "#25D366" }} />
+                                                <Typography.Text strong>{t("workbench.channelWhatsApp")}</Typography.Text>
+                                            </Space>
+                                        </Card>
+                                        <Card hoverable style={{ borderRadius: 12 }} bodyStyle={{ padding: 18 }}>
+                                            <Space size={12}>
+                                                <InstagramOutlined style={{ fontSize: 22, color: "#E1306C" }} />
+                                                <Typography.Text strong>{t("workbench.channelInstagram")}</Typography.Text>
+                                            </Space>
+                                        </Card>
+                                    </div>
+
+                                    <div style={{ textAlign: "center" }}>
+                                        <Button type="link" onClick={() => nav("/sites")} icon={<RightOutlined />} iconPosition="end">
+                                            {t("workbench.seeAllChannels")}
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <Empty description={t("workbench.selectConversation")} />
+                            )
+                        }
                     >
                         <div
                             style={{
@@ -500,14 +574,6 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
                                                 if (!selectedId) return;
                                                 toggleStar(selectedId, !detail?.starred);
                                             }}
-                                            onReopen={async () => {
-                                                if (!selectedId) return;
-                                                await reopenConversation(selectedId);
-
-                                                if (isArchives) {
-                                                    nav(`/conversations/${encodeURIComponent(selectedId)}`);
-                                                }
-                                            }}
                                             onOpenQuickReplies={() => setQrOpen(true)}
                                         />
                                         <Divider style={{ margin: "12px 0" }} />
@@ -529,6 +595,7 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
                                     onSendText={onSendText}
                                     onDownload={onDownload}
                                     onOpenQuickReplies={() => setQrOpen(true)}
+                                    onReopen={onReopenConversation}
                                     canLoadOlder={Boolean(selectedId) && messages.length >= historyLimit && historyLimit < 2000}
                                     loadingOlder={historyLoading}
                                     onLoadOlder={loadOlderHistory}

@@ -151,6 +151,11 @@ type ChatState = {
 
     draftByConversationId: Record<string, string | undefined>;
 
+    // UI: keep auto-archived (inactivity) conversations visible in inbox
+    // until the user refreshes the page or navigates away.
+    stickyArchivedByConversationId: Record<string, Conversation | undefined>;
+    clearStickyArchived: () => void;
+
     refreshConversations: (status?: string | null, starredOnly?: boolean) => Promise<void>;
     bootstrapInboxSubscriptions: (status?: string | null, starredOnly?: boolean) => Promise<void>;
     selectConversation: (id: string | null) => void;
@@ -584,19 +589,45 @@ function handleWsEvent(e: WsInboundEvent) {
             const reason = String(dataObj["reason"] ?? "").trim();
             const minsRaw = Number(dataObj["inactivity_minutes"] ?? 0);
             const mins = Number.isFinite(minsRaw) && minsRaw > 0 ? Math.floor(minsRaw) : null;
-            useChatStore.setState((st) => ({
-                conversations: st.conversations.map((c) =>
-                    c.id !== convId
-                        ? c
-                        : {
-                              ...c,
-                              status: "closed",
-                              closed_at: createdAtSec > 0 ? createdAtSec : (c.closed_at ?? null),
-                              last_archived_reason: reason || (c.last_archived_reason ?? null),
-                              last_archived_inactivity_minutes: mins ?? (c.last_archived_inactivity_minutes ?? null),
-                          },
-                ),
-            }));
+            useChatStore.setState((st) => {
+                let updatedSnapshot: Conversation | null = null;
+
+                const nextConversations = st.conversations.map((c) => {
+                    if (c.id !== convId) return c;
+                    const next: Conversation = {
+                        ...c,
+                        status: "closed",
+                        closed_at: createdAtSec > 0 ? createdAtSec : (c.closed_at ?? null),
+                        last_archived_reason: reason || (c.last_archived_reason ?? null),
+                        last_archived_inactivity_minutes: mins ?? (c.last_archived_inactivity_minutes ?? null),
+                    };
+                    updatedSnapshot = next;
+                    return next;
+                });
+
+                // Only keep sticky for inactivity auto-archive.
+                const shouldSticky = Boolean(reason.startsWith("inactivity"));
+
+                return {
+                    conversations: nextConversations,
+                    stickyArchivedByConversationId: shouldSticky && updatedSnapshot
+                        ? {
+                              ...st.stickyArchivedByConversationId,
+                              [convId]: updatedSnapshot,
+                          }
+                        : st.stickyArchivedByConversationId,
+                    conversationDetailById: st.conversationDetailById[convId]
+                        ? {
+                              ...st.conversationDetailById,
+                              [convId]: {
+                                  ...(st.conversationDetailById[convId] as ConversationDetail),
+                                  status: "closed",
+                                  closed_at: createdAtSec > 0 ? createdAtSec : (st.conversationDetailById[convId]?.closed_at ?? null),
+                              },
+                          }
+                        : st.conversationDetailById,
+                };
+            });
 
             // Refresh the current list (inbox or archives) so filters/status take effect.
             scheduleInboxRefresh();
@@ -811,6 +842,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     draftByConversationId: {},
 
+    stickyArchivedByConversationId: {},
+    clearStickyArchived: () => set({ stickyArchivedByConversationId: {} }),
+
     refreshConversations: async (status, starredOnly) => {
         set({ conversationsLoading: true });
         try {
@@ -826,6 +860,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
             const raw = Array.isArray(res.data) ? res.data : [];
             const localRead = get().localReadByConversationId;
             const list = raw.map((c) => (localRead?.[c.id] ? { ...c, unread_count: 0 } : c));
+
+            // Inbox UX: keep auto-archived (inactivity) conversations visible (greyed)
+            // even if the list API no longer returns them, until page reload / navigation away.
+            const sticky = get().stickyArchivedByConversationId;
+            if (!effectiveStatus && sticky && Object.keys(sticky).length) {
+                const idSet = new Set(list.map((c) => c.id));
+                const merged = [...list];
+                for (const c of Object.values(sticky)) {
+                    if (!c?.id) continue;
+                    if (idSet.has(c.id)) continue;
+                    merged.push(c);
+                }
+                set({
+                    conversations: merged,
+                    inboxStatus: effectiveStatus,
+                    inboxStarredOnly: effectiveStarredOnly,
+                });
+
+                // Subscribe to current inbox list for notifications.
+                applyInboxSubscriptions(merged);
+                return;
+            }
+
             set({
                 conversations: list,
                 inboxStatus: effectiveStatus,

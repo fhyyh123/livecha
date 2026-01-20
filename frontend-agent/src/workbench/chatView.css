@@ -363,6 +363,14 @@
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
+.cl-archivedComposerBody {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 12px;
+    padding: 18px 12px;
+}
+
 .cl-composerInput {
     border-radius: 0;
     padding: 0;

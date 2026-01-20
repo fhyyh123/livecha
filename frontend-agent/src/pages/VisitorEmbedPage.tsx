@@ -89,6 +89,7 @@ const VISITOR_ID_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 400; // ~400 days
 
 const VISITOR_IDENTITY_PREFIX = "chatlive.visitor_identity.";
 const VISITOR_LAST_READ_PREFIX = "chatlive.visitor_last_read.";
+const VISITOR_CONVERSATION_PREFIX = "chatlive.visitor_conversation.";
 
 type StoredIdentity = {
     name?: string | null;
@@ -218,6 +219,30 @@ function lastReadStorageKey(siteKey: string, conversationId: string): string {
     const sk = sanitizeCookieKeySegment(siteKey || "");
     const ck = sanitizeCookieKeySegment(conversationId || "");
     return `${VISITOR_LAST_READ_PREFIX}${sk}.${ck}`;
+}
+
+function conversationStorageKey(siteKey: string): string {
+    const sk = sanitizeCookieKeySegment(siteKey || "");
+    return `${VISITOR_CONVERSATION_PREFIX}${sk}`;
+}
+
+function loadStoredConversationId(siteKey: string): string | null {
+    if (!siteKey) return null;
+    const raw = safeLocalStorageGet(conversationStorageKey(siteKey));
+    const v = (raw || "").trim();
+    return v ? v : null;
+}
+
+function saveStoredConversationId(siteKey: string, conversationId: string) {
+    if (!siteKey) return;
+    const id = (conversationId || "").trim();
+    if (!id) return;
+    safeLocalStorageSet(conversationStorageKey(siteKey), id);
+}
+
+function clearStoredConversationId(siteKey: string) {
+    if (!siteKey) return;
+    safeLocalStorageRemove(conversationStorageKey(siteKey));
 }
 
 function loadLastRead(siteKey: string, conversationId: string): StoredLastRead | null {
@@ -432,6 +457,8 @@ export function VisitorEmbedPage() {
 
     const wsRef = useRef<WsClient | null>(null);
 
+    const createOrRecoverInFlightRef = useRef<Promise<CreateOrRecoverRes | null> | null>(null);
+
     const containerRef = useRef<HTMLDivElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const [visualHeightPx, setVisualHeightPx] = useState<number | null>(null);
@@ -444,7 +471,10 @@ export function VisitorEmbedPage() {
     const uiPrimary = safeHexColor(themeColor) || safeHexColor(bootstrap?.widget_config?.theme_color) || "#fbbf24";
     const uiPrimaryText = textColorForBg(uiPrimary);
 
-    const canSend = Boolean(conversation?.conversation_id) && !uploading && !!draft.trim();
+    // LiveChat-like: if anonymous is enabled, don't create a conversation until the visitor sends.
+    // For non-anonymous mode, conversation exists only after identity flow.
+    const composerEnabled = Boolean(bootstrap?.visitor_token) && (anonymousEnabled || Boolean(conversation?.conversation_id)) && !uploading;
+    const canSend = composerEnabled && !!draft.trim();
 
     const emojiList = useMemo(
         () => ["😀", "😁", "😂", "🙂", "😉", "😍", "🥳", "👍", "🙏", "🎉", "❤️", "😅", "🤔", "😭"],
@@ -469,7 +499,10 @@ export function VisitorEmbedPage() {
     }
 
     async function captureAndSendScreenshot() {
-        if (!conversation?.conversation_id || uploading) return;
+        if (uploading) return;
+        if (!bootstrap?.visitor_token) return;
+        // Non-anonymous mode requires identity flow first.
+        if (!anonymousEnabled && !conversation?.conversation_id) return;
 
         // Prefer real screenshot capture when supported.
         const md = navigator.mediaDevices;
@@ -936,6 +969,13 @@ export function VisitorEmbedPage() {
             });
             setBootstrap(data);
 
+            // If the visitor previously chatted, restore the conversation id from storage so we can
+            // show history immediately on refresh, without calling createOrRecover().
+            const storedConvId = loadStoredConversationId(siteKey);
+            if (storedConvId) {
+                setConversation((prev) => (prev?.conversation_id ? prev : { conversation_id: storedConvId, recovered: true }));
+            }
+
             const cfgTheme = data?.widget_config?.theme_color || null;
             if (typeof cfgTheme === "string" && cfgTheme) {
                 setThemeColor(cfgTheme);
@@ -948,24 +988,43 @@ export function VisitorEmbedPage() {
         }
     }
 
-    async function createOrRecover(override?: { name?: string; email?: string }) {
-        if (!bootstrap) return;
+    // Persist conversation id so refresh can restore history without creating.
+    useEffect(() => {
+        if (!siteKey) return;
+        const convId = conversation?.conversation_id;
+        if (convId) saveStoredConversationId(siteKey, convId);
+    }, [siteKey, conversation?.conversation_id]);
 
-        setLoading(true);
-        setError("");
+    async function createOrRecover(override?: { name?: string; email?: string }): Promise<CreateOrRecoverRes | null> {
+        if (!bootstrap) return null;
+        if (createOrRecoverInFlightRef.current) return createOrRecoverInFlightRef.current;
+
+        const p = (async () => {
+            setLoading(true);
+            setError("");
+            try {
+                const reqName = (override?.name ?? (anonymousEnabled ? identityName : name)).trim();
+                const reqEmail = (override?.email ?? (anonymousEnabled ? identityEmail : email)).trim();
+                const res = await apiFetch<CreateOrRecoverRes>("/api/v1/public/conversations", {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${bootstrap.visitor_token}` },
+                    body: JSON.stringify({ channel: "web", subject: "", name: reqName || undefined, email: reqEmail || undefined }),
+                });
+                setConversation(res);
+                return res;
+            } catch (e: unknown) {
+                setError(getErrorFields(e).message || "create_failed");
+                return null;
+            } finally {
+                setLoading(false);
+            }
+        })();
+
+        createOrRecoverInFlightRef.current = p;
         try {
-            const reqName = (override?.name ?? (anonymousEnabled ? identityName : name)).trim();
-            const reqEmail = (override?.email ?? (anonymousEnabled ? identityEmail : email)).trim();
-            const res = await apiFetch<CreateOrRecoverRes>("/api/v1/public/conversations", {
-                method: "POST",
-                headers: { Authorization: `Bearer ${bootstrap.visitor_token}` },
-                body: JSON.stringify({ channel: "web", subject: "", name: reqName || undefined, email: reqEmail || undefined }),
-            });
-            setConversation(res);
-        } catch (e: unknown) {
-            setError(getErrorFields(e).message || "create_failed");
+            return await p;
         } finally {
-            setLoading(false);
+            createOrRecoverInFlightRef.current = null;
         }
     }
 
@@ -1174,9 +1233,13 @@ export function VisitorEmbedPage() {
     async function sendText() {
         const text = draft.trim();
         if (!text) return;
-        if (!bootstrap || !conversation?.conversation_id) return;
+        if (!bootstrap?.visitor_token) return;
+        // Non-anonymous mode requires identity flow first.
+        if (!anonymousEnabled && !conversation?.conversation_id) return;
 
-        const convId = conversation.conversation_id;
+        // LiveChat-like behavior: create/recover only at first send.
+        const convId = conversation?.conversation_id || (await createOrRecover())?.conversation_id || null;
+        if (!convId) return;
 
         // Prefer WS
         if (wsRef.current?.getStatus() === "connected") {
@@ -1229,9 +1292,13 @@ export function VisitorEmbedPage() {
 
     async function sendFile(file: File) {
         if (!file) return;
-        if (!bootstrap || !conversation?.conversation_id) return;
+        if (!bootstrap?.visitor_token) return;
+        // Non-anonymous mode requires identity flow first.
+        if (!anonymousEnabled && !conversation?.conversation_id) return;
 
-        const convId = conversation.conversation_id;
+        // LiveChat-like behavior: create/recover only at first send.
+        const convId = conversation?.conversation_id || (await createOrRecover())?.conversation_id || null;
+        if (!convId) return;
         setUploading(true);
         setError("");
 
@@ -1295,18 +1362,21 @@ export function VisitorEmbedPage() {
     }, []);
 
     useEffect(() => {
-        if (!bootstrap) return;
-        // If anonymous is enabled, auto create.
-        if (anonymousEnabled) {
-            createOrRecover();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [bootstrap?.visitor_token]);
-
-    useEffect(() => {
         const convId = conversation?.conversation_id;
         if (!bootstrap || !convId) return;
-        loadDetailAndHistory(convId).catch((e) => setError(e?.message || "load_failed"));
+        loadDetailAndHistory(convId).catch((e) => {
+            const msg = getErrorFields(e).message || "load_failed";
+            // Stale storage / visitor mismatch: drop local cached conversation id and reset.
+            if (msg === "conversation_not_found" || msg === "forbidden") {
+                clearStoredConversationId(siteKey);
+                setConversation(null);
+                setDetail(null);
+                setMessages([]);
+                setError("");
+                return;
+            }
+            setError(msg);
+        });
         connectWs(convId);
         return () => {
             wsRef.current?.close();
@@ -1487,31 +1557,16 @@ export function VisitorEmbedPage() {
                                 <div style={{ fontWeight: 800, color: "#0f172a", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                                     {t("visitorEmbed.headerTitle")}
                                 </div>
-                                <div style={{ fontSize: 12, color: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", gap: 6 }}>
-                                    <span
-                                        aria-hidden
-                                        style={{
-                                            width: 8,
-                                            height: 8,
-                                            borderRadius: 999,
-                                            background:
-                                                wsStatus === "connected"
-                                                    ? "#22c55e"
-                                                    : wsStatus === "connecting"
-                                                      ? "#3b82f6"
-                                                      : "#94a3b8",
-                                        }}
-                                    />
-                                    <span>
-                                        {wsStatus === "connected"
-                                            ? t("visitorEmbed.wsStatus.connected")
-                                            : wsStatus === "connecting"
-                                              ? t("visitorEmbed.wsStatus.connecting")
-                                              : t("visitorEmbed.wsStatus.offline")}
-                                    </span>
-                                    {!hostOpen && unread ? <span style={{ color: "#ef4444", fontWeight: 700 }}>{t("visitorEmbed.unread", { count: unread })}</span> : null}
-                                    {peerTyping ? <span style={{ color: "#7c3aed", fontWeight: 600 }}>{t("visitorEmbed.typing")}</span> : null}
-                                </div>
+                                {!hostOpen && unread ? (
+                                    <div style={{ fontSize: 12, color: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", gap: 6 }}>
+                                        <span style={{ color: "#ef4444", fontWeight: 700 }}>{t("visitorEmbed.unread", { count: unread })}</span>
+                                        {peerTyping ? <span style={{ color: "#7c3aed", fontWeight: 600 }}>{t("visitorEmbed.typing")}</span> : null}
+                                    </div>
+                                ) : peerTyping ? (
+                                    <div style={{ fontSize: 12, color: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", gap: 6 }}>
+                                        <span style={{ color: "#7c3aed", fontWeight: 600 }}>{t("visitorEmbed.typing")}</span>
+                                    </div>
+                                ) : null}
                             </div>
                         </div>
 
@@ -1777,7 +1832,7 @@ export function VisitorEmbedPage() {
                                         type="text"
                                         aria-label={t("visitorEmbed.attach.addFile")}
                                         icon={<PlusOutlined />}
-                                        disabled={!conversation?.conversation_id || uploading}
+                                        disabled={!composerEnabled}
                                         onClick={() => fileInputRef.current?.click()}
                                         style={{
                                             width: 44,
@@ -1802,7 +1857,7 @@ export function VisitorEmbedPage() {
                                                 type="text"
                                                 icon={<FileAddOutlined />}
                                                 style={{ justifyContent: "flex-start", height: 38 }}
-                                                disabled={!conversation?.conversation_id || uploading}
+                                                disabled={!composerEnabled}
                                                 onClick={() => {
                                                     setAttachOpen(false);
                                                     fileInputRef.current?.click();
@@ -1814,7 +1869,7 @@ export function VisitorEmbedPage() {
                                                 type="text"
                                                 icon={<ScanOutlined />}
                                                 style={{ justifyContent: "flex-start", height: 38 }}
-                                                disabled={!conversation?.conversation_id || uploading}
+                                                disabled={!composerEnabled}
                                                 onClick={() => void captureAndSendScreenshot()}
                                             >
                                                 {t("visitorEmbed.attach.sendScreenshot")}
@@ -1827,7 +1882,7 @@ export function VisitorEmbedPage() {
                                             type="text"
                                             aria-label={t("visitorEmbed.attach.add")}
                                             icon={<PlusOutlined />}
-                                            disabled={!conversation?.conversation_id || uploading}
+                                            disabled={!composerEnabled}
                                             style={{
                                                 width: 44,
                                                 height: 44,
@@ -1863,7 +1918,7 @@ export function VisitorEmbedPage() {
                                     placeholder={t("visitorEmbed.composer.placeholder")}
                                     autoSize={{ minRows: 1, maxRows: 4 }}
                                     onKeyDown={onComposerKeyDown}
-                                    disabled={!conversation?.conversation_id || uploading}
+                                    disabled={!composerEnabled}
                                     style={{
                                         flex: "1 1 auto",
                                         minWidth: 0,
@@ -1910,7 +1965,7 @@ export function VisitorEmbedPage() {
                                             type="text"
                                             aria-label={t("visitorEmbed.attach.emoji")}
                                             icon={<SmileOutlined />}
-                                            disabled={!conversation?.conversation_id || uploading}
+                                            disabled={!composerEnabled}
                                             style={{
                                                 width: 40,
                                                 height: 40,
