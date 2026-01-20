@@ -189,6 +189,9 @@ type ChatState = {
 };
 
 const LOCAL_READ_STORAGE_KEY = "chatlive.agent.localReadByConversationId";
+const SESSION_STORAGE_KEY = "chatlive.agent.session_id" as const;
+const HEARTBEAT_INTERVAL_KEY = "chatlive.agent.heartbeat_interval" as const;
+const HEARTBEAT_TTL_KEY = "chatlive.agent.heartbeat_ttl" as const;
 const LOCAL_READ_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function loadLocalReadMarks(): Record<string, LocalReadMark> {
@@ -482,6 +485,25 @@ function handleWsEvent(e: WsInboundEvent) {
     if (e.type === "INBOX_CHANGED") {
         // Assignment/transfer happened; refresh inbox list.
         scheduleInboxRefresh();
+        return;
+    }
+
+    if (e.type === "SESSION") {
+        const obj = e as Record<string, unknown>;
+        const sessionId = String(obj.session_id ?? "");
+        if (sessionId) {
+            try {
+                localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
+                if (typeof obj.heartbeat_interval_seconds === "number") {
+                    localStorage.setItem(HEARTBEAT_INTERVAL_KEY, String(obj.heartbeat_interval_seconds));
+                }
+                if (typeof obj.heartbeat_ttl_seconds === "number") {
+                    localStorage.setItem(HEARTBEAT_TTL_KEY, String(obj.heartbeat_ttl_seconds));
+                }
+            } catch {
+                // ignore
+            }
+        }
         return;
     }
 

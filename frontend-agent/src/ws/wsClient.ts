@@ -4,6 +4,7 @@ export type WsInboundEvent =
     | { type: "MSG"; conversation_id?: string; msg: unknown }
     | { type: "SYNC_RES"; conversation_id?: string; messages?: unknown[]; conversation_events?: unknown[] }
     | { type: "MSG_ACK"; msg_id?: string; client_msg_id?: string }
+    | { type: "SESSION"; session_id?: string; heartbeat_interval_seconds?: number; heartbeat_ttl_seconds?: number }
     | {
           type: "AGENT_STATUS";
           user_id?: string;

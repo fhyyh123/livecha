@@ -204,9 +204,23 @@ public class WsHandler extends TextWebSocketHandler {
                         if (sid != null && !sid.isBlank()) {
                             var ok = agentPresenceService.heartbeat(sid, ctx.claims().userId());
                             if (!ok) {
-                                sendError(session, "invalid_session", rid);
-                                closeQuietly(session, CloseStatus.NOT_ACCEPTABLE);
-                                return;
+                                var tenantId = ctx.claims().tenantId();
+                                var userId = ctx.claims().userId();
+                                if (tenantId != null && userId != null) {
+                                    var newSessionId = agentPresenceService.createSession(tenantId, userId);
+                                    sessionRegistry.bind(session, new WsSessionRegistry.SessionContext(
+                                            ctx.claims(),
+                                            ctx.client(),
+                                            newSessionId
+                                    ));
+
+                                    ObjectNode refresh = objectMapper.createObjectNode();
+                                    refresh.put("type", "SESSION");
+                                    refresh.put("session_id", newSessionId);
+                                    refresh.put("heartbeat_interval_seconds", agentPresenceService.heartbeatIntervalSeconds());
+                                    refresh.put("heartbeat_ttl_seconds", agentPresenceService.heartbeatTtlSeconds());
+                                    send(session, refresh);
+                                }
                             }
                         }
 
