@@ -48,6 +48,8 @@ export function getDefaultContextPanelTabs(
                     t={t}
                     selectedId={props.selectedId}
                     selected={props.selected}
+                    detail={props.detail}
+                    detailLoading={props.detailLoading}
                     meta={props.meta}
                     metaLoading={props.metaLoading}
                     onSetTags={props.onSetTags}

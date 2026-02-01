@@ -74,9 +74,12 @@ export type ConversationDetail = {
     assigned_agent_user_id?: string | null;
     site_id?: string | null;
     visitor_id?: string | null;
+    skill_group_id?: string | null;
+    skill_group_name?: string | null;
     created_at?: number;
     last_msg_at?: number;
     closed_at?: number | null;
+    active_duration_seconds?: number | null;
     customer?: UserPublicProfile | null;
 
     visitor?: {
@@ -85,6 +88,9 @@ export type ConversationDetail = {
         name?: string | null;
         email?: string | null;
 
+        last_ip?: string | null;
+        last_user_agent?: string | null;
+
         geo_country?: string | null;
         geo_region?: string | null;
         geo_city?: string | null;
@@ -92,6 +98,8 @@ export type ConversationDetail = {
         geo_lon?: number | null;
         geo_timezone?: string | null;
         geo_updated_at?: number | null;
+        visit_count?: number | null;
+        chat_count?: number | null;
     } | null;
     starred?: boolean;
 };

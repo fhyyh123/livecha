@@ -471,7 +471,7 @@
     "contextSections": {
       "additionalInfo": "附加信息",
       "visitedPages": "访问页面",
-      "visitedPagesEmpty": "暂未接入访问轨迹（后续可从访客端埋点/会话事件接入）。"
+      "visitedPagesEmpty": "暂无访问记录。"
     },
     "tabs": {
       "profile": "资料",
@@ -483,6 +483,12 @@
     "noConversationSelected": "未选择会话",
     "conversationId": "会话ID：",
     "technicalInfo": "技术信息",
+    "technology": {
+      "ipAddress": "IP 地址",
+      "osDevice": "系统/设备",
+      "browser": "浏览器",
+      "unknown": "未知"
+    },
     "statusLabel": "状态：{{status}}",
     "channelLabel": "渠道：{{channel}}",
     "assignedLabel": "指派：{{assigned}}",
@@ -495,6 +501,14 @@
     "visitorLocation": "位置：{{location}}",
     "visitorLocalTime": "本地时间：{{time}}",
     "openInGoogleMaps": "在 Google 地图中打开",
+    "additionalInfoFirstTime": "首次访客：{{visits}}，{{chats}}",
+    "additionalInfoReturning": "回访访客：{{visits}}，{{chats}}",
+    "additionalInfoVisit": "{{count}} 次访问",
+    "additionalInfoChat": "{{count}} 次会话",
+    "additionalInfoChatDuration": "聊天时长：{{duration}}",
+    "additionalInfoGroups": "分组",
+    "additionalInfoGroupDefault": "General",
+    "additionalInfoUnknown": "暂无附加信息",
     "customerUsername": "用户名：{{username}}",
     "customerId": "用户ID：",
     "customerPhone": "手机：{{phone}}",

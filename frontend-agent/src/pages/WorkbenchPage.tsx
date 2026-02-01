@@ -233,6 +233,7 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
             detailLoading={detailLoading}
             meta={meta}
             metaLoading={metaLoading}
+            systemEvents={selectedId ? (systemEventsByConversationId[selectedId] || []) : []}
             anonymousEnabled={anonymousEnabled}
             onSetTags={setTags}
             onSetMetaLocal={setMetaLocal}

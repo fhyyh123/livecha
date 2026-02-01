@@ -72,6 +72,7 @@
     HOST_SET_OPEN: "HOST_SET_OPEN",
     HOST_SET_THEME: "HOST_SET_THEME",
     HOST_VISIBILITY: "HOST_VISIBILITY",
+    HOST_PAGEVIEW: "HOST_PAGEVIEW",
 
     WIDGET_READY: "WIDGET_READY",
     WIDGET_HEIGHT: "WIDGET_HEIGHT",
@@ -112,8 +113,25 @@
       onResize: null,
       onVvChange: null,
       onHostVis: null,
+      onPageChange: null,
+      onPopState: null,
+      onHashChange: null,
+      origPushState: null,
+      origReplaceState: null,
     },
   };
+
+  function getPageInfo() {
+    try {
+      return {
+        url: String(window.location && window.location.href ? window.location.href : ""),
+        title: String(document && document.title ? document.title : ""),
+        referrer: String(document && document.referrer ? document.referrer : ""),
+      };
+    } catch (e) {
+      return { url: "", title: "", referrer: "" };
+    }
+  }
 
   function isAllowedOrigin(origin) {
     try {
@@ -789,8 +807,11 @@
         open: !!state.open,
         themeColor: state.config.themeColor || null,
         autoHeight: !!state.config.autoHeight,
+        page: getPageInfo(),
       });
       postHostVisibility();
+      // Also send an explicit page_view event (so iframe can enqueue tracking uniformly).
+      postToIframe(MSG.HOST_PAGEVIEW, getPageInfo());
       flushPmQueue();
       var list = state.listeners.ready || [];
       for (var i = 0; i < list.length; i++) {
@@ -892,6 +913,7 @@
         open: !!state.open,
         themeColor: state.config.themeColor || null,
         autoHeight: !!state.config.autoHeight,
+        page: getPageInfo(),
       });
       return;
     }
@@ -956,11 +978,6 @@
     } catch (e0) {
       // ignore
     }
-    try {
-      iframe.allowFullscreen = true;
-    } catch (e1) {
-      // ignore
-    }
     ensureCssText(iframe, css.iframe);
 
     // Keep state theme in sync (button style handled above before state.button is assigned).
@@ -1010,6 +1027,54 @@
 
     state.handlers.onMessage = onMessage;
     window.addEventListener("message", state.handlers.onMessage);
+
+    // Page tracking: send page view on SPA navigations.
+    state.handlers.onPageChange = function (reason) {
+      try {
+        var info = getPageInfo();
+        if (!info || !info.url) return;
+        postToIframe(MSG.HOST_PAGEVIEW, {
+          url: info.url,
+          title: info.title,
+          referrer: info.referrer,
+          reason: reason || "",
+        });
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    state.handlers.onPopState = function () {
+      if (state.handlers.onPageChange) state.handlers.onPageChange("popstate");
+    };
+    state.handlers.onHashChange = function () {
+      if (state.handlers.onPageChange) state.handlers.onPageChange("hashchange");
+    };
+    try {
+      window.addEventListener("popstate", state.handlers.onPopState);
+      window.addEventListener("hashchange", state.handlers.onHashChange);
+    } catch (e) {
+      // ignore
+    }
+
+    try {
+      if (window.history && typeof window.history.pushState === "function") {
+        state.handlers.origPushState = window.history.pushState;
+        window.history.pushState = function () {
+          state.handlers.origPushState.apply(window.history, arguments);
+          if (state.handlers.onPageChange) state.handlers.onPageChange("pushState");
+        };
+      }
+      if (window.history && typeof window.history.replaceState === "function") {
+        state.handlers.origReplaceState = window.history.replaceState;
+        window.history.replaceState = function () {
+          state.handlers.origReplaceState.apply(window.history, arguments);
+          if (state.handlers.onPageChange) state.handlers.onPageChange("replaceState");
+        };
+      }
+    } catch (e) {
+      // ignore
+    }
 
     // Forward host tab visibility/focus changes to iframe so it can decide read receipts reliably.
     state.handlers.onHostVis = function () {
@@ -1238,6 +1303,20 @@
     state.outsideBound = false;
     try {
       if (state.handlers.onMessage) window.removeEventListener("message", state.handlers.onMessage);
+
+      try {
+        if (state.handlers.onPopState) window.removeEventListener("popstate", state.handlers.onPopState);
+        if (state.handlers.onHashChange) window.removeEventListener("hashchange", state.handlers.onHashChange);
+      } catch (e) {
+        // ignore
+      }
+
+      try {
+        if (state.handlers.origPushState && window.history) window.history.pushState = state.handlers.origPushState;
+        if (state.handlers.origReplaceState && window.history) window.history.replaceState = state.handlers.origReplaceState;
+      } catch (e) {
+        // ignore
+      }
     } catch (e) {
       // ignore
     }

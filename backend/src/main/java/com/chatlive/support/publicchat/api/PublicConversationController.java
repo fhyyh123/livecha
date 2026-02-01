@@ -6,6 +6,7 @@ import com.chatlive.support.chat.api.MessagePage;
 import com.chatlive.support.common.api.ApiResponse;
 import com.chatlive.support.publicchat.service.PublicConversationService;
 import com.chatlive.support.publicchat.service.PublicConversationQueryService;
+import com.chatlive.support.publicchat.api.PublicPageViewEventRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -89,5 +90,19 @@ public class PublicConversationController {
         var claims = jwtService.parse(token);
         var safeLimit = Math.max(1, Math.min(limit, 200));
         return ApiResponse.ok(publicConversationQueryService.listMessagesPage(claims, conversationId, afterMsgId, safeLimit));
+        }
+
+        @PostMapping("/conversations/{id}/events/page_view")
+        public ApiResponse<Boolean> recordPageView(
+            HttpServletRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @PathVariable("id") String conversationId,
+            @Valid @RequestBody PublicPageViewEventRequest req
+        ) {
+        var token = JwtService.extractBearerToken(authorization)
+            .orElseThrow(() -> new IllegalArgumentException("missing_token"));
+        var claims = jwtService.parse(token);
+        publicConversationService.recordPageView(request, claims, conversationId, req);
+        return ApiResponse.ok(Boolean.TRUE);
         }
 }

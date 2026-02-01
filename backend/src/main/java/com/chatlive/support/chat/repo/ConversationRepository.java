@@ -50,7 +50,8 @@ public class ConversationRepository {
             String status,
             java.time.Instant createdAt,
             java.time.Instant lastMsgAt,
-            java.time.Instant closedAt
+            java.time.Instant closedAt,
+            String skillGroupId
         ) {
         }
 
@@ -286,7 +287,7 @@ public class ConversationRepository {
 
     public java.util.Optional<ConversationDetailRow> findDetail(String tenantId, String conversationId) {
         var sql = """
-                select id, tenant_id, customer_user_id, assigned_agent_user_id, channel, subject, status, created_at, last_msg_at, closed_at
+            select id, tenant_id, customer_user_id, assigned_agent_user_id, channel, subject, status, created_at, last_msg_at, closed_at, skill_group_id
                 from conversation
                 where tenant_id = ? and id = ?
                 limit 1
@@ -301,10 +302,44 @@ public class ConversationRepository {
                 rs.getString("status"),
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("last_msg_at").toInstant(),
-                rs.getTimestamp("closed_at") == null ? null : rs.getTimestamp("closed_at").toInstant()
+            rs.getTimestamp("closed_at") == null ? null : rs.getTimestamp("closed_at").toInstant(),
+            rs.getString("skill_group_id")
         ), tenantId, conversationId);
         return list.stream().findFirst();
     }
+
+    /**
+     * Active chat duration in seconds, based on first/last human message timestamps.
+     *
+     * Notes:
+     * - Filters out system messages.
+     * - Returns null when there are no human messages yet.
+     */
+    public Long findActiveDurationSeconds(String tenantId, String conversationId) {
+        var sql = """
+            select case when count(1) = 0 then null
+                        else (extract(epoch from max(created_at)) - extract(epoch from min(created_at)))::bigint
+                   end as active_duration_seconds
+            from message
+            where tenant_id = ?
+              and conversation_id = ?
+              and sender_type in ('customer', 'agent')
+            """;
+
+        return jdbcTemplate.queryForObject(sql, Long.class, tenantId, conversationId);
+    }
+
+        public int countBySiteVisitor(String tenantId, String siteId, String visitorId) {
+        var sql = """
+            select count(1)
+            from conversation
+            where tenant_id = ?
+              and site_id = ?
+              and visitor_id = ?
+            """;
+        Integer n = jdbcTemplate.queryForObject(sql, Integer.class, tenantId, siteId, visitorId);
+        return n == null ? 0 : n;
+        }
 
     public int closeConversation(
             String tenantId,

@@ -22,7 +22,9 @@ public class VisitorRepository {
             Double geoLat,
             Double geoLon,
             String geoTimezone,
-            Instant geoUpdatedAt
+            Instant geoUpdatedAt,
+            String lastIp,
+            String lastUserAgent
     ) {
     }
 
@@ -33,7 +35,7 @@ public class VisitorRepository {
     }
 
     public Optional<VisitorRow> findByIdAndSite(String visitorId, String siteId) {
-        var sql = "select id, site_id, name, email, geo_country, geo_region, geo_city, geo_lat, geo_lon, geo_timezone, geo_updated_at " +
+        var sql = "select id, site_id, name, email, geo_country, geo_region, geo_city, geo_lat, geo_lon, geo_timezone, geo_updated_at, last_ip, last_user_agent " +
             "from visitor where id = ? and site_id = ? limit 1";
         var list = jdbcTemplate.query(sql, (rs, rowNum) -> new VisitorRow(
                 rs.getString("id"),
@@ -46,9 +48,19 @@ public class VisitorRepository {
             getDouble(rs.getObject("geo_lat")),
             getDouble(rs.getObject("geo_lon")),
             rs.getString("geo_timezone"),
-            toInstant(rs.getTimestamp("geo_updated_at"))
+            toInstant(rs.getTimestamp("geo_updated_at")),
+            rs.getString("last_ip"),
+            rs.getString("last_user_agent")
         ), visitorId, siteId);
         return list.stream().findFirst();
+    }
+
+    public void updateClientInfo(String visitorId, String siteId, String lastIp, String lastUserAgent) {
+        if (visitorId == null || visitorId.isBlank()) return;
+        if (siteId == null || siteId.isBlank()) return;
+
+        var sql = "update visitor set last_ip = ?, last_user_agent = ?, last_seen_at = now() where id = ? and site_id = ?";
+        jdbcTemplate.update(sql, lastIp, lastUserAgent, visitorId, siteId);
     }
 
         public void updateGeo(String visitorId, String siteId, String country, String region, String city, Double lat, Double lon, String timezone) {

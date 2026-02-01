@@ -5,6 +5,7 @@ import com.chatlive.support.chat.api.*;
 import com.chatlive.support.chat.repo.AgentProfileRepository;
 import com.chatlive.support.chat.repo.ConversationMarkRepository;
 import com.chatlive.support.chat.repo.ConversationRepository;
+import com.chatlive.support.chat.repo.SkillGroupRepository;
 import com.chatlive.support.chat.ws.WsSessionRegistry;
 import com.chatlive.support.chat.ws.WsBroadcaster;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -26,6 +27,7 @@ public class ConversationService {
     private final AssignmentService assignmentService;
     private final UserAccountRepository userAccountRepository;
     private final VisitorRepository visitorRepository;
+    private final SkillGroupRepository skillGroupRepository;
     private final ConversationMarkRepository conversationMarkRepository;
     private final AgentProfileRepository agentProfileRepository;
 
@@ -36,6 +38,7 @@ public class ConversationService {
             AssignmentService assignmentService,
             UserAccountRepository userAccountRepository,
             VisitorRepository visitorRepository,
+            SkillGroupRepository skillGroupRepository,
             ConversationMarkRepository conversationMarkRepository,
             AgentProfileRepository agentProfileRepository
     ) {
@@ -45,6 +48,7 @@ public class ConversationService {
         this.assignmentService = assignmentService;
         this.userAccountRepository = userAccountRepository;
         this.visitorRepository = visitorRepository;
+        this.skillGroupRepository = skillGroupRepository;
         this.conversationMarkRepository = conversationMarkRepository;
         this.agentProfileRepository = agentProfileRepository;
     }
@@ -128,23 +132,35 @@ public class ConversationService {
                 .map(u -> new UserPublicProfile(u.id(), u.username(), u.phone(), u.email()))
                 .orElse(null);
 
+        String skillGroupName = null;
+        if (detail.skillGroupId() != null && !detail.skillGroupId().isBlank()) {
+            skillGroupName = skillGroupRepository.findById(claims.tenantId(), detail.skillGroupId())
+                .map(SkillGroupRepository.SkillGroupRow::name)
+                .orElse(null);
+        }
+
         VisitorPublicProfile visitor = null;
         if (access.siteId() != null && !access.siteId().isBlank() && access.visitorId() != null && !access.visitorId().isBlank()) {
             var v = visitorRepository.findByIdAndSite(access.visitorId(), access.siteId()).orElse(null);
             if (v != null) {
+                var count = conversationRepository.countBySiteVisitor(claims.tenantId(), access.siteId(), access.visitorId());
                 var geoUpdatedAt = v.geoUpdatedAt() == null ? null : v.geoUpdatedAt().getEpochSecond();
                 visitor = new VisitorPublicProfile(
                         v.id(),
                         v.siteId(),
                         v.name(),
                         v.email(),
+                    v.lastIp(),
+                    v.lastUserAgent(),
                         v.geoCountry(),
                         v.geoRegion(),
                         v.geoCity(),
                         v.geoLat(),
                         v.geoLon(),
                         v.geoTimezone(),
-                        geoUpdatedAt
+                        geoUpdatedAt,
+                        count,
+                        count
                 );
             }
         }
@@ -153,6 +169,8 @@ public class ConversationService {
         if (claims.userId() != null && ("agent".equals(claims.role()) || "admin".equals(claims.role()))) {
             starred = conversationMarkRepository.findStarred(claims.tenantId(), conversationId, claims.userId()).orElse(false);
         }
+
+        Long activeDurationSeconds = conversationRepository.findActiveDurationSeconds(claims.tenantId(), conversationId);
 
         return new ConversationDetailResponse(
                 detail.id(),
@@ -163,9 +181,12 @@ public class ConversationService {
                 detail.assignedAgentUserId(),
                 access.siteId(),
                 access.visitorId(),
+                detail.skillGroupId(),
+                skillGroupName,
                 detail.createdAt().getEpochSecond(),
                 detail.lastMsgAt().getEpochSecond(),
             detail.closedAt() == null ? null : detail.closedAt().getEpochSecond(),
+                activeDurationSeconds,
                 customer,
                 visitor,
                 starred

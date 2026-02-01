@@ -9,9 +9,12 @@ public record ConversationDetailResponse(
         String assigned_agent_user_id,
         String site_id,
         String visitor_id,
+        String skill_group_id,
+        String skill_group_name,
         long created_at,
         long last_msg_at,
         Long closed_at,
+        Long active_duration_seconds,
         UserPublicProfile customer,
         VisitorPublicProfile visitor,
         boolean starred

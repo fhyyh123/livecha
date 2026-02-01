@@ -474,7 +474,7 @@
     "contextSections": {
       "additionalInfo": "Additional info",
       "visitedPages": "Visited pages",
-      "visitedPagesEmpty": "Visited pages is not wired yet (future: visitor tracking / conversation events)."
+      "visitedPagesEmpty": "No visited pages yet."
     },
     "tabs": {
       "profile": "Profile",
@@ -486,6 +486,12 @@
     "noConversationSelected": "No conversation selected",
     "conversationId": "Conversation ID: ",
     "technicalInfo": "Technical info",
+    "technology": {
+      "ipAddress": "IP address",
+      "osDevice": "OS/Device",
+      "browser": "Browser",
+      "unknown": "Unknown"
+    },
     "statusLabel": "Status: {{status}}",
     "channelLabel": "Channel: {{channel}}",
     "assignedLabel": "Assigned: {{assigned}}",
@@ -498,6 +504,16 @@
     "visitorLocation": "Location: {{location}}",
     "visitorLocalTime": "Local time: {{time}}",
     "openInGoogleMaps": "Open in Google Maps",
+    "additionalInfoFirstTime": "First-time visitor: {{visits}}, {{chats}}",
+    "additionalInfoReturning": "Returning visitor: {{visits}}, {{chats}}",
+    "additionalInfoVisit": "{{count}} visit",
+    "additionalInfoVisit_plural": "{{count}} visits",
+    "additionalInfoChat": "{{count}} chat",
+    "additionalInfoChat_plural": "{{count}} chats",
+    "additionalInfoChatDuration": "Chat duration: {{duration}}",
+    "additionalInfoGroups": "Groups",
+    "additionalInfoGroupDefault": "General",
+    "additionalInfoUnknown": "Additional info is not available yet",
     "customerUsername": "Username: {{username}}",
     "customerId": "User ID: ",
     "customerPhone": "Phone: {{phone}}",

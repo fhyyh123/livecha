@@ -110,6 +110,7 @@ const MSG = {
     HOST_SET_OPEN: "HOST_SET_OPEN",
     HOST_SET_THEME: "HOST_SET_THEME",
     HOST_VISIBILITY: "HOST_VISIBILITY",
+    HOST_PAGEVIEW: "HOST_PAGEVIEW",
 
     WIDGET_READY: "WIDGET_READY",
     WIDGET_HEIGHT: "WIDGET_HEIGHT",
@@ -118,6 +119,12 @@ const MSG = {
     WIDGET_REQUEST_OPEN: "WIDGET_REQUEST_OPEN",
     WIDGET_REQUEST_CLOSE: "WIDGET_REQUEST_CLOSE",
 } as const;
+
+type HostPageViewPayload = {
+    url?: string;
+    title?: string;
+    referrer?: string;
+};
 
 function safeOriginFromUrl(url: string): string {
     try {
@@ -421,6 +428,7 @@ export function VisitorEmbedPage() {
     const hostOpenRef = useRef(isTopLevel);
     const unreadRef = useRef(0);
     const lastReadRef = useRef<StoredLastRead | null>(null);
+    const pendingPageViewsRef = useRef<HostPageViewPayload[]>([]);
 
     // In some cross-origin iframe contexts, iframe document visibility/focus can be unreliable.
     // Host page (widget.js) can optionally send HOST_VISIBILITY so we can decide read receipts correctly.
@@ -458,6 +466,60 @@ export function VisitorEmbedPage() {
     const wsRef = useRef<WsClient | null>(null);
 
     const createOrRecoverInFlightRef = useRef<Promise<CreateOrRecoverRes | null> | null>(null);
+
+    function normalizePageViewPayload(payload: unknown): HostPageViewPayload | null {
+        const rec = asRecord(payload);
+        if (!rec) return null;
+        const url = typeof rec.url === "string" ? rec.url.trim() : "";
+        const title = typeof rec.title === "string" ? rec.title.trim() : "";
+        const referrer = typeof rec.referrer === "string" ? rec.referrer.trim() : "";
+        if (!url) return null;
+        return { url, title: title || undefined, referrer: referrer || undefined };
+    }
+
+    function enqueuePageView(pv: HostPageViewPayload) {
+        const url = String(pv?.url || "").trim();
+        if (!url) return;
+
+        const next: HostPageViewPayload[] = [...(pendingPageViewsRef.current || [])];
+        const last = next.length ? next[next.length - 1] : null;
+        if (last && String(last.url || "").trim() === url) return;
+        next.push({ url, title: pv.title, referrer: pv.referrer });
+
+        // Clamp queue size (best-effort).
+        pendingPageViewsRef.current = next.slice(-30);
+    }
+
+    // Flush queued pageviews once conversation exists.
+    useEffect(() => {
+        const token = bootstrap?.visitor_token || "";
+        const convId = conversation?.conversation_id || "";
+        if (!token || !convId) return;
+
+        const pending = pendingPageViewsRef.current || [];
+        if (!pending.length) return;
+
+        const snapshot = pending.slice(0);
+        pendingPageViewsRef.current = [];
+
+        (async () => {
+            for (const p of snapshot) {
+                const url = String(p?.url || "").trim();
+                if (!url) continue;
+                const title = typeof p.title === "string" ? p.title.trim() : "";
+                const referrer = typeof p.referrer === "string" ? p.referrer.trim() : "";
+                try {
+                    await apiFetch<unknown>(`/api/v1/public/conversations/${encodeURIComponent(convId)}/events/page_view`, {
+                        method: "POST",
+                        headers: { Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ url, title: title || undefined, referrer: referrer || undefined }),
+                    });
+                } catch {
+                    // best-effort
+                }
+            }
+        })();
+    }, [bootstrap?.visitor_token, conversation?.conversation_id]);
 
     const containerRef = useRef<HTMLDivElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -857,6 +919,15 @@ export function VisitorEmbedPage() {
                 setHostOpen(open);
                 const themeColor = typeof payloadRec?.themeColor === "string" ? payloadRec.themeColor : null;
                 if (themeColor) setThemeColor(themeColor);
+
+                const pv = normalizePageViewPayload(payloadRec?.page);
+                if (pv) enqueuePageView(pv);
+                return;
+            }
+
+            if (data.type === MSG.HOST_PAGEVIEW) {
+                const pv = normalizePageViewPayload(payload);
+                if (pv) enqueuePageView(pv);
                 return;
             }
 

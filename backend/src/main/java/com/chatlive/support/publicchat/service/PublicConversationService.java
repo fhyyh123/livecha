@@ -9,11 +9,13 @@ import com.chatlive.support.chat.ws.WsBroadcaster;
 import com.chatlive.support.common.geo.VisitorGeoUpdater;
 import com.chatlive.support.publicchat.api.CreateOrRecoverConversationRequest;
 import com.chatlive.support.publicchat.api.CreateOrRecoverConversationResponse;
+import com.chatlive.support.publicchat.api.PublicPageViewEventRequest;
 import com.chatlive.support.publicchat.api.PublicSendFileMessageRequest;
 import com.chatlive.support.publicchat.api.PublicSendTextMessageRequest;
 import com.chatlive.support.user.repo.UserAccountRepository;
 import com.chatlive.support.widget.repo.VisitorRepository;
 import com.chatlive.support.widget.repo.WidgetConfigRepository;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 
@@ -172,6 +174,69 @@ public class PublicConversationService {
         assignmentService.autoAssignNewConversation(claims.tenantId(), conversationId, skillGroupId);
 
         return new CreateOrRecoverConversationResponse(conversationId, false);
+    }
+
+    public void recordPageView(HttpServletRequest request, JwtClaims claims, String conversationId, PublicPageViewEventRequest req) {
+        if (claims == null || !"visitor".equals(claims.role())) {
+            throw new IllegalArgumentException("forbidden");
+        }
+        if (claims.tenantId() == null || claims.tenantId().isBlank()) {
+            throw new IllegalArgumentException("forbidden");
+        }
+        if (claims.siteId() == null || claims.siteId().isBlank()) {
+            throw new IllegalArgumentException("forbidden");
+        }
+        if (claims.userId() == null || claims.userId().isBlank()) {
+            throw new IllegalArgumentException("forbidden");
+        }
+        if (conversationId == null || conversationId.isBlank()) {
+            throw new IllegalArgumentException("missing_conversation_id");
+        }
+
+        // Best-effort persist client info (ip/ua) for agent Technology panel.
+        visitorGeoUpdater.refreshGeoIfNeeded(claims.userId(), claims.siteId(), request);
+
+        var access = conversationRepository.findAccess(claims.tenantId(), conversationId)
+                .orElseThrow(() -> new IllegalArgumentException("conversation_not_found"));
+        var canAccess = access.siteId() != null
+                && !access.siteId().isBlank()
+                && claims.siteId().equals(access.siteId())
+                && access.visitorId() != null
+                && !access.visitorId().isBlank()
+                && claims.userId().equals(access.visitorId());
+        if (!canAccess) {
+            throw new IllegalArgumentException("forbidden");
+        }
+
+        var url = safeTrim(req == null ? null : req.url());
+        if (url == null || url.isBlank()) {
+            // Best-effort / optional tracking.
+            return;
+        }
+        if (url.length() > 4096) {
+            url = url.substring(0, 4096);
+        }
+
+        var title = safeTrim(req == null ? null : req.title());
+        if (title != null && title.length() > 512) {
+            title = title.substring(0, 512);
+        }
+
+        var referrer = safeTrim(req == null ? null : req.referrer());
+        if (referrer != null && referrer.length() > 4096) {
+            referrer = referrer.substring(0, 4096);
+        }
+
+        var data = JsonNodeFactory.instance.objectNode();
+        data.put("url", url);
+        if (title != null && !title.isBlank()) {
+            data.put("title", title);
+        }
+        if (referrer != null && !referrer.isBlank()) {
+            data.put("referrer", referrer);
+        }
+
+        wsBroadcaster.broadcastConversationEvent(claims.tenantId(), conversationId, "page_view", data);
     }
 
     private static String safeTrim(String s) {
