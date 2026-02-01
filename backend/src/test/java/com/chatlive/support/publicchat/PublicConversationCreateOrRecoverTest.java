@@ -158,11 +158,11 @@ class PublicConversationCreateOrRecoverTest {
     }
 
     @Test
-    void identity_required_when_anonymous_disabled() throws Exception {
-        // create a dedicated site with anonymous disabled
+        void identity_required_when_pre_chat_enabled() throws Exception {
+                // create a dedicated site with pre-chat enabled
         jdbcTemplate.update("insert into site(id, tenant_id, name, public_key, status, created_at) values ('site_no_anon','t1','NoAnon','pk_no_anon','active', now())");
         jdbcTemplate.update("insert into site_domain_allowlist(site_id, domain, created_at) values ('site_no_anon','localhost', now())");
-        jdbcTemplate.update("insert into widget_config(site_id, anonymous_enabled, theme_color, welcome_text, created_at, updated_at) values ('site_no_anon', false, null, null, now(), now())");
+                jdbcTemplate.update("insert into widget_config(site_id, pre_chat_enabled, theme_color, welcome_text, created_at, updated_at) values ('site_no_anon', true, null, null, now(), now())");
 
         var token = bootstrapToken("pk_no_anon", "http://localhost:5173");
 

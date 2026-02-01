@@ -37,8 +37,52 @@
       "customize": "Customize",
       "language": "Language",
       "availability": "Availability",
-      "welcomeScreen": "Welcome screen"
+      "welcomeScreen": "Welcome screen",
+      "forms": "Forms",
+      "preChatForm": "Pre-chat form",
+      "askForEmail": "Ask for email",
+      "postChatForm": "Post-chat form",
+      "ticketForm": "Ticket form"
     }
+  },
+  "preChatForm": {
+    "title": "Pre-chat form",
+    "adminOnlyHint": "Admin only",
+    "selectSite": "Site",
+    "selectSitePlaceholder": "Select a site",
+    "hint": "When enabled, visitors will be asked for details before starting a chat. If neither Name nor Email is marked as required, at least one of them is still required.",
+    "enabled": {
+      "label": "Enable pre-chat form"
+    },
+    "information": {
+      "title": "Information",
+      "hint": "A short message displayed at the top of the form.",
+      "messageLabel": "Message",
+      "messagePlaceholder": "e.g. Let's chat! Fill in a few details to get started."
+    },
+    "name": {
+      "title": "Name",
+      "labelLabel": "Label",
+      "labelPlaceholder": "Name:",
+      "required": "Required"
+    },
+    "email": {
+      "title": "Email",
+      "labelLabel": "Label",
+      "labelPlaceholder": "E-mail:",
+      "required": "Required"
+    },
+    "previewTitle": "Preview",
+    "previewEmpty": "Select a site to preview"
+  },
+  "askForEmail": {
+    "title": "Ask for email"
+  },
+  "postChatForm": {
+    "title": "Post-chat form"
+  },
+  "ticketForm": {
+    "title": "Ticket form"
   },
   "inactivityTimeouts": {
     "title": "Inactivity timeouts",
@@ -88,7 +132,8 @@
     ,
     "loadFailed": "Load failed",
     "saveFailed": "Save failed",
-    "saved": "Saved"
+    "saved": "Saved",
+    "comingSoon": "Coming soon"
   },
   "profile": {
     "title": "Profile",
@@ -582,10 +627,6 @@
     "widgetConfig": {
       "title": "Widget config (site-level)",
       "hint": "These settings affect visitor behavior.",
-      "allowAnonymous": {
-        "label": "Allow anonymous",
-        "tooltip": "When disabled, visitors must provide name or email before creating a conversation"
-      },
       "themeColor": {
         "label": "Theme color (optional)",
         "tooltip": "Example: #2563eb. Syncs to the button and inside the iframe.",
@@ -663,7 +704,7 @@
     "missingSiteKey": "Missing parameter site_key",
     "missingSiteKeyDetail": "Please check the iframe URL includes ?site_key=...",
     "identityRequiredTitle": "Identity required",
-    "identityRequiredDetail": "Anonymous is disabled. Please provide at least name or email.",
+    "identityRequiredDetail": "This site uses a pre-chat form. Please provide at least name or email.",
     "originNotAllowedTitle": "Origin not allowed",
     "originNotAllowedDetail": "Please ask the site admin to add current domain to allowlist.",
     "invalidResponseTitle": "Invalid server response",
@@ -685,6 +726,13 @@
     "leaveContactCancel": "Skip and close",
     "leaveContactHint": "So we can follow up after you leave (at least name or email).",
     "identityError": "Please fill at least name or email (or you can skip).",
+    "preChat": {
+      "nameLabel": "Name:",
+      "emailLabel": "E-mail:",
+      "nameRequiredError": "Name is required",
+      "emailRequiredError": "Email is required",
+      "atLeastOneError": "Please provide at least name or email"
+    },
     "conversationLabel": "Conversation: {{id}}",
     "recovered": "(recovered)",
     "created": "(new)",

@@ -34,7 +34,7 @@ class PublicWidgetBootstrapTest {
                 .andExpect(jsonPath("$.data.visitor_id").isNotEmpty())
                 .andExpect(jsonPath("$.data.site_id").value("site_demo"))
                 .andExpect(jsonPath("$.data.tenant_id").value("t1"))
-                .andExpect(jsonPath("$.data.widget_config.anonymous_enabled").value(true));
+                .andExpect(jsonPath("$.data.widget_config.pre_chat_enabled").value(false));
     }
 
     @Test

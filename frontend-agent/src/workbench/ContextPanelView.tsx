@@ -30,8 +30,6 @@ export type ContextPanelViewProps = {
     metaLoading: boolean;
 
     systemEvents?: ConversationSystemEvent[];
-
-    anonymousEnabled?: boolean;
     onSetTags: (conversationId: string, tags: string[]) => Promise<void>;
     onSetMetaLocal: (conversationId: string, meta: ConversationMeta) => void;
     onSetNote: (conversationId: string, note: string) => Promise<void>;
@@ -48,7 +46,6 @@ export function ContextPanelView({
     meta,
     metaLoading,
     systemEvents,
-    anonymousEnabled = false,
     onSetTags,
     onSetMetaLocal,
     onSetNote,
@@ -275,7 +272,6 @@ export function ContextPanelView({
                                 selectedId={selectedId}
                                 detail={detail}
                                 detailLoading={detailLoading}
-                                anonymousEnabled={anonymousEnabled}
                                 embedded
                             />
                         ),

@@ -42,14 +42,19 @@ public class AdminWidgetConfigController {
 
         var row = widgetConfigRepository.findBySiteId(site.id()).orElse(null);
         if (row == null) {
-            return ApiResponse.ok(new WidgetConfigDto(true, null, null, null, null));
+            return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, null, null, false, false));
         }
         return ApiResponse.ok(new WidgetConfigDto(
-                row.anonymousEnabled(),
+                row.preChatEnabled(),
                 row.themeColor(),
                 row.welcomeText(),
                 row.cookieDomain(),
-                row.cookieSameSite()
+                row.cookieSameSite(),
+                row.preChatMessage(),
+                row.preChatNameLabel(),
+                row.preChatEmailLabel(),
+                row.preChatNameRequired(),
+                row.preChatEmailRequired()
         ));
     }
 
@@ -63,31 +68,46 @@ public class AdminWidgetConfigController {
         var site = siteRepository.findById(claims.tenantId(), siteId)
                 .orElseThrow(() -> new IllegalArgumentException("site_not_found"));
 
-        var anonymousEnabled = req != null && req.anonymous_enabled();
+            var preChatEnabled = req != null && req.pre_chat_enabled();
         var themeColor = emptyToNull(req == null ? null : req.theme_color());
         var welcomeText = emptyToNull(req == null ? null : req.welcome_text());
         var cookieDomain = emptyToNull(req == null ? null : req.cookie_domain());
         var cookieSameSite = normalizeSameSite(req == null ? null : req.cookie_samesite());
+        var preChatMessage = emptyToNull(req == null ? null : req.pre_chat_message());
+        var preChatNameLabel = emptyToNull(req == null ? null : req.pre_chat_name_label());
+        var preChatEmailLabel = emptyToNull(req == null ? null : req.pre_chat_email_label());
+        var preChatNameRequired = req != null && req.pre_chat_name_required();
+        var preChatEmailRequired = req != null && req.pre_chat_email_required();
 
         widgetConfigRepository.upsert(
                 site.id(),
-                anonymousEnabled,
+        preChatEnabled,
                 themeColor,
                 welcomeText,
                 cookieDomain,
-                cookieSameSite
+            cookieSameSite,
+            preChatMessage,
+            preChatNameLabel,
+            preChatEmailLabel,
+            preChatNameRequired,
+            preChatEmailRequired
         );
 
         var row = widgetConfigRepository.findBySiteId(site.id()).orElse(null);
         if (row == null) {
-            return ApiResponse.ok(new WidgetConfigDto(true, null, null, null, null));
+            return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, null, null, false, false));
         }
         return ApiResponse.ok(new WidgetConfigDto(
-                row.anonymousEnabled(),
+                row.preChatEnabled(),
                 row.themeColor(),
                 row.welcomeText(),
                 row.cookieDomain(),
-                row.cookieSameSite()
+                row.cookieSameSite(),
+                row.preChatMessage(),
+                row.preChatNameLabel(),
+                row.preChatEmailLabel(),
+                row.preChatNameRequired(),
+                row.preChatEmailRequired()
         ));
     }
 

@@ -17,8 +17,6 @@ export type ConversationListPaneViewProps = {
     listTitle?: string;
     groupTitle?: (count: number) => string;
 
-    anonymousEnabled?: boolean;
-
     keyword: string;
     setKeyword: (next: string) => void;
 
@@ -79,8 +77,7 @@ function avatarTextFromTitle(title: string, t: (key: string, options?: Record<st
     return s.slice(0, 1).toUpperCase();
 }
 
-function getPrimaryTitle(c: Conversation, anonymousEnabled: boolean, t: (key: string, options?: Record<string, unknown>) => string) {
-    if (anonymousEnabled) return t("workbench.customer");
+function getPrimaryTitle(c: Conversation, t: (key: string, options?: Record<string, unknown>) => string) {
     const name = String(c.visitor_name || "").trim();
     const email = String(c.visitor_email || "").trim();
     const who = name && name !== "-" ? name : (email && email !== "-" ? email : "");
@@ -102,7 +99,6 @@ export function ConversationListPaneView({
     t,
     listTitle,
     groupTitle,
-    anonymousEnabled = false,
     keyword,
     setKeyword,
     showLocalSearch = true,
@@ -262,7 +258,7 @@ export function ConversationListPaneView({
                                 // UX: once the chat is opened/selected, the badge should disappear immediately.
                                 // Server-side unread_count may lag until MSG_READ/MSG_READ_OK roundtrip completes.
                                 const unread = isSelected ? 0 : Number(c.unread_count || 0);
-                                const title = getPrimaryTitle(c, anonymousEnabled, t);
+                                const title = getPrimaryTitle(c, t);
                                 const lastMsgText = String(c.last_message_text || "").trim();
                                 const lastFromAgent = String(c.last_message_sender_type || "") === "agent";
 

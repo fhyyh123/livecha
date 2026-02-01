@@ -107,6 +107,16 @@ export const SETTINGS_MENU_TREE: NavTreeItem[] = [
         ],
     },
     {
+        key: "forms",
+        labelKey: "settings.menu.forms",
+        children: [
+            { key: "preChatForm", labelKey: "settings.menu.preChatForm", route: "/settings/forms/pre-chat" },
+            { key: "askForEmail", labelKey: "settings.menu.askForEmail", route: "/settings/forms/ask-for-email" },
+            { key: "postChatForm", labelKey: "settings.menu.postChatForm", route: "/settings/forms/post-chat" },
+            { key: "ticketForm", labelKey: "settings.menu.ticketForm", route: "/settings/forms/ticket" },
+        ],
+    },
+    {
         key: "chatSettings",
         labelKey: "settings.menu.chatSettings",
         children: [

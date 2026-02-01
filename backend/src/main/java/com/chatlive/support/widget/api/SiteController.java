@@ -69,15 +69,20 @@ public class SiteController {
 
         var row = widgetConfigRepository.findBySiteId(site.id()).orElse(null);
         if (row == null) {
-            return ApiResponse.ok(new WidgetConfigDto(true, null, null, null, null));
+            return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, null, null, false, false));
         }
 
         return ApiResponse.ok(new WidgetConfigDto(
-                row.anonymousEnabled(),
+                row.preChatEnabled(),
                 row.themeColor(),
                 row.welcomeText(),
                 row.cookieDomain(),
-                row.cookieSameSite()
+                row.cookieSameSite(),
+                row.preChatMessage(),
+                row.preChatNameLabel(),
+                row.preChatEmailLabel(),
+                row.preChatNameRequired(),
+                row.preChatEmailRequired()
         ));
     }
 }

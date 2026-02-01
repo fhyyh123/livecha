@@ -61,13 +61,18 @@ public class PublicWidgetService {
 
         var config = widgetConfigRepository.findBySiteId(site.id())
             .map(r -> new WidgetConfigDto(
-                r.anonymousEnabled(),
+                r.preChatEnabled(),
                 r.themeColor(),
                 r.welcomeText(),
                 r.cookieDomain(),
-                r.cookieSameSite()
+                r.cookieSameSite(),
+                r.preChatMessage(),
+                r.preChatNameLabel(),
+                r.preChatEmailLabel(),
+                r.preChatNameRequired(),
+                r.preChatEmailRequired()
             ))
-            .orElseGet(() -> new WidgetConfigDto(true, null, null, null, null));
+            .orElseGet(() -> new WidgetConfigDto(false, null, null, null, null, null, null, null, false, false));
 
         String visitorId;
         if (req.visitor_id() != null && !req.visitor_id().isBlank()) {

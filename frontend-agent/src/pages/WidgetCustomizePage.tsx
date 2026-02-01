@@ -13,11 +13,16 @@ type SiteItem = {
 };
 
 type WidgetConfigDto = {
-    anonymous_enabled: boolean;
+    pre_chat_enabled: boolean;
     theme_color?: string | null;
     welcome_text?: string | null;
     cookie_domain?: string | null;
     cookie_samesite?: string | null;
+    pre_chat_message?: string | null;
+    pre_chat_name_label?: string | null;
+    pre_chat_email_label?: string | null;
+    pre_chat_name_required?: boolean;
+    pre_chat_email_required?: boolean;
 };
 
 export function WidgetCustomizePage() {
@@ -175,17 +180,11 @@ export function WidgetCustomizePage() {
                     <Form
                         form={form}
                         layout="vertical"
-                        initialValues={{ anonymous_enabled: true }}
                         onFinish={save}
                         style={{ maxWidth: 720 }}
                         disabled={cfgLoading || !isAdmin}
                     >
-                        <Form.Item
-                            label={t("widgetCustomize.widgetConfig.allowAnonymous.label")}
-                            name="anonymous_enabled"
-                            valuePropName="checked"
-                            tooltip={t("widgetCustomize.widgetConfig.allowAnonymous.tooltip")}
-                        >
+                        <Form.Item name="pre_chat_enabled" hidden valuePropName="checked">
                             <Switch />
                         </Form.Item>
 

@@ -104,14 +104,24 @@ public class PublicConversationService {
         }
 
         var config = widgetConfigRepository.findBySiteId(claims.siteId()).orElse(null);
-        var anonymousEnabled = config == null || config.anonymousEnabled();
+        var preChatEnabled = config != null && config.preChatEnabled();
+        var nameRequired = config != null && config.preChatNameRequired();
+        var emailRequired = config != null && config.preChatEmailRequired();
 
         var name = safeTrim(req == null ? null : req.name());
         var email = safeTrim(req == null ? null : req.email());
 
-        if (!anonymousEnabled) {
-            if ((name == null || name.isBlank()) && (email == null || email.isBlank())) {
+        if (preChatEnabled) {
+            if (nameRequired && (name == null || name.isBlank())) {
                 throw new IllegalArgumentException("identity_required");
+            }
+            if (emailRequired && (email == null || email.isBlank())) {
+                throw new IllegalArgumentException("identity_required");
+            }
+            if (!nameRequired && !emailRequired) {
+                if ((name == null || name.isBlank()) && (email == null || email.isBlank())) {
+                    throw new IllegalArgumentException("identity_required");
+                }
             }
         }
 
@@ -126,7 +136,7 @@ public class PublicConversationService {
         // Best-effort geo refresh (no IP stored or returned).
         visitorGeoUpdater.refreshGeoIfNeeded(visitorId, claims.siteId(), request);
 
-        // Persist identity fields if provided (even when anonymous is enabled)
+        // Persist identity fields if provided
         if ((name != null && !name.isBlank()) || (email != null && !email.isBlank())) {
             visitorRepository.updateIdentity(visitorId, emptyToNull(name), emptyToNull(email));
         }

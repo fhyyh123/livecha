@@ -10,11 +10,16 @@ export type SiteItem = {
 };
 
 export type WidgetConfig = {
-    anonymous_enabled: boolean;
+    pre_chat_enabled: boolean;
     theme_color?: string | null;
     welcome_text?: string | null;
     cookie_domain?: string | null;
     cookie_samesite?: string | null;
+    pre_chat_message?: string | null;
+    pre_chat_name_label?: string | null;
+    pre_chat_email_label?: string | null;
+    pre_chat_name_required?: boolean;
+    pre_chat_email_required?: boolean;
 };
 
 const CURRENT_SITE_STORAGE_KEY = "chatlive:currentSiteId" as const;

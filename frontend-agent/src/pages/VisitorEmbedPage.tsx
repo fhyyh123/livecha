@@ -20,9 +20,16 @@ function getErrorFields(err: unknown): { name?: string; message?: string } {
 }
 
 type WidgetConfig = {
-    anonymous_enabled: boolean;
+    pre_chat_enabled: boolean;
     theme_color?: string | null;
     welcome_text?: string | null;
+    cookie_domain?: string | null;
+    cookie_samesite?: string | null;
+    pre_chat_message?: string | null;
+    pre_chat_name_label?: string | null;
+    pre_chat_email_label?: string | null;
+    pre_chat_name_required?: boolean;
+    pre_chat_email_required?: boolean;
 };
 
 type BootstrapRes = {
@@ -528,20 +535,26 @@ export function VisitorEmbedPage() {
     const [themeColor, setThemeColor] = useState<string | null>(null);
     const [unread, setUnread] = useState(0);
 
-    const anonymousEnabled = bootstrap?.widget_config?.anonymous_enabled ?? true;
+    const preChatEnabled = Boolean(bootstrap?.widget_config?.pre_chat_enabled);
+    const preChatMessage = (bootstrap?.widget_config?.pre_chat_message || "").trim();
+    const preChatNameLabel = (bootstrap?.widget_config?.pre_chat_name_label || "").trim();
+    const preChatEmailLabel = (bootstrap?.widget_config?.pre_chat_email_label || "").trim();
+    const preChatNameRequired = Boolean(bootstrap?.widget_config?.pre_chat_name_required);
+    const preChatEmailRequired = Boolean(bootstrap?.widget_config?.pre_chat_email_required);
 
     const uiPrimary = safeHexColor(themeColor) || safeHexColor(bootstrap?.widget_config?.theme_color) || "#fbbf24";
     const uiPrimaryText = textColorForBg(uiPrimary);
 
-    // LiveChat-like: if anonymous is enabled, don't create a conversation until the visitor sends.
-    // For non-anonymous mode, conversation exists only after identity flow.
-    const composerEnabled = Boolean(bootstrap?.visitor_token) && (anonymousEnabled || Boolean(conversation?.conversation_id)) && !uploading;
+    // If pre-chat is enabled, require a conversation (created after form submit) before sending.
+    const composerEnabled = Boolean(bootstrap?.visitor_token) && (!preChatEnabled || Boolean(conversation?.conversation_id)) && !uploading;
     const canSend = composerEnabled && !!draft.trim();
 
     const emojiList = useMemo(
         () => ["😀", "😁", "😂", "🙂", "😉", "😍", "🥳", "👍", "🙏", "🎉", "❤️", "😅", "🤔", "😭"],
         [],
     );
+
+    const [preChatError, setPreChatError] = useState<string>("");
 
     const textAreaRef = useRef<TextAreaRef | null>(null);
 
@@ -563,8 +576,8 @@ export function VisitorEmbedPage() {
     async function captureAndSendScreenshot() {
         if (uploading) return;
         if (!bootstrap?.visitor_token) return;
-        // Non-anonymous mode requires identity flow first.
-        if (!anonymousEnabled && !conversation?.conversation_id) return;
+        // Pre-chat mode requires form submit first.
+        if (preChatEnabled && !conversation?.conversation_id) return;
 
         // Prefer real screenshot capture when supported.
         const md = navigator.mediaDevices;
@@ -1074,8 +1087,8 @@ export function VisitorEmbedPage() {
             setLoading(true);
             setError("");
             try {
-                const reqName = (override?.name ?? (anonymousEnabled ? identityName : name)).trim();
-                const reqEmail = (override?.email ?? (anonymousEnabled ? identityEmail : email)).trim();
+                const reqName = (override?.name ?? (preChatEnabled ? name : identityName)).trim();
+                const reqEmail = (override?.email ?? (preChatEnabled ? email : identityEmail)).trim();
                 const res = await apiFetch<CreateOrRecoverRes>("/api/v1/public/conversations", {
                     method: "POST",
                     headers: { Authorization: `Bearer ${bootstrap.visitor_token}` },
@@ -1114,7 +1127,7 @@ export function VisitorEmbedPage() {
     }
 
     function shouldAskIdentityOnClose(): boolean {
-        if (!anonymousEnabled) return false;
+        if (preChatEnabled) return false;
         if (hasIdentity) return false;
         // Avoid being annoying: only ask after user had any activity.
         if (messages.length > 0) return true;
@@ -1305,8 +1318,8 @@ export function VisitorEmbedPage() {
         const text = draft.trim();
         if (!text) return;
         if (!bootstrap?.visitor_token) return;
-        // Non-anonymous mode requires identity flow first.
-        if (!anonymousEnabled && !conversation?.conversation_id) return;
+        // Pre-chat mode requires form submit first.
+        if (preChatEnabled && !conversation?.conversation_id) return;
 
         // LiveChat-like behavior: create/recover only at first send.
         const convId = conversation?.conversation_id || (await createOrRecover())?.conversation_id || null;
@@ -1364,8 +1377,8 @@ export function VisitorEmbedPage() {
     async function sendFile(file: File) {
         if (!file) return;
         if (!bootstrap?.visitor_token) return;
-        // Non-anonymous mode requires identity flow first.
-        if (!anonymousEnabled && !conversation?.conversation_id) return;
+        // Pre-chat mode requires form submit first.
+        if (preChatEnabled && !conversation?.conversation_id) return;
 
         // LiveChat-like behavior: create/recover only at first send.
         const convId = conversation?.conversation_id || (await createOrRecover())?.conversation_id || null;
@@ -1713,15 +1726,62 @@ export function VisitorEmbedPage() {
                             </div>
                         ) : null}
 
-                        {!anonymousEnabled && !conversation ? (
+                        {preChatEnabled && !conversation ? (
                             <div style={{ background: "#fff", borderRadius: 14, padding: 12, border: "1px solid rgba(15,23,42,.06)", marginBottom: 12 }}>
                                 <div style={{ color: "rgba(15,23,42,.65)", fontSize: 13, marginBottom: 10 }}>
-                                    {t("visitorEmbed.identityRequiredDetail")}
+                                    {preChatMessage || t("visitorEmbed.identityRequiredDetail")}
                                 </div>
                                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                                    <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("visitorEmbed.nameOptional")} />
-                                    <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("visitorEmbed.emailOptional")} />
-                                    <Button onClick={() => createOrRecover()} loading={loading} type="primary">
+                                    <div>
+                                        <div style={{ fontSize: 12, color: "rgba(15,23,42,.55)", marginBottom: 4 }}>
+                                            {(preChatNameLabel || t("visitorEmbed.preChat.nameLabel")) + (preChatNameRequired ? " *" : "")}
+                                        </div>
+                                        <Input
+                                            value={name}
+                                            onChange={(e) => {
+                                                setName(e.target.value);
+                                                setPreChatError("");
+                                            }}
+                                            placeholder={t("visitorEmbed.nameOptional")}
+                                        />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: 12, color: "rgba(15,23,42,.55)", marginBottom: 4 }}>
+                                            {(preChatEmailLabel || t("visitorEmbed.preChat.emailLabel")) + (preChatEmailRequired ? " *" : "")}
+                                        </div>
+                                        <Input
+                                            value={email}
+                                            onChange={(e) => {
+                                                setEmail(e.target.value);
+                                                setPreChatError("");
+                                            }}
+                                            placeholder={t("visitorEmbed.emailOptional")}
+                                        />
+                                    </div>
+
+                                    {preChatError ? <Alert type="warning" showIcon message={preChatError} /> : null}
+
+                                    <Button
+                                        onClick={() => {
+                                            const n = name.trim();
+                                            const e = email.trim();
+                                            if (preChatNameRequired && !n) {
+                                                setPreChatError(t("visitorEmbed.preChat.nameRequiredError"));
+                                                return;
+                                            }
+                                            if (preChatEmailRequired && !e) {
+                                                setPreChatError(t("visitorEmbed.preChat.emailRequiredError"));
+                                                return;
+                                            }
+                                            if (!preChatNameRequired && !preChatEmailRequired && !n && !e) {
+                                                setPreChatError(t("visitorEmbed.preChat.atLeastOneError"));
+                                                return;
+                                            }
+                                            void createOrRecover();
+                                        }}
+                                        loading={loading}
+                                        type="primary"
+                                    >
                                         {t("visitorEmbed.startConversation")}
                                     </Button>
                                 </div>

@@ -44,11 +44,16 @@ public class SiteWizardService {
         // defaults
         widgetConfigRepository.upsert(
                 site.id(),
-                true,
+            false,
                 emptyToNull(themeColor),
                 emptyToNull(welcomeText),
                 emptyToNull(cookieDomain),
-                emptyToNull(cookieSameSite)
+            emptyToNull(cookieSameSite),
+            null,
+            null,
+            null,
+            false,
+            false
         );
 
         var domain = emptyToNull(allowlistDomain);

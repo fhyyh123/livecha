@@ -33,6 +33,10 @@ const VisitorEmbedPage = lazy(() => import("./pages/VisitorEmbedPage").then((m) 
 const SitesPage = lazy(() => import("./pages/SitesPage").then((m) => ({ default: m.SitesPage })));
 const TrustedDomainsPage = lazy(() => import("./pages/TrustedDomainsPage").then((m) => ({ default: m.TrustedDomainsPage })));
 const WidgetCustomizePage = lazy(() => import("./pages/WidgetCustomizePage").then((m) => ({ default: m.WidgetCustomizePage })));
+const PreChatFormPage = lazy(() => import("./pages/PreChatFormPage").then((m) => ({ default: m.PreChatFormPage })));
+const AskForEmailPage = lazy(() => import("./pages/AskForEmailPage").then((m) => ({ default: m.AskForEmailPage })));
+const PostChatFormPage = lazy(() => import("./pages/PostChatFormPage").then((m) => ({ default: m.PostChatFormPage })));
+const TicketFormPage = lazy(() => import("./pages/TicketFormPage").then((m) => ({ default: m.TicketFormPage })));
 const InactivityTimeoutsPage = lazy(() => import("./pages/InactivityTimeoutsPage").then((m) => ({ default: m.InactivityTimeoutsPage })));
 const InvitesPage = lazy(() => import("./pages/InvitesPage").then((m) => ({ default: m.InvitesPage })));
 const TeamPage = lazy(() => import("./pages/TeamPage").then((m) => ({ default: m.TeamPage })));
@@ -343,6 +347,38 @@ function App() {
                 element={
                   <Suspense fallback={<RouteFallback />}>
                     <WidgetCustomizePage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/settings/forms/pre-chat"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <PreChatFormPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/settings/forms/ask-for-email"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <AskForEmailPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/settings/forms/post-chat"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <PostChatFormPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/settings/forms/ticket"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <TicketFormPage />
                   </Suspense>
                 }
               />

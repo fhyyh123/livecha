@@ -12,8 +12,6 @@ export type ConversationHeaderProps = {
     peerTyping: boolean;
     peerLastRead: boolean;
 
-    anonymousEnabled?: boolean;
-
     isNarrow: boolean;
     onOpenContextPanel: () => void;
 
@@ -29,14 +27,12 @@ export function ConversationHeader(props: ConversationHeaderProps) {
         peerTyping,
         peerLastRead,
         isNarrow,
-        anonymousEnabled = false,
         onOpenContextPanel,
         onToggleStar,
         onOpenQuickReplies,
     } = props;
 
     const title = (() => {
-        if (anonymousEnabled) return t("workbench.customer");
         const name = String(detail?.visitor?.name || "").trim();
         const email = String(detail?.visitor?.email || "").trim();
         const who = name && name !== "-" ? name : (email && email !== "-" ? email : "");

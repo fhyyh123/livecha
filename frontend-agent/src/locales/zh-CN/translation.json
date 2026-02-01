@@ -38,7 +38,52 @@
       "language": "语言",
       "availability": "可用性",
       "welcomeScreen": "欢迎屏幕"
+      ,
+      "forms": "表格",
+      "preChatForm": "预聊天表单",
+      "askForEmail": "索取邮箱",
+      "postChatForm": "聊天后表单",
+      "ticketForm": "工单表单"
     }
+  },
+  "preChatForm": {
+    "title": "预聊天表单",
+    "adminOnlyHint": "仅管理员可操作",
+    "selectSite": "站点",
+    "selectSitePlaceholder": "选择一个 site",
+    "hint": "开启后，访客开始对话前会先填写信息。若 Name/Email 都不设为必填，则至少需要填写一个。",
+    "enabled": {
+      "label": "启用预聊天表单"
+    },
+    "information": {
+      "title": "信息",
+      "hint": "在表单顶部展示一段说明文案。",
+      "messageLabel": "Message",
+      "messagePlaceholder": "例如：让我们开始吧！先填写几个信息。"
+    },
+    "name": {
+      "title": "姓名",
+      "labelLabel": "Label",
+      "labelPlaceholder": "Name:",
+      "required": "必填"
+    },
+    "email": {
+      "title": "邮箱",
+      "labelLabel": "Label",
+      "labelPlaceholder": "E-mail:",
+      "required": "必填"
+    },
+    "previewTitle": "预览",
+    "previewEmpty": "请选择站点以预览"
+  },
+  "askForEmail": {
+    "title": "索取邮箱"
+  },
+  "postChatForm": {
+    "title": "聊天后表单"
+  },
+  "ticketForm": {
+    "title": "工单表单"
   },
   "inactivityTimeouts": {
       "title": "不活跃超时",
@@ -88,7 +133,8 @@
     ,
     "loadFailed": "加载失败",
     "saveFailed": "保存失败",
-    "saved": "已保存"
+    "saved": "已保存",
+    "comingSoon": "敬请期待"
   },
   "profile": {
     "title": "个人资料",
@@ -577,10 +623,6 @@
     "widgetConfig": {
       "title": "Widget 配置（站点级）",
       "hint": "这里的配置会影响访客端行为。",
-      "allowAnonymous": {
-        "label": "允许匿名",
-        "tooltip": "关闭后，访客创建会话前必须提供 name 或 email"
-      },
       "themeColor": {
         "label": "主题色（可选）",
         "tooltip": "示例：#2563eb。会同步到按钮与 iframe 内页。",
@@ -658,7 +700,7 @@
     "missingSiteKey": "缺少参数 site_key",
     "missingSiteKeyDetail": "请检查 iframe URL 是否包含 ?site_key=...",
     "identityRequiredTitle": "需要身份信息",
-    "identityRequiredDetail": "该站点关闭匿名，请提供 name 或 email 至少一个。",
+    "identityRequiredDetail": "该站点已启用预聊天表单，请提供 name 或 email 至少一个。",
     "originNotAllowedTitle": "来源域名不允许",
     "originNotAllowedDetail": "请联系站点管理员把当前域名加入 allowlist。",
     "invalidResponseTitle": "服务响应异常",
@@ -680,6 +722,13 @@
     "leaveContactCancel": "跳过并关闭",
     "leaveContactHint": "方便我们在你离开页面后继续跟进（至少填写 name 或 email 之一）。",
     "identityError": "请至少填写 name 或 email（也可以选择跳过）。",
+    "preChat": {
+      "nameLabel": "Name:",
+      "emailLabel": "E-mail:",
+      "nameRequiredError": "请填写 name",
+      "emailRequiredError": "请填写 email",
+      "atLeastOneError": "请至少填写 name 或 email"
+    },
     "conversationLabel": "会话：{{id}}",
     "recovered": "（已恢复）",
     "created": "（新建）",

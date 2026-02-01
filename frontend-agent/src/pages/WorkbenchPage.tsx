@@ -85,15 +85,7 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
         setDraft,
     } = useChatStore();
 
-    const { currentSiteId, widgetConfigBySiteId, loadWidgetConfig } = useSiteStore();
-
-    useEffect(() => {
-        if (!currentSiteId) return;
-        loadWidgetConfig(currentSiteId).catch(() => {
-            // ignore
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentSiteId]);
+    const { currentSiteId } = useSiteStore();
 
     // UX: auto-archived conversations are kept visible (greyed) while staying on this page.
     // Clear the sticky cache when navigating away so returning/reloading won't keep them.
@@ -102,8 +94,6 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
             clearStickyArchived();
         };
     }, [clearStickyArchived]);
-
-    const anonymousEnabled = Boolean(currentSiteId && widgetConfigBySiteId[currentSiteId]?.anonymous_enabled);
 
     const isArchives = mode === "archives";
     const routeBase = isArchives ? "/archives" : "/conversations";
@@ -234,7 +224,6 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
             meta={meta}
             metaLoading={metaLoading}
             systemEvents={selectedId ? (systemEventsByConversationId[selectedId] || []) : []}
-            anonymousEnabled={anonymousEnabled}
             onSetTags={setTags}
             onSetMetaLocal={setMetaLocal}
             onSetNote={setNote}
@@ -503,7 +492,6 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
                             t={t}
                             listTitle={isArchives ? t("archives.title") : undefined}
                             groupTitle={isArchives ? ((count) => t("archives.myArchives", { count })) : undefined}
-                            anonymousEnabled={anonymousEnabled}
                             keyword={keyword}
                             setKeyword={setKeyword}
                             showLocalSearch={!screens.md}
@@ -598,7 +586,6 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
                                             peerTyping={peerTyping}
                                             peerLastRead={peerReadLastAgentMsg}
                                             isNarrow={isNarrow}
-                                            anonymousEnabled={anonymousEnabled}
                                             onOpenContextPanel={() => setContextDrawerOpen(true)}
                                             onToggleStar={() => {
                                                 if (!selectedId) return;

@@ -10,16 +10,13 @@ type Props = {
     detail: ConversationDetail | null;
     detailLoading: boolean;
 
-    anonymousEnabled: boolean;
-
     embedded?: boolean;
 };
 
-export function ProfileTab({ t, selectedId, detail, detailLoading, anonymousEnabled, embedded = false }: Props) {
+export function ProfileTab({ t, selectedId, detail, detailLoading, embedded = false }: Props) {
     const googleMapsKey = (import.meta as any)?.env?.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
     function getCustomerDisplayName() {
-        if (anonymousEnabled) return t("workbench.customer");
         const name = String(detail?.visitor?.name || "").trim();
         const email = String(detail?.visitor?.email || "").trim();
         const who = name && name !== "-" ? name : (email && email !== "-" ? email : "");
@@ -83,7 +80,7 @@ export function ProfileTab({ t, selectedId, detail, detailLoading, anonymousEnab
                 <Space direction="vertical" size={4} style={{ width: "100%" }}>
                     <Typography.Text>{t("workbench.visitorName", { name: getCustomerDisplayName() })}</Typography.Text>
                     <Typography.Text type="secondary">
-                        {t("workbench.visitorEmail", { email: anonymousEnabled ? "-" : (detail.visitor.email || "-") })}
+                        {t("workbench.visitorEmail", { email: detail.visitor.email || "-" })}
                     </Typography.Text>
 
                     {locationText ? (

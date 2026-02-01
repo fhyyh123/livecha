@@ -107,11 +107,16 @@ snippet 生成逻辑要点：
 - `PUT /api/v1/admin/sites/{id}/widget-config`
 
 配置字段：
-- `anonymous_enabled`
+- `pre_chat_enabled`
 - `theme_color`
 - `welcome_text`
 - `cookie_domain`
 - `cookie_samesite`（严格枚举：None/Strict/Lax）
+- `pre_chat_message`
+- `pre_chat_name_label`
+- `pre_chat_email_label`
+- `pre_chat_name_required`
+- `pre_chat_email_required`
 
 #### 非 Admin（agent/admin）可用的 Sites / WidgetConfig
 

@@ -28,7 +28,6 @@ export function getDefaultContextPanelTabs(
                     selectedId={props.selectedId}
                     detail={props.detail}
                     detailLoading={props.detailLoading}
-                    anonymousEnabled={props.anonymousEnabled ?? false}
                 />
             ),
         },
