@@ -78,7 +78,7 @@ const DEFAULTS = {
     offset_y: 20,
     debug: false,
 } as const;
-
+ 
 const THEME_COLORS = [
     "#000000",
     "#7c3aed",
