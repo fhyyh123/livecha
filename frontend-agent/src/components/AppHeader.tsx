@@ -45,10 +45,12 @@ export function AppHeader() {
 
     const starredOnly = String(searchParams.get("starred") || "") === "1";
 
-    const siteOptions = useMemo(
-        () => sites.map((s) => ({ value: s.id, label: `${s.name} (${s.public_key})` })),
-        [sites],
-    );
+    const selectedSiteLabel = useMemo(() => {
+        const cur = String(currentSiteId || "");
+        const s = (sites || []).find((x) => String(x.id) === cur) || (sites || [])[0];
+        if (!s) return "";
+        return `${s.name} (${s.public_key})`;
+    }, [currentSiteId, sites]);
 
     function onChangeSite(next: string) {
         const nextSiteId = String(next || "");
@@ -97,16 +99,22 @@ export function AppHeader() {
 
                 <Space size={8} wrap>
                     <Typography.Text style={{ color: "#fff" }}>{t("sites.selectSite")}</Typography.Text>
-                    <Select
-                        style={{ minWidth: 260 }}
-                        placeholder={t("sites.selectSitePlaceholder")}
-                        loading={sitesLoading}
-                        value={currentSiteId || undefined}
-                        options={siteOptions}
-                        onChange={(v) => onChangeSite(String(v || ""))}
-                        showSearch
-                        optionFilterProp="label"
-                    />
+                    {sites.length > 1 ? (
+                        <Select
+                            style={{ minWidth: 260 }}
+                            placeholder={t("sites.selectSitePlaceholder")}
+                            loading={sitesLoading}
+                            value={currentSiteId || undefined}
+                            options={sites.map((s) => ({ value: s.id, label: `${s.name} (${s.public_key})` }))}
+                            onChange={(v) => onChangeSite(String(v || ""))}
+                            showSearch
+                            optionFilterProp="label"
+                        />
+                    ) : (
+                        <Tag style={{ marginInlineEnd: 0, background: "rgba(255,255,255,0.06)", color: "#fff" }}>
+                            {selectedSiteLabel || "-"}
+                        </Tag>
+                    )}
                 </Space>
             </div>
 

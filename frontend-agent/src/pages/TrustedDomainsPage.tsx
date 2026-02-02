@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Input, Select, Space, Spin, Tabs, Table, Typography } from "antd";
+import { Alert, Button, Card, Input, Space, Spin, Tabs, Table, Typography } from "antd";
 import { DeleteOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 
@@ -77,10 +77,11 @@ export function TrustedDomainsPage() {
     const [installStatusLoading, setInstallStatusLoading] = useState(false);
     const [installStatusError, setInstallStatusError] = useState<string>("");
 
-    const siteOptions = useMemo(
-        () => sites.map((s) => ({ value: s.id, label: `${s.name} (${s.public_key})` })),
-        [sites],
-    );
+    const selectedSiteLabel = useMemo(() => {
+        const s = sites.find((x) => x.id === siteId) || sites[0];
+        if (!s) return "";
+        return `${s.name} (${s.public_key})`;
+    }, [siteId, sites]);
 
     const trustedRows: TrustedDomainRow[] = useMemo(() => {
         // Backend currently returns a string[] only; keep metadata placeholders for now.
@@ -407,14 +408,7 @@ export function TrustedDomainsPage() {
                 <Space direction="vertical" size={12} style={{ width: "100%" }}>
                     <Space wrap>
                         <Typography.Text strong>{t("trustedDomains.selectSite")}</Typography.Text>
-                        <Select
-                            style={{ minWidth: 420 }}
-                            placeholder={t("trustedDomains.selectSitePlaceholder")}
-                            options={siteOptions}
-                            value={siteId || undefined}
-                            onChange={(v) => setSiteId(v)}
-                            disabled={sitesLoading || !isAdmin}
-                        />
+                        <Typography.Text code>{selectedSiteLabel || "-"}</Typography.Text>
                         {sitesLoading ? <Spin size="small" /> : null}
                     </Space>
 

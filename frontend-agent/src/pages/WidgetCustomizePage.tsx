@@ -43,10 +43,11 @@ export function WidgetCustomizePage() {
 
     const [form] = Form.useForm<WidgetConfigDto>();
 
-    const siteOptions = useMemo(
-        () => sites.map((s) => ({ value: s.id, label: `${s.name} (${s.public_key})` })),
-        [sites],
-    );
+    const selectedSiteLabel = useMemo(() => {
+        const s = sites.find((x) => x.id === siteId) || sites[0];
+        if (!s) return "";
+        return `${s.name} (${s.public_key})`;
+    }, [siteId, sites]);
 
     useEffect(() => {
         let mounted = true;
@@ -158,14 +159,7 @@ export function WidgetCustomizePage() {
                 <Space direction="vertical" size={12} style={{ width: "100%" }}>
                     <Space wrap>
                         <Typography.Text strong>{t("widgetCustomize.selectSite")}</Typography.Text>
-                        <Select
-                            style={{ minWidth: 420 }}
-                            placeholder={t("widgetCustomize.selectSitePlaceholder")}
-                            options={siteOptions}
-                            value={siteId || undefined}
-                            onChange={(v) => setSiteId(v)}
-                            disabled={sitesLoading || !isAdmin}
-                        />
+                        <Typography.Text code>{selectedSiteLabel || "-"}</Typography.Text>
                         {sitesLoading ? <Spin size="small" /> : null}
                         {cfgLoading ? <Spin size="small" /> : null}
                     </Space>

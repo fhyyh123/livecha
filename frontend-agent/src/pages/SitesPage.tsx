@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Collapse, Row, Col, Select, Space, Spin, Tag, Typography, notification } from "antd";
+import { Alert, Button, Card, Collapse, Row, Col, Space, Spin, Tag, Typography, notification } from "antd";
 import { CheckCircleFilled, CopyOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -90,10 +90,11 @@ export function SitesPage() {
         ].join("\n");
     }, [snippet, t]);
 
-    const siteOptions = useMemo(
-        () => sites.map((s) => ({ value: s.id, label: `${s.name} (${s.public_key})` })),
-        [sites],
-    );
+    const selectedSiteLabel = useMemo(() => {
+        const s = sites.find((x) => x.id === siteId) || sites[0];
+        if (!s) return "";
+        return `${s.name} (${s.public_key})`;
+    }, [siteId, sites]);
 
     useEffect(() => {
         let mounted = true;
@@ -248,13 +249,7 @@ export function SitesPage() {
                 <div style={{ minWidth: 360 }}>
                     <Typography.Text type="secondary">{t("sites.selectSite")}</Typography.Text>
                     <div style={{ marginTop: 8 }}>
-                        <Select
-                            style={{ width: "100%", minWidth: 360 }}
-                            placeholder={t("sites.selectSitePlaceholder")}
-                            options={siteOptions}
-                            value={siteId || undefined}
-                            onChange={(v) => setSiteId(v)}
-                        />
+                        <Typography.Text code>{selectedSiteLabel || "-"}</Typography.Text>
                     </div>
                 </div>
             </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Checkbox, Divider, Form, Input, Select, Space, Spin, Switch, Typography } from "antd";
+import { Alert, Button, Card, Checkbox, Divider, Form, Input, Space, Spin, Switch, Typography } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { http } from "../providers/http";
@@ -54,12 +54,13 @@ export function PreChatFormPage() {
 
     const [form] = Form.useForm<PreChatFormValues>();
 
-    const siteOptions = useMemo(
-        () => sites.map((s) => ({ value: s.id, label: `${s.name} (${s.public_key})` })),
-        [sites],
-    );
+    const selectedSiteLabel = useMemo(() => {
+        const s = sites.find((x) => x.id === siteId) || sites[0];
+        if (!s) return "";
+        return `${s.name} (${s.public_key})`;
+    }, [siteId, sites]);
 
-    const selectedSite = useMemo(() => sites.find((s) => s.id === siteId), [sites, siteId]);
+    const selectedSite = useMemo(() => sites.find((s) => s.id === siteId) || null, [sites, siteId]);
 
     useEffect(() => {
         let mounted = true;
@@ -204,14 +205,7 @@ export function PreChatFormPage() {
                         <Space direction="vertical" size={12} style={{ width: "100%" }}>
                             <Space wrap>
                                 <Typography.Text strong>{t("preChatForm.selectSite")}</Typography.Text>
-                                <Select
-                                    style={{ minWidth: 420 }}
-                                    placeholder={t("preChatForm.selectSitePlaceholder")}
-                                    options={siteOptions}
-                                    value={siteId || undefined}
-                                    onChange={(v) => setSiteId(v)}
-                                    disabled={sitesLoading || !isAdmin}
-                                />
+                                <Typography.Text code>{selectedSiteLabel || "-"}</Typography.Text>
                                 {sitesLoading ? <Spin size="small" /> : null}
                                 {cfgLoading ? <Spin size="small" /> : null}
                             </Space>
