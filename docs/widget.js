@@ -67,9 +67,6 @@
     offsetY: 20,
     debug: false,
 
-    // If true, do not fire /chatlive/ping install beacon (useful for admin preview).
-    disableInstallBeacon: false,
-
     // Optional postMessage origin allowlist. If set, widget accepts messages from these origins.
     // Otherwise it defaults to the embedUrl origin.
     allowedOrigins: null,
@@ -1306,7 +1303,7 @@
     startKeepAlive();
 
     // Fire a best-effort install beacon for "installation verification".
-    if (!config.disableInstallBeacon) fireInstallBeacon(config);
+    fireInstallBeacon(config);
 
     // Start closed by default
     setOpen(false);
@@ -1630,7 +1627,6 @@
       siteKey: siteKey,
       embedUrl: embedUrl,
       origin: el.dataset.chatliveOrigin || null,
-      disableInstallBeacon: parseBool(el.dataset.chatliveDisableInstallBeacon, undefined),
       cookieDomain: el.dataset.chatliveCookieDomain || undefined,
       cookieSameSite: normalizeSameSite(el.dataset.chatliveCookieSamesite) || undefined,
       position: el.dataset.chatlivePosition || undefined,

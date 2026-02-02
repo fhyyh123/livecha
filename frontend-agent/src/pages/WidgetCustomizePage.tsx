@@ -307,8 +307,6 @@ function buildPreviewScriptTagHtml(params: {
     lines.push(`  src=\"${escapeAttr(scriptUrl)}\"`);
     lines.push(`  data-chatlive-site-key=\"${escapeAttr(siteKey)}\"`);
     lines.push(`  data-chatlive-embed-url=\"${escapeAttr(embedUrl)}\"`);
-    // Admin preview: avoid spamming /chatlive/ping beacons.
-    lines.push("  data-chatlive-disable-install-beacon=\"true\"");
     lines.push(`  data-chatlive-auto-height=\"${autoHeightAttr}\"`);
 
     if (themeColor) lines.push(`  data-chatlive-theme-color=\"${escapeAttr(themeColor)}\"`);
@@ -1024,8 +1022,7 @@ export function WidgetCustomizePage() {
                                     title="widget-preview"
                                     srcDoc={previewSrcDoc}
                                     style={previewIframeStyle}
-                                    // Avoid Chrome warning: allow-scripts + allow-same-origin weakens sandbox.
-                                    sandbox="allow-scripts allow-forms"
+                                    sandbox="allow-scripts allow-same-origin allow-forms"
                                 />
                             ) : (
                                 <div style={{ color: "rgba(0,0,0,.45)" }}>{t("preChatForm.previewEmpty")}</div>
