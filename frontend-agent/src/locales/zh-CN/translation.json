@@ -765,6 +765,7 @@
     "leaveContactHint": "方便我们在你离开页面后继续跟进（至少填写 name 或 email 之一）。",
     "identityError": "请至少填写 name 或 email（也可以选择跳过）。",
     "preChat": {
+      "defaultInfo": "让我们开始吧，先填写几个信息！",
       "nameLabel": "Name:",
       "emailLabel": "E-mail:",
       "nameRequiredError": "请填写 name",

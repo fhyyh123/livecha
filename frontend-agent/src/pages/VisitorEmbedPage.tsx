@@ -1805,7 +1805,7 @@ export function VisitorEmbedPage() {
                         {preChatEnabled && !conversation ? (
                             <div style={{ background: "#fff", borderRadius: 14, padding: 12, border: "1px solid rgba(15,23,42,.06)", marginBottom: 12 }}>
                                 <div style={{ color: "rgba(15,23,42,.65)", fontSize: 13, marginBottom: 10 }}>
-                                    {preChatInfoText || t("visitorEmbed.identityRequiredDetail")}
+                                    {preChatInfoText || t("visitorEmbed.preChat.defaultInfo")}
                                 </div>
                                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                                     {preChatFields

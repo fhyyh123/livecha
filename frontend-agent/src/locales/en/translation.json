@@ -769,6 +769,7 @@
     "leaveContactHint": "So we can follow up after you leave (at least name or email).",
     "identityError": "Please fill at least name or email (or you can skip).",
     "preChat": {
+      "defaultInfo": "Let's get started — please fill in a few details!",
       "nameLabel": "Name:",
       "emailLabel": "E-mail:",
       "nameRequiredError": "Name is required",
