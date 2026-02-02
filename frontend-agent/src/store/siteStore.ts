@@ -16,6 +16,8 @@ export type WidgetConfig = {
     welcome_text?: string | null;
     cookie_domain?: string | null;
     cookie_samesite?: string | null;
+    widget_language?: string | null;
+    widget_phrases_json?: string | null;
     pre_chat_message?: string | null;
     pre_chat_name_label?: string | null;
     pre_chat_email_label?: string | null;

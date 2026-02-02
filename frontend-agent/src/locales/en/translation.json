@@ -730,6 +730,146 @@
       }
     }
   },
+  "widgetLanguage": {
+    "title": "Language",
+    "adminOnlyHint": "Admin only",
+    "selectSite": "Site",
+    "language": {
+      "label": "Select language"
+    },
+    "phrases": {
+      "title": "Customize phrases",
+      "hint": "These texts are shown to visitors in the website widget.",
+      "sectionWelcome": "Welcome your customers",
+      "welcomeText": {
+        "label": "Welcome message",
+        "placeholder": "Hello. How may I help you?"
+      },
+      "defaultCustomerName": {
+        "label": "Default customer name",
+        "placeholder": "Customer"
+      },
+      "headerTitle": {
+        "label": "Header title",
+        "placeholder": "Text Support"
+      },
+      "messagePlaceholder": {
+        "label": "Message placeholder",
+        "placeholder": "Write a message..."
+      },
+      "sectionActions": "Buttons & prompts",
+      "minimize": {
+        "label": "Minimize",
+        "placeholder": "Minimize"
+      },
+      "retry": {
+        "label": "Retry",
+        "placeholder": "Retry"
+      },
+      "startConversation": {
+        "label": "Start conversation",
+        "placeholder": "Start conversation"
+      },
+      "nameOptional": {
+        "label": "Name input placeholder",
+        "placeholder": "name (optional)"
+      },
+      "emailOptional": {
+        "label": "Email input placeholder",
+        "placeholder": "email (optional)"
+      },
+      "leaveContactTitle": {
+        "label": "Leave contact title",
+        "placeholder": "Leave contact (optional)"
+      },
+      "leaveContactOk": {
+        "label": "Leave contact OK button",
+        "placeholder": "Submit and close"
+      },
+      "leaveContactCancel": {
+        "label": "Leave contact Cancel button",
+        "placeholder": "Skip and close"
+      },
+      "leaveContactHint": {
+        "label": "Leave contact hint",
+        "placeholder": "So we can follow up after you leave (at least name or email)."
+      },
+      "identityError": {
+        "label": "Identity error",
+        "placeholder": "Please fill at least name or email (or you can skip)."
+      },
+      "sectionPreChat": "Pre-chat",
+      "preChatDefaultInfo": {
+        "label": "Pre-chat info text",
+        "placeholder": "Let's get started — please fill in a few details!"
+      },
+      "preChatNameLabel": {
+        "label": "Pre-chat name label",
+        "placeholder": "Name:"
+      },
+      "preChatEmailLabel": {
+        "label": "Pre-chat email label",
+        "placeholder": "E-mail:"
+      },
+      "preChatRequiredError": {
+        "label": "Pre-chat required error",
+        "placeholder": "{{label}} is required"
+      },
+      "preChatAtLeastOneError": {
+        "label": "Pre-chat at least one error",
+        "placeholder": "Please provide at least one field"
+      },
+      "sectionComposer": "Composer",
+      "composerSend": {
+        "label": "Send button",
+        "placeholder": "Send"
+      },
+      "composerEnterContentHint": {
+        "label": "Enter content hint",
+        "placeholder": "Type something"
+      },
+      "sectionAttachments": "Attachments",
+      "attachAddFile": {
+        "label": "Add file",
+        "placeholder": "Add file"
+      },
+      "attachAdd": {
+        "label": "Add",
+        "placeholder": "Add"
+      },
+      "attachUploadFile": {
+        "label": "Upload file",
+        "placeholder": "Upload file"
+      },
+      "attachSendScreenshot": {
+        "label": "Send screenshot",
+        "placeholder": "Send screenshot"
+      },
+      "attachEmoji": {
+        "label": "Emoji",
+        "placeholder": "Emoji"
+      },
+      "sectionConversation": "Conversation",
+      "noMessages": {
+        "label": "No messages",
+        "placeholder": "No messages"
+      },
+      "typing": {
+        "label": "Typing indicator",
+        "placeholder": "· typing…"
+      },
+      "unread": {
+        "label": "Unread badge",
+        "placeholder": "· {{count}} unread"
+      }
+    },
+    "preview": {
+      "title": "Preview",
+      "welcomeFallback": "Hello. How may I help you?",
+      "customerBubble": "I'd like to ask something",
+      "agentBubble": "Go ahead"
+    }
+  },
   "conversationChat": {
     "title": "Conversation",
     "ws": "WS",

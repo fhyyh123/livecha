@@ -11,8 +11,10 @@ import routerProvider, {
 } from "@refinedev/react-router-v6";
 import { ConfigProvider } from "antd";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
-import { useTranslation } from "react-i18next";
+import { I18nextProvider, useTranslation } from "react-i18next";
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+
+import { embedI18n } from "./i18nEmbed";
 
 import { authProvider } from "./providers/authProvider";
 import { AUTH_CHANGED_EVENT, getToken, http } from "./providers/http";
@@ -33,6 +35,7 @@ const VisitorEmbedPage = lazy(() => import("./pages/VisitorEmbedPage").then((m) 
 const SitesPage = lazy(() => import("./pages/SitesPage").then((m) => ({ default: m.SitesPage })));
 const TrustedDomainsPage = lazy(() => import("./pages/TrustedDomainsPage").then((m) => ({ default: m.TrustedDomainsPage })));
 const WidgetCustomizePage = lazy(() => import("./pages/WidgetCustomizePage").then((m) => ({ default: m.WidgetCustomizePage })));
+const WidgetLanguagePage = lazy(() => import("./pages/WidgetLanguagePage.tsx").then((m) => ({ default: m.WidgetLanguagePage })));
 const PreChatFormPage = lazy(() => import("./pages/PreChatFormPage").then((m) => ({ default: m.PreChatFormPage })));
 const AskForEmailPage = lazy(() => import("./pages/AskForEmailPage").then((m) => ({ default: m.AskForEmailPage })));
 const PostChatFormPage = lazy(() => import("./pages/PostChatFormPage").then((m) => ({ default: m.PostChatFormPage })));
@@ -167,7 +170,9 @@ function App() {
             path="/visitor/embed"
             element={
               <Suspense fallback={<RouteFallback />}>
-                <VisitorEmbedPage />
+                <I18nextProvider i18n={embedI18n}>
+                  <VisitorEmbedPage />
+                </I18nextProvider>
               </Suspense>
             }
           />
@@ -203,7 +208,9 @@ function App() {
               path="/visitor/embed"
               element={
                 <Suspense fallback={<RouteFallback />}>
-                  <VisitorEmbedPage />
+                  <I18nextProvider i18n={embedI18n}>
+                    <VisitorEmbedPage />
+                  </I18nextProvider>
                 </Suspense>
               }
             />
@@ -347,6 +354,14 @@ function App() {
                 element={
                   <Suspense fallback={<RouteFallback />}>
                     <WidgetCustomizePage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/settings/widget/language"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <WidgetLanguagePage />
                   </Suspense>
                 }
               />

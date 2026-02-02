@@ -23,9 +23,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 public class PublicConversationService {
+
+    private static final Pattern WIDGET_LANG_ALLOWED = Pattern.compile("^(en|zh-CN)$", Pattern.CASE_INSENSITIVE);
 
     private final WidgetConfigRepository widgetConfigRepository;
     private final VisitorRepository visitorRepository;
@@ -196,6 +199,18 @@ public class PublicConversationService {
         // Persist identity fields if provided
         if ((name != null && !name.isBlank()) || (email != null && !email.isBlank())) {
             visitorRepository.updateIdentity(visitorId, emptyToNull(name), emptyToNull(email));
+        } else {
+            // LiveChat-like behavior: if visitor stays anonymous, use a configurable default name.
+            // We only set it if current visitor has no name yet (avoid overwriting real identity).
+            var defaultName = extractDefaultCustomerName(config == null ? null : config.widgetPhrasesJson());
+            if (defaultName != null && !defaultName.isBlank()) {
+                var current = visitorRepository.findByIdAndSite(visitorId, claims.siteId()).orElse(null);
+                var currentName = current == null ? null : safeTrim(current.name());
+                if (currentName == null || currentName.isBlank()) {
+                    var currentEmail = current == null ? null : safeTrim(current.email());
+                    visitorRepository.updateIdentity(visitorId, defaultName, emptyToNull(currentEmail));
+                }
+            }
         }
 
         // Reuse existing agent-side model: create a customer user_account with id==visitorId.
@@ -256,6 +271,23 @@ public class PublicConversationService {
         }
 
         return new CreateOrRecoverConversationResponse(conversationId, recovered);
+    }
+
+    private static String extractDefaultCustomerName(String widgetPhrasesJson) {
+        var raw = safeTrim(widgetPhrasesJson);
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            var node = mapper.readTree(raw);
+            if (node == null || !node.isObject()) return null;
+            var v = node.get("default_customer_name");
+            if (v == null || !v.isTextual()) return null;
+            var t = v.asText();
+            t = t == null ? null : t.trim();
+            return (t == null || t.isBlank()) ? null : t;
+        } catch (Exception ignore) {
+            return null;
+        }
     }
 
     private java.util.List<PreChatFieldConfig> parsePreChatFields(String preChatFieldsJson) {

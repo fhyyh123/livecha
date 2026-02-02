@@ -5,6 +5,7 @@ import { ArrowUpOutlined, FileAddOutlined, LeftOutlined, MinusOutlined, PlusOutl
 import { useTranslation } from "react-i18next";
 
 import { WsClient, type WsInboundEvent, type WsStatus } from "../ws/wsClient";
+import { applyWidgetPhrasesToEmbedI18n, normalizeWidgetLanguage } from "../i18nEmbed";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
     if (!value || typeof value !== "object") return null;
@@ -25,6 +26,19 @@ function safeJsonParse<T>(s: string): T | null {
     } catch {
         return null;
     }
+}
+
+function parseWidgetPhrases(json: string | null | undefined): Record<string, string> {
+    const raw = String(json || "").trim();
+    if (!raw) return {};
+    const parsed = safeJsonParse<unknown>(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    if (Array.isArray(parsed)) return {};
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+        if (typeof v === "string" && v.trim()) out[k] = v;
+    }
+    return out;
 }
 
 type PreChatFieldType = "info" | "name" | "email" | "text" | "textarea" | "select" | "multiselect";
@@ -69,6 +83,8 @@ type WidgetConfig = {
     welcome_text?: string | null;
     cookie_domain?: string | null;
     cookie_samesite?: string | null;
+    widget_language?: string | null;
+    widget_phrases_json?: string | null;
     pre_chat_message?: string | null;
     pre_chat_name_label?: string | null;
     pre_chat_email_label?: string | null;
@@ -455,7 +471,7 @@ function formatTimeShort(epochSeconds: number): string {
 }
 
 export function VisitorEmbedPage() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const q = useMemo(() => new URLSearchParams(location.search), []);
     const siteKey = q.get("site_key") || "";
     const debugUi = q.get("debug") === "1";
@@ -1112,6 +1128,11 @@ export function VisitorEmbedPage() {
                 body: JSON.stringify({ site_key: siteKey, origin, visitor_id: storedVisitorId }),
             });
 
+            // Apply per-site phrases to the embed i18n instance (so they affect all t("visitorEmbed.*") calls).
+            const nextLang = normalizeWidgetLanguage(data?.widget_config?.widget_language);
+            const phrases = parseWidgetPhrases(data?.widget_config?.widget_phrases_json || null);
+            applyWidgetPhrasesToEmbedI18n(i18n, nextLang, phrases);
+
             safeLocalStorageSet(VISITOR_ID_PREFIX + siteKey, data.visitor_id);
             writeCookie(cookieName, data.visitor_id, {
                 domain: cookieDomain || undefined,
@@ -1119,6 +1140,11 @@ export function VisitorEmbedPage() {
                 secure: location.protocol === "https:" || cookieSameSite === "None",
             });
             setBootstrap(data);
+
+            // Apply per-site widget language without leaking into the agent/admin app.
+            if (i18n.language !== nextLang) {
+                void i18n.changeLanguage(nextLang);
+            }
 
             // If the visitor previously chatted, restore the conversation id from storage so we can
             // show history immediately on refresh, without calling createOrRecover().
@@ -1138,6 +1164,9 @@ export function VisitorEmbedPage() {
             setLoading(false);
         }
     }
+
+    const headerTitle = t("visitorEmbed.headerTitle");
+    const composerPlaceholder = t("visitorEmbed.composer.placeholder");
 
     // Persist conversation id so refresh can restore history without creating.
     useEffect(() => {
@@ -1631,6 +1660,8 @@ export function VisitorEmbedPage() {
         void sendText();
     }
 
+    const isPreChatScreen = preChatEnabled && !conversation?.conversation_id;
+
     return (
         <ConfigProvider
             theme={
@@ -1715,7 +1746,7 @@ export function VisitorEmbedPage() {
                             />
                             <div style={{ minWidth: 0, display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
                                 <div style={{ fontWeight: 800, color: "#0f172a", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                    {t("visitorEmbed.headerTitle")}
+                                    {headerTitle}
                                 </div>
                                 {!hostOpen && unread ? (
                                     <div style={{ fontSize: 12, color: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", gap: 6 }}>
@@ -1753,7 +1784,7 @@ export function VisitorEmbedPage() {
                         </div>
                     </div>
 
-                    {/* Scrollable conversation */}
+                    {/* Scrollable content */}
                     <div
                         style={{
                             flex: "1 1 auto",
@@ -1763,6 +1794,8 @@ export function VisitorEmbedPage() {
                             overscrollBehavior: "contain",
                             background: "#f8fafc",
                             padding: "14px 12px",
+                            borderBottomLeftRadius: isPreChatScreen ? 18 : undefined,
+                            borderBottomRightRadius: isPreChatScreen ? 18 : undefined,
                         }}
                     >
                         {!siteKey ? <div style={{ color: "#ef4444", fontWeight: 700 }}>{t("visitorEmbed.missingSiteKey")}</div> : null}
@@ -1802,7 +1835,7 @@ export function VisitorEmbedPage() {
                             </div>
                         ) : null}
 
-                        {preChatEnabled && !conversation ? (
+                        {isPreChatScreen ? (
                             <div style={{ background: "#fff", borderRadius: 14, padding: 12, border: "1px solid rgba(15,23,42,.06)", marginBottom: 12 }}>
                                 <div style={{ color: "rgba(15,23,42,.65)", fontSize: 13, marginBottom: 10 }}>
                                     {preChatInfoText || t("visitorEmbed.preChat.defaultInfo")}
@@ -1986,119 +2019,124 @@ export function VisitorEmbedPage() {
                             </div>
                         ) : null}
 
-                        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                            {messages.length === 0 ? (
-                                <div style={{ display: "flex", justifyContent: "center", padding: "18px 0" }}>
-                                    <div style={{ fontSize: 13, color: "rgba(15,23,42,.45)" }}>{t("visitorEmbed.noMessages")}</div>
+                        {!isPreChatScreen ? (
+                            <>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                    {messages.length === 0 ? (
+                                        <div style={{ display: "flex", justifyContent: "center", padding: "18px 0" }}>
+                                            <div style={{ fontSize: 13, color: "rgba(15,23,42,.45)" }}>{t("visitorEmbed.noMessages")}</div>
+                                        </div>
+                                    ) : null}
+
+                                    {messages.map((m) => {
+                                        const system = isSystemMessage(m);
+                                        const sender = String(m.sender_type || "");
+                                        const isCustomer = sender === "customer";
+                                        const isAgent = sender === "agent";
+
+                                        if (system) {
+                                            return (
+                                                <div key={m.id} style={{ display: "flex", justifyContent: "center" }}>
+                                                    <div
+                                                        style={{
+                                                            maxWidth: "92%",
+                                                            background: "rgba(15,23,42,.08)",
+                                                            color: "rgba(15,23,42,.65)",
+                                                            padding: "8px 12px",
+                                                            borderRadius: 999,
+                                                            fontSize: 12,
+                                                            textAlign: "center",
+                                                        }}
+                                                    >
+                                                        {m.content?.text || ""}
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
+                                        const rowStyle: CSSProperties = {
+                                            display: "flex",
+                                            flexDirection: isCustomer ? "row-reverse" : "row",
+                                            alignItems: "flex-end",
+                                            gap: 8,
+                                        };
+
+                                        const bubbleStyle: CSSProperties = {
+                                            maxWidth: "78%",
+                                            padding: "10px 12px",
+                                            borderRadius: 18,
+                                            boxShadow: "0 8px 24px rgba(0,0,0,.06)",
+                                            border: isCustomer ? "none" : "1px solid rgba(15,23,42,.08)",
+                                            background: isCustomer ? uiPrimary : "#ffffff",
+                                            color: isCustomer ? uiPrimaryText : "#0f172a",
+                                        };
+
+                                        const avatarStyle: CSSProperties = {
+                                            width: 28,
+                                            height: 28,
+                                            borderRadius: 12,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            background: isAgent ? "#111827" : "transparent",
+                                            color: "#fff",
+                                            fontSize: 12,
+                                            fontWeight: 800,
+                                            flex: "0 0 auto",
+                                            boxShadow: isAgent ? "0 10px 20px rgba(0,0,0,.12)" : undefined,
+                                            visibility: isAgent ? "visible" : "hidden",
+                                        };
+
+                                        const metaStyle: CSSProperties = {
+                                            fontSize: 11,
+                                            color: "rgba(15,23,42,.45)",
+                                            marginTop: 4,
+                                            display: "flex",
+                                            justifyContent: isCustomer ? "flex-end" : "flex-start",
+                                            gap: 8,
+                                            paddingLeft: isCustomer ? 0 : 36,
+                                            paddingRight: isCustomer ? 0 : 0,
+                                        };
+
+                                        const showRead = peerLastReadMsgId && isCustomer && m.id === peerLastReadMsgId;
+
+                                        return (
+                                            <div key={m.id} style={{ display: "flex", flexDirection: "column" }}>
+                                                <div style={rowStyle}>
+                                                    <div style={avatarStyle} aria-hidden>
+                                                        S
+                                                    </div>
+                                                    <div style={bubbleStyle}>{renderMessageContent(m)}</div>
+                                                </div>
+                                                <div style={metaStyle}>
+                                                    <span>{formatTimeShort(m.created_at)}</span>
+                                                    {showRead ? <span style={{ color: "rgba(15,23,42,.55)", fontWeight: 600 }}>Read</span> : null}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                            ) : null}
 
-                            {messages.map((m) => {
-                                const system = isSystemMessage(m);
-                                const sender = String(m.sender_type || "");
-                                const isCustomer = sender === "customer";
-                                const isAgent = sender === "agent";
-
-                                if (system) {
-                                    return (
-                                        <div key={m.id} style={{ display: "flex", justifyContent: "center" }}>
-                                            <div
-                                                style={{
-                                                    maxWidth: "92%",
-                                                    background: "rgba(15,23,42,.08)",
-                                                    color: "rgba(15,23,42,.65)",
-                                                    padding: "8px 12px",
-                                                    borderRadius: 999,
-                                                    fontSize: 12,
-                                                    textAlign: "center",
-                                                }}
-                                            >
-                                                {m.content?.text || ""}
-                                            </div>
-                                        </div>
-                                    );
-                                }
-
-                                const rowStyle: CSSProperties = {
-                                    display: "flex",
-                                    flexDirection: isCustomer ? "row-reverse" : "row",
-                                    alignItems: "flex-end",
-                                    gap: 8,
-                                };
-
-                                const bubbleStyle: CSSProperties = {
-                                    maxWidth: "78%",
-                                    padding: "10px 12px",
-                                    borderRadius: 18,
-                                    boxShadow: "0 8px 24px rgba(0,0,0,.06)",
-                                    border: isCustomer ? "none" : "1px solid rgba(15,23,42,.08)",
-                                    background: isCustomer ? uiPrimary : "#ffffff",
-                                    color: isCustomer ? uiPrimaryText : "#0f172a",
-                                };
-
-                                const avatarStyle: CSSProperties = {
-                                    width: 28,
-                                    height: 28,
-                                    borderRadius: 12,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    background: isAgent ? "#111827" : "transparent",
-                                    color: "#fff",
-                                    fontSize: 12,
-                                    fontWeight: 800,
-                                    flex: "0 0 auto",
-                                    boxShadow: isAgent ? "0 10px 20px rgba(0,0,0,.12)" : undefined,
-                                    visibility: isAgent ? "visible" : "hidden",
-                                };
-
-                                const metaStyle: CSSProperties = {
-                                    fontSize: 11,
-                                    color: "rgba(15,23,42,.45)",
-                                    marginTop: 4,
-                                    display: "flex",
-                                    justifyContent: isCustomer ? "flex-end" : "flex-start",
-                                    gap: 8,
-                                    paddingLeft: isCustomer ? 0 : 36,
-                                    paddingRight: isCustomer ? 0 : 0,
-                                };
-
-                                const showRead = peerLastReadMsgId && isCustomer && m.id === peerLastReadMsgId;
-
-                                return (
-                                    <div key={m.id} style={{ display: "flex", flexDirection: "column" }}>
-                                        <div style={rowStyle}>
-                                            <div style={avatarStyle} aria-hidden>
-                                                S
-                                            </div>
-                                            <div style={bubbleStyle}>{renderMessageContent(m)}</div>
-                                        </div>
-                                        <div style={metaStyle}>
-                                            <span>{formatTimeShort(m.created_at)}</span>
-                                            {showRead ? <span style={{ color: "rgba(15,23,42,.55)", fontWeight: 600 }}>Read</span> : null}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        <div ref={messagesEndRef} />
+                                <div ref={messagesEndRef} />
+                            </>
+                        ) : null}
 
                     </div>
 
                     {/* Bottom composer (pinned) */}
-                    <div
-                        style={{
-                            flex: "0 0 auto",
-                            padding: "14px 12px",
-                            borderTop: "1px solid rgba(15,23,42,.06)",
-                            background: "#ffffff",
-                            borderBottomLeftRadius: 18,
-                            borderBottomRightRadius: 18,
-                            paddingBottom: "calc(14px + env(safe-area-inset-bottom))",
-                        }}
-                    >
-                        <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
+                    {!isPreChatScreen ? (
+                        <div
+                            style={{
+                                flex: "0 0 auto",
+                                padding: "14px 12px",
+                                borderTop: "1px solid rgba(15,23,42,.06)",
+                                background: "#ffffff",
+                                borderBottomLeftRadius: 18,
+                                borderBottomRightRadius: 18,
+                                paddingBottom: "calc(14px + env(safe-area-inset-bottom))",
+                            }}
+                        >
+                            <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
                             {/* Hidden inputs for attachment actions */}
                             <input
                                 ref={fileInputRef}
@@ -2218,7 +2256,7 @@ export function VisitorEmbedPage() {
                                     ref={textAreaRef}
                                     value={draft}
                                     onChange={(e) => setDraft(e.target.value)}
-                                    placeholder={t("visitorEmbed.composer.placeholder")}
+                                    placeholder={composerPlaceholder}
                                     autoSize={{ minRows: 1, maxRows: 4 }}
                                     onKeyDown={onComposerKeyDown}
                                     disabled={!composerEnabled}
@@ -2302,8 +2340,9 @@ export function VisitorEmbedPage() {
                                     />
                                 </Tooltip>
                             </div>
+                            </div>
                         </div>
-                    </div>
+                    ) : null}
                 </div>
             </div>
         </ConfigProvider>

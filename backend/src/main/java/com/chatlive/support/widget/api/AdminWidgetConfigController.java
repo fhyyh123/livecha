@@ -42,7 +42,7 @@ public class AdminWidgetConfigController {
 
         var row = widgetConfigRepository.findBySiteId(site.id()).orElse(null);
         if (row == null) {
-            return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, null, null, null, false, false));
+            return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, "en", null, null, null, null, false, false));
         }
         return ApiResponse.ok(new WidgetConfigDto(
                 row.preChatEnabled(),
@@ -51,6 +51,8 @@ public class AdminWidgetConfigController {
                 row.welcomeText(),
                 row.cookieDomain(),
                 row.cookieSameSite(),
+                row.widgetLanguage(),
+                row.widgetPhrasesJson(),
                 row.preChatMessage(),
                 row.preChatNameLabel(),
                 row.preChatEmailLabel(),
@@ -75,6 +77,9 @@ public class AdminWidgetConfigController {
         var welcomeText = emptyToNull(req == null ? null : req.welcome_text());
         var cookieDomain = emptyToNull(req == null ? null : req.cookie_domain());
         var cookieSameSite = normalizeSameSite(req == null ? null : req.cookie_samesite());
+
+        var widgetLanguage = normalizeWidgetLanguage(req == null ? null : req.widget_language());
+        var widgetPhrasesJson = emptyToNull(req == null ? null : req.widget_phrases_json());
         var preChatMessage = emptyToNull(req == null ? null : req.pre_chat_message());
         var preChatNameLabel = emptyToNull(req == null ? null : req.pre_chat_name_label());
         var preChatEmailLabel = emptyToNull(req == null ? null : req.pre_chat_email_label());
@@ -84,11 +89,13 @@ public class AdminWidgetConfigController {
         widgetConfigRepository.upsert(
                 site.id(),
         preChatEnabled,
-            preChatFieldsJson,
+        preChatFieldsJson,
                 themeColor,
                 welcomeText,
                 cookieDomain,
             cookieSameSite,
+            widgetLanguage,
+            widgetPhrasesJson,
             preChatMessage,
             preChatNameLabel,
             preChatEmailLabel,
@@ -98,7 +105,7 @@ public class AdminWidgetConfigController {
 
         var row = widgetConfigRepository.findBySiteId(site.id()).orElse(null);
         if (row == null) {
-            return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, null, null, null, false, false));
+            return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, "en", null, null, null, null, false, false));
         }
         return ApiResponse.ok(new WidgetConfigDto(
                 row.preChatEnabled(),
@@ -107,6 +114,8 @@ public class AdminWidgetConfigController {
                 row.welcomeText(),
                 row.cookieDomain(),
                 row.cookieSameSite(),
+                row.widgetLanguage(),
+                row.widgetPhrasesJson(),
                 row.preChatMessage(),
                 row.preChatNameLabel(),
                 row.preChatEmailLabel(),
@@ -129,6 +138,15 @@ public class AdminWidgetConfigController {
         if (s == null) return null;
         var t = s.trim();
         return t.isBlank() ? null : t;
+    }
+
+    private static String normalizeWidgetLanguage(String s) {
+        if (s == null) return "en";
+        var t = s.trim();
+        if (t.isBlank()) return "en";
+        if ("en".equalsIgnoreCase(t)) return "en";
+        if ("zh-CN".equalsIgnoreCase(t) || "zh-cn".equalsIgnoreCase(t)) return "zh-CN";
+        return "en";
     }
 
     private static String normalizeSameSite(String s) {

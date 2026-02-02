@@ -726,6 +726,146 @@
       }
     }
   },
+  "widgetLanguage": {
+    "title": "语言",
+    "adminOnlyHint": "仅管理员可配置",
+    "selectSite": "站点",
+    "language": {
+      "label": "选择语言"
+    },
+    "phrases": {
+      "title": "自定义文案",
+      "hint": "这些文本会展示给访客（网站小部件）。",
+      "sectionWelcome": "欢迎你的客户",
+      "welcomeText": {
+        "label": "欢迎语",
+        "placeholder": "你好，有什么可以帮你？"
+      },
+      "defaultCustomerName": {
+        "label": "默认客户名称",
+        "placeholder": "客户"
+      },
+      "headerTitle": {
+        "label": "标题",
+        "placeholder": "在线客服"
+      },
+      "messagePlaceholder": {
+        "label": "输入框占位提示",
+        "placeholder": "请输入消息..."
+      },
+      "sectionActions": "按钮与提示",
+      "minimize": {
+        "label": "最小化",
+        "placeholder": "最小化"
+      },
+      "retry": {
+        "label": "重试",
+        "placeholder": "重试"
+      },
+      "startConversation": {
+        "label": "开始对话",
+        "placeholder": "开始对话"
+      },
+      "nameOptional": {
+        "label": "姓名输入框占位",
+        "placeholder": "name（可选）"
+      },
+      "emailOptional": {
+        "label": "邮箱输入框占位",
+        "placeholder": "email（可选）"
+      },
+      "leaveContactTitle": {
+        "label": "留联系方式标题",
+        "placeholder": "留下联系方式（可选）"
+      },
+      "leaveContactOk": {
+        "label": "提交按钮",
+        "placeholder": "提交并关闭"
+      },
+      "leaveContactCancel": {
+        "label": "跳过按钮",
+        "placeholder": "跳过并关闭"
+      },
+      "leaveContactHint": {
+        "label": "留联系方式提示",
+        "placeholder": "方便我们在你离开页面后继续跟进（至少填写 name 或 email 之一）。"
+      },
+      "identityError": {
+        "label": "身份信息错误提示",
+        "placeholder": "请至少填写 name 或 email（也可以选择跳过）。"
+      },
+      "sectionPreChat": "预聊天表单",
+      "preChatDefaultInfo": {
+        "label": "预聊天说明文字",
+        "placeholder": "让我们开始吧，先填写几个信息！"
+      },
+      "preChatNameLabel": {
+        "label": "Name 标签",
+        "placeholder": "Name:"
+      },
+      "preChatEmailLabel": {
+        "label": "E-mail 标签",
+        "placeholder": "E-mail:"
+      },
+      "preChatRequiredError": {
+        "label": "必填校验提示",
+        "placeholder": "{{label}}为必填"
+      },
+      "preChatAtLeastOneError": {
+        "label": "至少填写一项提示",
+        "placeholder": "请至少填写一个字段"
+      },
+      "sectionComposer": "输入框",
+      "composerSend": {
+        "label": "发送按钮",
+        "placeholder": "发送"
+      },
+      "composerEnterContentHint": {
+        "label": "未输入内容提示",
+        "placeholder": "请输入内容"
+      },
+      "sectionAttachments": "附件",
+      "attachAddFile": {
+        "label": "添加文件",
+        "placeholder": "添加文件"
+      },
+      "attachAdd": {
+        "label": "添加",
+        "placeholder": "添加"
+      },
+      "attachUploadFile": {
+        "label": "上传文件",
+        "placeholder": "上传文件"
+      },
+      "attachSendScreenshot": {
+        "label": "发送截图",
+        "placeholder": "发送截图"
+      },
+      "attachEmoji": {
+        "label": "表情",
+        "placeholder": "表情"
+      },
+      "sectionConversation": "会话",
+      "noMessages": {
+        "label": "暂无消息",
+        "placeholder": "暂无消息"
+      },
+      "typing": {
+        "label": "正在输入",
+        "placeholder": "· 正在输入…"
+      },
+      "unread": {
+        "label": "未读提示",
+        "placeholder": "· {{count}} 未读"
+      }
+    },
+    "preview": {
+      "title": "预览",
+      "welcomeFallback": "你好，有什么可以帮你？",
+      "customerBubble": "我想咨询一个问题",
+      "agentBubble": "请讲"
+    }
+  },
   "conversationChat": {
     "title": "会话",
     "ws": "WS",

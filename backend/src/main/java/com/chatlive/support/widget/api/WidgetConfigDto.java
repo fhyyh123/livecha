@@ -7,6 +7,8 @@ public record WidgetConfigDto(
         String welcome_text,
         String cookie_domain,
         String cookie_samesite,
+        String widget_language,
+        String widget_phrases_json,
         String pre_chat_message,
         String pre_chat_name_label,
         String pre_chat_email_label,

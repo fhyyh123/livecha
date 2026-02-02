@@ -50,6 +50,8 @@ public class SiteWizardService {
                 emptyToNull(welcomeText),
                 emptyToNull(cookieDomain),
             emptyToNull(cookieSameSite),
+            "en",
+            null,
             null,
             null,
             null,

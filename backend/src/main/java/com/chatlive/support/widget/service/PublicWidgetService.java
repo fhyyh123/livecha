@@ -67,13 +67,15 @@ public class PublicWidgetService {
                 r.welcomeText(),
                 r.cookieDomain(),
                 r.cookieSameSite(),
+                r.widgetLanguage(),
+                r.widgetPhrasesJson(),
                 r.preChatMessage(),
                 r.preChatNameLabel(),
                 r.preChatEmailLabel(),
                 r.preChatNameRequired(),
                 r.preChatEmailRequired()
             ))
-            .orElseGet(() -> new WidgetConfigDto(false, null, null, null, null, null, null, null, null, false, false));
+            .orElseGet(() -> new WidgetConfigDto(false, null, null, null, null, null, "en", null, null, null, null, false, false));
 
         String visitorId;
         if (req.visitor_id() != null && !req.visitor_id().isBlank()) {

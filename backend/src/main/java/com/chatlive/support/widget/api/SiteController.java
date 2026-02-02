@@ -69,7 +69,7 @@ public class SiteController {
 
         var row = widgetConfigRepository.findBySiteId(site.id()).orElse(null);
         if (row == null) {
-            return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, null, null, null, false, false));
+                return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, "en", null, null, null, null, false, false));
         }
 
         return ApiResponse.ok(new WidgetConfigDto(
@@ -79,6 +79,8 @@ public class SiteController {
                 row.welcomeText(),
                 row.cookieDomain(),
                 row.cookieSameSite(),
+                row.widgetLanguage(),
+                row.widgetPhrasesJson(),
                 row.preChatMessage(),
                 row.preChatNameLabel(),
                 row.preChatEmailLabel(),
