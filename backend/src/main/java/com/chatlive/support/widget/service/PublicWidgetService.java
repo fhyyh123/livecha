@@ -19,6 +19,24 @@ import java.time.Duration;
 @Service
 public class PublicWidgetService {
 
+    private static final String DEFAULT_POSITION = "bottom-right";
+    private static final int DEFAULT_Z_INDEX = 2147483647;
+    private static final String DEFAULT_LAUNCHER_TEXT = "Chat";
+    private static final String DEFAULT_LAUNCHER_STYLE = "bubble";
+    private static final String DEFAULT_THEME_MODE = "light";
+    private static final String DEFAULT_COLOR_SETTINGS_MODE = "theme";
+    private static final int DEFAULT_WIDTH = 380;
+    private static final int DEFAULT_HEIGHT = 560;
+    private static final boolean DEFAULT_AUTO_HEIGHT = true;
+    private static final String DEFAULT_AUTO_HEIGHT_MODE = "fixed";
+    private static final int DEFAULT_MIN_HEIGHT = 320;
+    private static final double DEFAULT_MAX_HEIGHT_RATIO = 0.85;
+    private static final int DEFAULT_MOBILE_BREAKPOINT = 640;
+    private static final boolean DEFAULT_MOBILE_FULLSCREEN = true;
+    private static final int DEFAULT_OFFSET_X = 20;
+    private static final int DEFAULT_OFFSET_Y = 20;
+    private static final boolean DEFAULT_DEBUG = false;
+
     private final SiteRepository siteRepository;
     private final SiteDomainAllowlistRepository allowlistRepository;
     private final WidgetConfigRepository widgetConfigRepository;
@@ -73,9 +91,59 @@ public class PublicWidgetService {
                 r.preChatNameLabel(),
                 r.preChatEmailLabel(),
                 r.preChatNameRequired(),
-                r.preChatEmailRequired()
+                r.preChatEmailRequired(),
+                r.launcherStyle() != null && !r.launcherStyle().isBlank() ? r.launcherStyle() : DEFAULT_LAUNCHER_STYLE,
+                r.themeMode() != null && !r.themeMode().isBlank() ? r.themeMode() : DEFAULT_THEME_MODE,
+                r.colorSettingsMode() != null && !r.colorSettingsMode().isBlank() ? r.colorSettingsMode() : DEFAULT_COLOR_SETTINGS_MODE,
+                r.colorOverridesJson(),
+                r.position() != null && !r.position().isBlank() ? r.position() : DEFAULT_POSITION,
+                r.zIndex() != null ? r.zIndex() : DEFAULT_Z_INDEX,
+                r.launcherText() != null && !r.launcherText().isBlank() ? r.launcherText() : DEFAULT_LAUNCHER_TEXT,
+                r.width() != null ? r.width() : DEFAULT_WIDTH,
+                r.height() != null ? r.height() : DEFAULT_HEIGHT,
+                r.autoHeight() != null ? r.autoHeight() : DEFAULT_AUTO_HEIGHT,
+                r.autoHeightMode() != null && !r.autoHeightMode().isBlank() ? r.autoHeightMode() : DEFAULT_AUTO_HEIGHT_MODE,
+                r.minHeight() != null ? r.minHeight() : DEFAULT_MIN_HEIGHT,
+                r.maxHeightRatio() != null ? r.maxHeightRatio() : DEFAULT_MAX_HEIGHT_RATIO,
+                r.mobileBreakpoint() != null ? r.mobileBreakpoint() : DEFAULT_MOBILE_BREAKPOINT,
+                r.mobileFullscreen() != null ? r.mobileFullscreen() : DEFAULT_MOBILE_FULLSCREEN,
+                r.offsetX() != null ? r.offsetX() : DEFAULT_OFFSET_X,
+                r.offsetY() != null ? r.offsetY() : DEFAULT_OFFSET_Y,
+                r.debug() != null ? r.debug() : DEFAULT_DEBUG
             ))
-            .orElseGet(() -> new WidgetConfigDto(false, null, null, null, null, null, "en", null, null, null, null, false, false));
+            .orElseGet(() -> new WidgetConfigDto(
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    "en",
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
+                    false,
+                    DEFAULT_LAUNCHER_STYLE,
+                    DEFAULT_THEME_MODE,
+                    DEFAULT_COLOR_SETTINGS_MODE,
+                    null,
+                    DEFAULT_POSITION,
+                    DEFAULT_Z_INDEX,
+                    DEFAULT_LAUNCHER_TEXT,
+                    DEFAULT_WIDTH,
+                    DEFAULT_HEIGHT,
+                    DEFAULT_AUTO_HEIGHT,
+                    DEFAULT_AUTO_HEIGHT_MODE,
+                    DEFAULT_MIN_HEIGHT,
+                    DEFAULT_MAX_HEIGHT_RATIO,
+                    DEFAULT_MOBILE_BREAKPOINT,
+                    DEFAULT_MOBILE_FULLSCREEN,
+                    DEFAULT_OFFSET_X,
+                    DEFAULT_OFFSET_Y,
+                    DEFAULT_DEBUG
+            ));
 
         String visitorId;
         if (req.visitor_id() != null && !req.visitor_id().isBlank()) {

@@ -80,6 +80,9 @@ type WidgetConfig = {
     pre_chat_enabled: boolean;
     pre_chat_fields_json?: string | null;
     theme_color?: string | null;
+    theme_mode?: string | null;
+    color_settings_mode?: string | null;
+    color_overrides_json?: string | null;
     welcome_text?: string | null;
     cookie_domain?: string | null;
     cookie_samesite?: string | null;
@@ -595,6 +598,9 @@ export function VisitorEmbedPage() {
     const [visualHeightPx, setVisualHeightPx] = useState<number | null>(null);
     const [hostOpen, setHostOpen] = useState(isTopLevel);
     const [themeColor, setThemeColor] = useState<string | null>(null);
+    const [hostThemeMode, setHostThemeMode] = useState<string | null>(null);
+    const [hostColorSettingsMode, setHostColorSettingsMode] = useState<string | null>(null);
+    const [hostColorOverridesJson, setHostColorOverridesJson] = useState<string | null>(null);
     const [unread, setUnread] = useState(0);
 
     const preChatEnabled = Boolean(bootstrap?.widget_config?.pre_chat_enabled);
@@ -625,8 +631,56 @@ export function VisitorEmbedPage() {
         return String(info?.text || "").trim() || "";
     }, [preChatFields]);
 
-    const uiPrimary = safeHexColor(themeColor) || safeHexColor(bootstrap?.widget_config?.theme_color) || "#fbbf24";
-    const uiPrimaryText = textColorForBg(uiPrimary);
+    const effectiveThemeMode = useMemo(() => {
+        const raw = String(hostThemeMode || bootstrap?.widget_config?.theme_mode || "light").trim().toLowerCase();
+        return raw === "dark" ? "dark" : "light";
+    }, [bootstrap?.widget_config?.theme_mode, hostThemeMode]);
+
+    const effectiveColorSettingsMode = useMemo(() => {
+        const raw = String(hostColorSettingsMode || bootstrap?.widget_config?.color_settings_mode || "theme").trim().toLowerCase();
+        return raw === "advanced" ? "advanced" : "theme";
+    }, [bootstrap?.widget_config?.color_settings_mode, hostColorSettingsMode]);
+
+    const effectiveColorOverridesJson = useMemo(() => {
+        if (effectiveColorSettingsMode !== "advanced") return "";
+        return String(hostColorOverridesJson || bootstrap?.widget_config?.color_overrides_json || "").trim();
+    }, [bootstrap?.widget_config?.color_overrides_json, effectiveColorSettingsMode, hostColorOverridesJson]);
+
+    const colorOverrides = useMemo(() => {
+        if (!effectiveColorOverridesJson) return {} as Record<string, string>;
+        try {
+            const v = JSON.parse(effectiveColorOverridesJson) as unknown;
+            if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+            const out: Record<string, string> = {};
+            for (const [k, rawVal] of Object.entries(v as Record<string, unknown>)) {
+                const key = String(k || "").trim();
+                if (!key) continue;
+                const val = safeHexColor(typeof rawVal === "string" ? rawVal : String(rawVal ?? ""));
+                if (!val) continue;
+                out[key] = val;
+            }
+            return out;
+        } catch {
+            return {};
+        }
+    }, [effectiveColorOverridesJson]);
+
+    const uiPrimary =
+        safeHexColor(colorOverrides.primary) || safeHexColor(themeColor) || safeHexColor(bootstrap?.widget_config?.theme_color) || "#fbbf24";
+
+    const uiPanelBg = effectiveThemeMode === "dark" ? "#111827" : "#ffffff";
+    const uiBorder = effectiveThemeMode === "dark" ? "rgba(255,255,255,.08)" : "rgba(15,23,42,.06)";
+    const uiTextMain = effectiveThemeMode === "dark" ? "#e5e7eb" : "#0f172a";
+    const uiTextMuted = effectiveThemeMode === "dark" ? "rgba(229,231,235,.65)" : "rgba(15,23,42,.65)";
+    const uiChatBg =
+        safeHexColor(colorOverrides.chat_bg) || (effectiveThemeMode === "dark" ? "#0b1220" : "#f8fafc");
+
+    const uiCustomerBubble = safeHexColor(colorOverrides.customer_bubble) || uiPrimary;
+    const uiCustomerText = safeHexColor(colorOverrides.customer_text) || textColorForBg(uiCustomerBubble);
+    const uiAgentBubble =
+        safeHexColor(colorOverrides.agent_bubble) || (effectiveThemeMode === "dark" ? "rgba(255,255,255,.06)" : "#ffffff");
+    const uiAgentText = safeHexColor(colorOverrides.agent_text) || uiTextMain;
+    const uiSystemText = safeHexColor(colorOverrides.system) || uiTextMuted;
 
     // If pre-chat is enabled, require a conversation (created after form submit) before sending.
     const composerEnabled = Boolean(bootstrap?.visitor_token) && (!preChatEnabled || Boolean(conversation?.conversation_id)) && !uploading;
@@ -1015,6 +1069,10 @@ export function VisitorEmbedPage() {
                 setHostOpen(open);
                 const themeColor = typeof payloadRec?.themeColor === "string" ? payloadRec.themeColor : null;
                 if (themeColor) setThemeColor(themeColor);
+
+                if (typeof payloadRec?.themeMode === "string") setHostThemeMode(payloadRec.themeMode);
+                if (typeof payloadRec?.colorSettingsMode === "string") setHostColorSettingsMode(payloadRec.colorSettingsMode);
+                if (typeof payloadRec?.colorOverridesJson === "string") setHostColorOverridesJson(payloadRec.colorOverridesJson);
 
                 const pv = normalizePageViewPayload(payloadRec?.page);
                 if (pv) enqueuePageView(pv);
@@ -1665,10 +1723,10 @@ export function VisitorEmbedPage() {
     return (
         <ConfigProvider
             theme={
-                themeColor
+                uiPrimary
                     ? {
                           token: {
-                              colorPrimary: themeColor,
+                              colorPrimary: uiPrimary,
                           },
                       }
                     : undefined
@@ -1694,11 +1752,11 @@ export function VisitorEmbedPage() {
                         height: "100%",
                         display: "flex",
                         flexDirection: "column",
-                        background: "#ffffff",
+                        background: uiPanelBg,
                         borderRadius: 18,
                         overflow: "hidden",
                         boxShadow: "0 18px 50px rgba(0,0,0,.16)",
-                        border: "1px solid rgba(15,23,42,.06)",
+                        border: `1px solid ${uiBorder}`,
                         margin: 0,
                         minHeight: 0,
                     }}
@@ -1711,8 +1769,8 @@ export function VisitorEmbedPage() {
                             alignItems: "center",
                             justifyContent: "space-between",
                             padding: "10px 10px",
-                            background: "#ffffff",
-                            borderBottom: "1px solid rgba(15,23,42,.06)",
+                            background: uiPanelBg,
+                            borderBottom: `1px solid ${uiBorder}`,
                         }}
                     >
                         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
@@ -1792,7 +1850,7 @@ export function VisitorEmbedPage() {
                             minHeight: 0,
                             WebkitOverflowScrolling: "touch",
                             overscrollBehavior: "contain",
-                            background: "#f8fafc",
+                            background: uiChatBg,
                             padding: "14px 12px",
                             borderBottomLeftRadius: isPreChatScreen ? 18 : undefined,
                             borderBottomRightRadius: isPreChatScreen ? 18 : undefined,
@@ -1822,8 +1880,8 @@ export function VisitorEmbedPage() {
                                 <div
                                     style={{
                                         maxWidth: "92%",
-                                        background: "rgba(15,23,42,.06)",
-                                        color: "rgba(15,23,42,.7)",
+                                        background: effectiveThemeMode === "dark" ? "rgba(255,255,255,.08)" : "rgba(15,23,42,.06)",
+                                        color: effectiveThemeMode === "dark" ? "rgba(229,231,235,.85)" : "rgba(15,23,42,.7)",
                                         padding: "8px 12px",
                                         borderRadius: 999,
                                         fontSize: 12,
@@ -1836,8 +1894,8 @@ export function VisitorEmbedPage() {
                         ) : null}
 
                         {isPreChatScreen ? (
-                            <div style={{ background: "#fff", borderRadius: 14, padding: 12, border: "1px solid rgba(15,23,42,.06)", marginBottom: 12 }}>
-                                <div style={{ color: "rgba(15,23,42,.65)", fontSize: 13, marginBottom: 10 }}>
+                            <div style={{ background: uiPanelBg, borderRadius: 14, padding: 12, border: `1px solid ${uiBorder}`, marginBottom: 12 }}>
+                                <div style={{ color: uiTextMuted, fontSize: 13, marginBottom: 10 }}>
                                     {preChatInfoText || t("visitorEmbed.preChat.defaultInfo")}
                                 </div>
                                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -2040,8 +2098,8 @@ export function VisitorEmbedPage() {
                                                     <div
                                                         style={{
                                                             maxWidth: "92%",
-                                                            background: "rgba(15,23,42,.08)",
-                                                            color: "rgba(15,23,42,.65)",
+                                                            background: effectiveThemeMode === "dark" ? "rgba(255,255,255,.10)" : "rgba(15,23,42,.08)",
+                                                            color: uiSystemText,
                                                             padding: "8px 12px",
                                                             borderRadius: 999,
                                                             fontSize: 12,
@@ -2066,9 +2124,9 @@ export function VisitorEmbedPage() {
                                             padding: "10px 12px",
                                             borderRadius: 18,
                                             boxShadow: "0 8px 24px rgba(0,0,0,.06)",
-                                            border: isCustomer ? "none" : "1px solid rgba(15,23,42,.08)",
-                                            background: isCustomer ? uiPrimary : "#ffffff",
-                                            color: isCustomer ? uiPrimaryText : "#0f172a",
+                                            border: isCustomer ? "none" : `1px solid ${uiBorder}`,
+                                            background: isCustomer ? uiCustomerBubble : uiAgentBubble,
+                                            color: isCustomer ? uiCustomerText : uiAgentText,
                                         };
 
                                         const avatarStyle: CSSProperties = {
@@ -2078,7 +2136,7 @@ export function VisitorEmbedPage() {
                                             display: "flex",
                                             alignItems: "center",
                                             justifyContent: "center",
-                                            background: isAgent ? "#111827" : "transparent",
+                                            background: isAgent ? (effectiveThemeMode === "dark" ? "rgba(255,255,255,.10)" : "#111827") : "transparent",
                                             color: "#fff",
                                             fontSize: 12,
                                             fontWeight: 800,
@@ -2089,7 +2147,7 @@ export function VisitorEmbedPage() {
 
                                         const metaStyle: CSSProperties = {
                                             fontSize: 11,
-                                            color: "rgba(15,23,42,.45)",
+                                            color: effectiveThemeMode === "dark" ? "rgba(229,231,235,.45)" : "rgba(15,23,42,.45)",
                                             marginTop: 4,
                                             display: "flex",
                                             justifyContent: isCustomer ? "flex-end" : "flex-start",
@@ -2110,7 +2168,7 @@ export function VisitorEmbedPage() {
                                                 </div>
                                                 <div style={metaStyle}>
                                                     <span>{formatTimeShort(m.created_at)}</span>
-                                                    {showRead ? <span style={{ color: "rgba(15,23,42,.55)", fontWeight: 600 }}>Read</span> : null}
+                                                    {showRead ? <span style={{ color: uiTextMuted, fontWeight: 600 }}>Read</span> : null}
                                                 </div>
                                             </div>
                                         );
@@ -2129,8 +2187,8 @@ export function VisitorEmbedPage() {
                             style={{
                                 flex: "0 0 auto",
                                 padding: "14px 12px",
-                                borderTop: "1px solid rgba(15,23,42,.06)",
-                                background: "#ffffff",
+                                borderTop: `1px solid ${uiBorder}`,
+                                background: uiPanelBg,
                                 borderBottomLeftRadius: 18,
                                 borderBottomRightRadius: 18,
                                 paddingBottom: "calc(14px + env(safe-area-inset-bottom))",
@@ -2179,7 +2237,8 @@ export function VisitorEmbedPage() {
                                             width: 44,
                                             height: 44,
                                             borderRadius: 999,
-                                            background: "rgba(15,23,42,.06)",
+                                            background: effectiveThemeMode === "dark" ? "rgba(255,255,255,.08)" : "rgba(15,23,42,.06)",
+                                            color: uiTextMain,
                                             display: "flex",
                                             alignItems: "center",
                                             justifyContent: "center",
@@ -2228,7 +2287,8 @@ export function VisitorEmbedPage() {
                                                 width: 44,
                                                 height: 44,
                                                 borderRadius: 999,
-                                                background: "rgba(15,23,42,.06)",
+                                                background: effectiveThemeMode === "dark" ? "rgba(255,255,255,.08)" : "rgba(15,23,42,.06)",
+                                                color: uiTextMain,
                                                 display: "flex",
                                                 alignItems: "center",
                                                 justifyContent: "center",
@@ -2245,8 +2305,8 @@ export function VisitorEmbedPage() {
                                     display: "flex",
                                     alignItems: "flex-end",
                                     gap: 6,
-                                    background: "#ffffff",
-                                    border: "1px solid rgba(15,23,42,.12)",
+                                    background: effectiveThemeMode === "dark" ? "rgba(255,255,255,.06)" : "#ffffff",
+                                    border: `1px solid ${effectiveThemeMode === "dark" ? "rgba(255,255,255,.12)" : "rgba(15,23,42,.12)"}`,
                                     borderRadius: 999,
                                     padding: "6px 6px 6px 12px",
                                     boxShadow: "0 10px 28px rgba(0,0,0,.06)",
@@ -2270,7 +2330,7 @@ export function VisitorEmbedPage() {
                                         padding: "8px 4px",
                                         fontSize: 14,
                                         lineHeight: 1.35,
-                                        color: "#0f172a",
+                                        color: uiTextMain,
                                     }}
                                 />
 

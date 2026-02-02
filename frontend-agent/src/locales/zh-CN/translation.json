@@ -652,10 +652,46 @@
     }
   },
   "widgetCustomize": {
+        "appearance": {
+          "minimizedWindow": "最小化窗口",
+          "minimizedBar": "条形",
+          "minimizedBubble": "气泡",
+          "themeAndColors": "主题与颜色",
+          "light": "浅色",
+          "dark": "深色",
+          "themeColor": "主题色",
+          "moreColorSettings": "更多颜色设置",
+          "moreColorHint": "自定义每一项颜色",
+          "minimizedWidget": "最小化小部件",
+          "bubble": "气泡",
+          "iconColor": "图标颜色",
+          "maximizedWidget": "展开后小部件",
+          "chatBackground": "聊天背景",
+          "primaryColor": "主色",
+          "customerBubble": "访客气泡",
+          "customerText": "访客文字",
+          "agentBubble": "客服气泡",
+          "agentText": "客服文字",
+          "systemMessages": "系统消息"
+        },
     "title": "网站小部件定制",
     "adminOnlyHint": "仅管理员可操作",
     "selectSite": "站点",
     "selectSitePlaceholder": "选择一个 site",
+    "sections": {
+      "install": "在网站上定制/安装",
+      "appearance": "外观",
+      "position": "位置",
+      "size": "尺寸",
+      "mobile": "移动端",
+      "tweaks": "更多选项"
+    },
+    "install": {
+      "hint": "将下面的代码片段复制到你的网站中即可安装小部件。",
+      "snippetPlaceholder": "选择站点后会生成安装代码。",
+      "copy": "复制代码片段",
+      "script": "带版本脚本"
+    },
     "widgetConfig": {
       "title": "Widget 配置（站点级）",
       "hint": "这里的配置会影响访客端行为。",
@@ -668,6 +704,45 @@
         "label": "欢迎语（可选）",
         "placeholder": "你好！有什么可以帮你？"
       }
+    },
+    "fields": {
+      "launcherText": "启动按钮文字",
+      "position": "位置",
+      "offsetX": "横向偏移（X）",
+      "offsetY": "纵向偏移（Y）",
+      "zIndex": "层级（z-index）",
+      "width": "宽度",
+      "height": "高度",
+      "autoHeight": "自动高度",
+      "autoHeightMode": "自动高度模式",
+      "minHeight": "最小高度",
+      "maxHeightRatio": "最大高度比例",
+      "mobileBreakpoint": "移动端断点",
+      "mobileFullscreen": "移动端全屏",
+      "debug": "调试"
+    },
+    "positions": {
+      "bottomRight": "右下角",
+      "bottomLeft": "左下角",
+      "topRight": "右上角",
+      "topLeft": "左上角"
+    },
+    "autoHeightModes": {
+      "fixed": "固定",
+      "growOnly": "只增不减",
+      "dynamic": "动态"
+    },
+    "preview": {
+      "title": "预览",
+      "reload": "重新加载",
+      "open": "打开",
+      "close": "关闭",
+      "minimize": "最小化",
+      "send": "发送",
+      "fakePage": "网站页面（预览）",
+      "fakeConversation": "会话预览",
+      "fakeMessage": "你好！",
+      "defaultWelcome": "在线客服"
     },
     "cookieStrategy": {
       "title": "visitor_id Cookie 策略（可选）",

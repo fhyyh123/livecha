@@ -40,6 +40,14 @@
     // Try to stay above most host overlays.
     zIndex: 2147483647,
     launcherText: "Chat",
+    // Launcher style:
+    // - "bubble": circle launcher (LiveChat-like bubble)
+    // - "bar": pill launcher with label
+    launcherStyle: "bubble",
+    // Theme mode hint (currently used by admin preview pages; visitor UI may choose to read it later)
+    themeMode: "light",
+    colorSettingsMode: "theme",
+    colorOverridesJson: null,
     width: 380,
     height: 560,
     // Product default: fixed-size popup like LiveChat. Auto-height can be enabled explicitly.
@@ -58,6 +66,9 @@
     offsetX: 20,
     offsetY: 20,
     debug: false,
+
+    // If true, do not fire /chatlive/ping install beacon (useful for admin preview).
+    disableInstallBeacon: false,
 
     // Optional postMessage origin allowlist. If set, widget accepts messages from these origins.
     // Otherwise it defaults to the embedUrl origin.
@@ -482,6 +493,8 @@
   }
 
   function layoutStyles(config) {
+    var launcherStyle = String((config && config.launcherStyle) || "bubble").trim().toLowerCase();
+    var isBar = launcherStyle === "bar";
     var base = {
       root:
         // Be resilient against host page CSS overrides (including aggressive !important rules).
@@ -511,8 +524,10 @@
         "background:#111827!important;color:#fff!important;" +
         "cursor:pointer;" +
         "position:fixed!important;" +
-        "display:flex!important;align-items:center!important;justify-content:center!important;" +
-        "width:56px!important;height:56px!important;border-radius:999px!important;" +
+        "display:flex!important;align-items:center!important;justify-content:center!important;gap:10px;" +
+        (isBar
+          ? "height:56px!important;width:auto!important;min-width:120px!important;padding:0 18px!important;border-radius:16px!important;"
+          : "width:56px!important;height:56px!important;border-radius:999px!important;") +
         "box-shadow: 0 10px 25px rgba(0,0,0,0.18);" +
         "font-size:14px!important;font-weight:600!important;" +
         "user-select:none!important;" +
@@ -581,14 +596,90 @@
     return base;
   }
 
+  function applyLauncherVisual() {
+    try {
+      if (!state.button || !state.buttonLabel) return;
+      var cfg = state.config || DEFAULTS;
+      var style = String(cfg.launcherStyle || "bubble").trim().toLowerCase();
+      var isBar = style === "bar";
+      var icon = null;
+      try {
+        icon = state.button.querySelector("[data-chatlive-button-icon='1']");
+      } catch (e0) {
+        icon = null;
+      }
+
+      if (state.open) {
+        // When open, show a close glyph and hide icon.
+        state.buttonLabel.textContent = "×";
+        if (icon) icon.style.display = "none";
+        return;
+      }
+
+      if (isBar) {
+        state.buttonLabel.textContent = cfg.launcherText || "Chat";
+        if (icon) icon.style.display = "inline-flex";
+      } else {
+        // Bubble: prefer icon-only look.
+        state.buttonLabel.textContent = "";
+        if (icon) icon.style.display = "inline-flex";
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  function normalizeHexColor(s) {
+    try {
+      var t = String(s || "").trim();
+      if (!t) return "";
+      var v = t.charAt(0) === "#" ? t : "#" + t;
+      if (!/^#[0-9a-fA-F]{6}$/.test(v)) return "";
+      return v.toUpperCase();
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function parseColorOverrides(json) {
+    try {
+      if (!json) return {};
+      var raw = JSON.parse(String(json));
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+      var out = {};
+      for (var k in raw) {
+        if (!Object.prototype.hasOwnProperty.call(raw, k)) continue;
+        var key = String(k || "").trim();
+        if (!key) continue;
+        var val = normalizeHexColor(raw[k]);
+        if (!val) continue;
+        out[key] = val;
+      }
+      return out;
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function applyLauncherTheme() {
+    try {
+      if (!state.button || !state.config) return;
+
+      var overrides = parseColorOverrides(state.config.colorOverridesJson);
+      var bg = overrides.minimized_bubble || normalizeHexColor(state.config.themeColor) || "";
+      if (!bg) bg = "#111827";
+      var fg = overrides.minimized_icon || "#FFFFFF";
+
+      state.button.style.background = String(bg);
+      state.button.style.color = String(fg);
+    } catch (e) {
+      // ignore
+    }
+  }
+
   function setThemeColor(color) {
     state.config.themeColor = color || null;
-    if (!state.button) return;
-    if (state.config.themeColor) {
-      state.button.style.background = String(state.config.themeColor);
-    } else {
-      state.button.style.background = "#111827";
-    }
+    applyLauncherTheme();
   }
 
   function setUnread(n) {
@@ -765,7 +856,7 @@
       panel.style.visibility = "visible";
       panel.style.opacity = "1";
       panel.style.pointerEvents = "auto";
-      if (state.buttonLabel) state.buttonLabel.textContent = "×";
+      applyLauncherVisual();
       // Hide badge while open (widget should also reset unread).
       if (state.badge) state.badge.style.display = "none";
       postToIframe(MSG.HOST_SET_OPEN, { open: true });
@@ -782,7 +873,7 @@
       panel.style.opacity = "0";
       panel.style.visibility = "hidden";
       panel.style.pointerEvents = "none";
-      if (state.buttonLabel) state.buttonLabel.textContent = state.config.launcherText || "Chat";
+      applyLauncherVisual();
       postToIframe(MSG.HOST_SET_OPEN, { open: false });
       postHostVisibility();
       // Re-show badge if needed.
@@ -806,6 +897,10 @@
       postToIframe(MSG.HOST_INIT, {
         open: !!state.open,
         themeColor: state.config.themeColor || null,
+        themeMode: state.config.themeMode || "light",
+        colorSettingsMode: state.config.colorSettingsMode || "theme",
+        colorOverridesJson: state.config.colorOverridesJson || null,
+        launcherStyle: state.config.launcherStyle || "bubble",
         autoHeight: !!state.config.autoHeight,
         page: getPageInfo(),
       });
@@ -907,11 +1002,15 @@
 
       // Update UI.
       applyResponsiveLayout();
-      if (!state.open && state.buttonLabel) state.buttonLabel.textContent = state.config.launcherText || "Chat";
+      applyLauncherVisual();
       if (!state.config.autoHeight) setPanelHeightPx(state.config.height);
       postToIframe(MSG.HOST_INIT, {
         open: !!state.open,
         themeColor: state.config.themeColor || null,
+        themeMode: state.config.themeMode || "light",
+        colorSettingsMode: state.config.colorSettingsMode || "theme",
+        colorOverridesJson: state.config.colorOverridesJson || null,
+        launcherStyle: state.config.launcherStyle || "bubble",
         autoHeight: !!state.config.autoHeight,
         page: getPageInfo(),
       });
@@ -940,11 +1039,38 @@
     if (config.themeColor) {
       button.style.background = String(config.themeColor);
     }
+    // Apply final launcher theme (supports advanced overrides and icon color)
+    try {
+      state.config = config;
+      state.button = button;
+      applyLauncherTheme();
+    } catch (e) {
+      // ignore
+    }
+
+    // Button icon
+    var buttonIcon = document.createElement("span");
+    buttonIcon.setAttribute("data-chatlive-button-icon", "1");
+    ensureCssText(
+      buttonIcon,
+      "display:inline-flex;align-items:center;justify-content:center;" +
+        "width:22px;height:22px;" +
+        "line-height:22px;" +
+        "color:inherit;" +
+        "pointer-events:none;",
+    );
+    buttonIcon.innerHTML =
+      "<svg width='22' height='22' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>" +
+      "<path d='M7 8h10M7 12h6' stroke='currentColor' stroke-width='2' stroke-linecap='round'/>" +
+      "<path d='M21 12c0 4.418-4.03 8-9 8-1.015 0-2-.145-2.93-.414L3 21l1.62-4.12A7.42 7.42 0 0 1 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8Z' stroke='currentColor' stroke-width='2' stroke-linejoin='round'/>" +
+      "</svg>";
+    button.appendChild(buttonIcon);
 
     // Button label (do not use button.textContent later; it would clear the badge node)
     var buttonLabel = document.createElement("span");
     buttonLabel.setAttribute("data-chatlive-button-label", "1");
     buttonLabel.textContent = config.launcherText || "Chat";
+    ensureCssText(buttonLabel, "display:inline-block;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;");
     button.appendChild(buttonLabel);
 
     // Badge
@@ -1115,6 +1241,8 @@
     state.iframe = iframe;
     state.button = button;
     state.buttonLabel = buttonLabel;
+    // Apply initial label/icon state.
+    applyLauncherVisual();
     state.badge = badge;
 
     // Initialize height baseline so autoHeight (grow-only) doesn't shrink the panel unexpectedly.
@@ -1178,7 +1306,7 @@
     startKeepAlive();
 
     // Fire a best-effort install beacon for "installation verification".
-    fireInstallBeacon(config);
+    if (!config.disableInstallBeacon) fireInstallBeacon(config);
 
     // Start closed by default
     setOpen(false);
@@ -1502,11 +1630,16 @@
       siteKey: siteKey,
       embedUrl: embedUrl,
       origin: el.dataset.chatliveOrigin || null,
+      disableInstallBeacon: parseBool(el.dataset.chatliveDisableInstallBeacon, undefined),
       cookieDomain: el.dataset.chatliveCookieDomain || undefined,
       cookieSameSite: normalizeSameSite(el.dataset.chatliveCookieSamesite) || undefined,
       position: el.dataset.chatlivePosition || undefined,
       zIndex: parseNumber(el.dataset.chatliveZIndex, undefined),
       launcherText: el.dataset.chatliveLauncherText || undefined,
+      launcherStyle: el.dataset.chatliveLauncherStyle || undefined,
+      themeMode: el.dataset.chatliveThemeMode || undefined,
+      colorSettingsMode: el.dataset.chatliveColorSettingsMode || undefined,
+      colorOverridesJson: el.dataset.chatliveColorOverridesJson || undefined,
       width: parseNumber(el.dataset.chatliveWidth, undefined),
       height: parseNumber(el.dataset.chatliveHeight, undefined),
       autoHeight: parseBool(el.dataset.chatliveAutoHeight, undefined),

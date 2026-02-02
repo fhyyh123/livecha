@@ -656,10 +656,46 @@
     }
   },
   "widgetCustomize": {
+        "appearance": {
+          "minimizedWindow": "Minimized window",
+          "minimizedBar": "Bar",
+          "minimizedBubble": "Bubble",
+          "themeAndColors": "Theme and colors",
+          "light": "Light",
+          "dark": "Dark",
+          "themeColor": "Theme color",
+          "moreColorSettings": "More color settings",
+          "moreColorHint": "Set all colors yourself",
+          "minimizedWidget": "Minimized widget",
+          "bubble": "Bubble",
+          "iconColor": "Icon color",
+          "maximizedWidget": "Maximized widget",
+          "chatBackground": "Chat background",
+          "primaryColor": "Primary color",
+          "customerBubble": "Customer bubble",
+          "customerText": "Customer text",
+          "agentBubble": "Agent bubble",
+          "agentText": "Agent text",
+          "systemMessages": "System messages"
+        },
     "title": "Website widget customization",
     "adminOnlyHint": "Admin only",
     "selectSite": "Site",
     "selectSitePlaceholder": "Select a site",
+    "sections": {
+      "install": "Customize widget on website",
+      "appearance": "Appearance",
+      "position": "Position",
+      "size": "Size",
+      "mobile": "Mobile chat widget",
+      "tweaks": "Additional tweaks"
+    },
+    "install": {
+      "hint": "Copy/paste the snippet into your website to install the widget.",
+      "snippetPlaceholder": "Snippet will appear after you select a site.",
+      "copy": "Copy snippet",
+      "script": "Versioned script"
+    },
     "widgetConfig": {
       "title": "Widget config (site-level)",
       "hint": "These settings affect visitor behavior.",
@@ -672,6 +708,45 @@
         "label": "Welcome text (optional)",
         "placeholder": "Hi! How can we help?"
       }
+    },
+    "fields": {
+      "launcherText": "Launcher button text",
+      "position": "Position",
+      "offsetX": "Offset X",
+      "offsetY": "Offset Y",
+      "zIndex": "z-index",
+      "width": "Width",
+      "height": "Height",
+      "autoHeight": "Auto height",
+      "autoHeightMode": "Auto height mode",
+      "minHeight": "Min height",
+      "maxHeightRatio": "Max height ratio",
+      "mobileBreakpoint": "Mobile breakpoint",
+      "mobileFullscreen": "Mobile fullscreen",
+      "debug": "Debug"
+    },
+    "positions": {
+      "bottomRight": "Bottom right",
+      "bottomLeft": "Bottom left",
+      "topRight": "Top right",
+      "topLeft": "Top left"
+    },
+    "autoHeightModes": {
+      "fixed": "Fixed",
+      "growOnly": "Grow only",
+      "dynamic": "Dynamic"
+    },
+    "preview": {
+      "title": "Preview",
+      "reload": "Reload",
+      "open": "Open",
+      "close": "Close",
+      "minimize": "Minimize",
+      "send": "Send",
+      "fakePage": "Your website (preview)",
+      "fakeConversation": "Conversation preview",
+      "fakeMessage": "Hi!",
+      "defaultWelcome": "Chat"
     },
     "cookieStrategy": {
       "title": "visitor_id cookie strategy (optional)",

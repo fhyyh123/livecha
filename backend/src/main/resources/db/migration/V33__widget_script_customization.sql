@@ -1,0 +1,16 @@
+-- Widget script customization fields (align with docs/widget.js data-chatlive-* options)
+
+alter table widget_config add column if not exists position text;
+alter table widget_config add column if not exists z_index integer;
+alter table widget_config add column if not exists launcher_text text;
+alter table widget_config add column if not exists width integer;
+alter table widget_config add column if not exists height integer;
+alter table widget_config add column if not exists auto_height boolean;
+alter table widget_config add column if not exists auto_height_mode text;
+alter table widget_config add column if not exists min_height integer;
+alter table widget_config add column if not exists max_height_ratio double precision;
+alter table widget_config add column if not exists mobile_breakpoint integer;
+alter table widget_config add column if not exists mobile_fullscreen boolean;
+alter table widget_config add column if not exists offset_x integer;
+alter table widget_config add column if not exists offset_y integer;
+alter table widget_config add column if not exists debug boolean;

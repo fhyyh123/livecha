@@ -44,19 +44,37 @@ public class SiteWizardService {
         // defaults
         widgetConfigRepository.upsert(
                 site.id(),
-            false,
+                false,
                 null,
                 emptyToNull(themeColor),
                 emptyToNull(welcomeText),
                 emptyToNull(cookieDomain),
-            emptyToNull(cookieSameSite),
-            "en",
-            null,
-            null,
-            null,
-            null,
-            false,
-            false
+                emptyToNull(cookieSameSite),
+                "en",
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                "bubble",
+                "light",
+                "theme",
+                null,
+            null, // position
+            null, // zIndex
+            null, // launcherText
+            null, // width
+            null, // height
+            null, // autoHeight
+            null, // autoHeightMode
+            null, // minHeight
+            null, // maxHeightRatio
+            null, // mobileBreakpoint
+            null, // mobileFullscreen
+            null, // offsetX
+            null, // offsetY
+            null  // debug
         );
 
         var domain = emptyToNull(allowlistDomain);

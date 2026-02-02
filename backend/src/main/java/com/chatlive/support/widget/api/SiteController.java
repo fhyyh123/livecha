@@ -16,6 +16,24 @@ import java.util.List;
 @RequestMapping("/api/v1/sites")
 public class SiteController {
 
+        private static final String DEFAULT_LAUNCHER_STYLE = "bubble";
+        private static final String DEFAULT_THEME_MODE = "light";
+        private static final String DEFAULT_COLOR_SETTINGS_MODE = "theme";
+        private static final String DEFAULT_POSITION = "bottom-right";
+        private static final int DEFAULT_Z_INDEX = 2147483647;
+        private static final String DEFAULT_LAUNCHER_TEXT = "Chat";
+        private static final int DEFAULT_WIDTH = 380;
+        private static final int DEFAULT_HEIGHT = 560;
+        private static final boolean DEFAULT_AUTO_HEIGHT = true;
+        private static final String DEFAULT_AUTO_HEIGHT_MODE = "fixed";
+        private static final int DEFAULT_MIN_HEIGHT = 320;
+        private static final double DEFAULT_MAX_HEIGHT_RATIO = 0.85;
+        private static final int DEFAULT_MOBILE_BREAKPOINT = 640;
+        private static final boolean DEFAULT_MOBILE_FULLSCREEN = true;
+        private static final int DEFAULT_OFFSET_X = 20;
+        private static final int DEFAULT_OFFSET_Y = 20;
+        private static final boolean DEFAULT_DEBUG = false;
+
     public record SiteItem(String id, String name, String public_key, String status) {
     }
 
@@ -69,7 +87,39 @@ public class SiteController {
 
         var row = widgetConfigRepository.findBySiteId(site.id()).orElse(null);
         if (row == null) {
-                return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, "en", null, null, null, null, false, false));
+                return ApiResponse.ok(new WidgetConfigDto(
+                        false,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "en",
+                        null,
+                        null,
+                        null,
+                        null,
+                        false,
+                        false,
+                        DEFAULT_LAUNCHER_STYLE,
+                        DEFAULT_THEME_MODE,
+                        DEFAULT_COLOR_SETTINGS_MODE,
+                        null,
+                        DEFAULT_POSITION,
+                        DEFAULT_Z_INDEX,
+                        DEFAULT_LAUNCHER_TEXT,
+                        DEFAULT_WIDTH,
+                        DEFAULT_HEIGHT,
+                        DEFAULT_AUTO_HEIGHT,
+                        DEFAULT_AUTO_HEIGHT_MODE,
+                        DEFAULT_MIN_HEIGHT,
+                        DEFAULT_MAX_HEIGHT_RATIO,
+                        DEFAULT_MOBILE_BREAKPOINT,
+                        DEFAULT_MOBILE_FULLSCREEN,
+                        DEFAULT_OFFSET_X,
+                        DEFAULT_OFFSET_Y,
+                        DEFAULT_DEBUG
+                ));
         }
 
         return ApiResponse.ok(new WidgetConfigDto(
@@ -85,7 +135,25 @@ public class SiteController {
                 row.preChatNameLabel(),
                 row.preChatEmailLabel(),
                 row.preChatNameRequired(),
-                row.preChatEmailRequired()
+                row.preChatEmailRequired(),
+                row.launcherStyle() != null && !row.launcherStyle().isBlank() ? row.launcherStyle() : DEFAULT_LAUNCHER_STYLE,
+                row.themeMode() != null && !row.themeMode().isBlank() ? row.themeMode() : DEFAULT_THEME_MODE,
+                row.colorSettingsMode() != null && !row.colorSettingsMode().isBlank() ? row.colorSettingsMode() : DEFAULT_COLOR_SETTINGS_MODE,
+                row.colorOverridesJson(),
+                row.position() != null && !row.position().isBlank() ? row.position() : DEFAULT_POSITION,
+                row.zIndex() != null ? row.zIndex() : DEFAULT_Z_INDEX,
+                row.launcherText() != null && !row.launcherText().isBlank() ? row.launcherText() : DEFAULT_LAUNCHER_TEXT,
+                row.width() != null ? row.width() : DEFAULT_WIDTH,
+                row.height() != null ? row.height() : DEFAULT_HEIGHT,
+                row.autoHeight() != null ? row.autoHeight() : DEFAULT_AUTO_HEIGHT,
+                row.autoHeightMode() != null && !row.autoHeightMode().isBlank() ? row.autoHeightMode() : DEFAULT_AUTO_HEIGHT_MODE,
+                row.minHeight() != null ? row.minHeight() : DEFAULT_MIN_HEIGHT,
+                row.maxHeightRatio() != null ? row.maxHeightRatio() : DEFAULT_MAX_HEIGHT_RATIO,
+                row.mobileBreakpoint() != null ? row.mobileBreakpoint() : DEFAULT_MOBILE_BREAKPOINT,
+                row.mobileFullscreen() != null ? row.mobileFullscreen() : DEFAULT_MOBILE_FULLSCREEN,
+                row.offsetX() != null ? row.offsetX() : DEFAULT_OFFSET_X,
+                row.offsetY() != null ? row.offsetY() : DEFAULT_OFFSET_Y,
+                row.debug() != null ? row.debug() : DEFAULT_DEBUG
         ));
     }
 }

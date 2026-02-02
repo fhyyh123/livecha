@@ -13,6 +13,24 @@ public record WidgetConfigDto(
         String pre_chat_name_label,
         String pre_chat_email_label,
         boolean pre_chat_name_required,
-        boolean pre_chat_email_required
+        boolean pre_chat_email_required,
+        String launcher_style,
+        String theme_mode,
+        String color_settings_mode,
+        String color_overrides_json,
+        String position,
+        Integer z_index,
+        String launcher_text,
+        Integer width,
+        Integer height,
+        Boolean auto_height,
+        String auto_height_mode,
+        Integer min_height,
+        Double max_height_ratio,
+        Integer mobile_breakpoint,
+        Boolean mobile_fullscreen,
+        Integer offset_x,
+        Integer offset_y,
+        Boolean debug
 ) {
 }

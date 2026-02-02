@@ -17,6 +17,24 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/admin/sites")
 public class AdminWidgetConfigController {
 
+    private static final String DEFAULT_POSITION = "bottom-right";
+    private static final int DEFAULT_Z_INDEX = 2147483647;
+    private static final String DEFAULT_LAUNCHER_TEXT = "Chat";
+    private static final String DEFAULT_LAUNCHER_STYLE = "bubble";
+    private static final String DEFAULT_THEME_MODE = "light";
+    private static final String DEFAULT_COLOR_SETTINGS_MODE = "theme";
+    private static final int DEFAULT_WIDTH = 380;
+    private static final int DEFAULT_HEIGHT = 560;
+    private static final boolean DEFAULT_AUTO_HEIGHT = true;
+    private static final String DEFAULT_AUTO_HEIGHT_MODE = "fixed";
+    private static final int DEFAULT_MIN_HEIGHT = 320;
+    private static final double DEFAULT_MAX_HEIGHT_RATIO = 0.85;
+    private static final int DEFAULT_MOBILE_BREAKPOINT = 640;
+    private static final boolean DEFAULT_MOBILE_FULLSCREEN = true;
+    private static final int DEFAULT_OFFSET_X = 20;
+    private static final int DEFAULT_OFFSET_Y = 20;
+    private static final boolean DEFAULT_DEBUG = false;
+
     private final JwtService jwtService;
     private final SiteRepository siteRepository;
     private final WidgetConfigRepository widgetConfigRepository;
@@ -42,7 +60,39 @@ public class AdminWidgetConfigController {
 
         var row = widgetConfigRepository.findBySiteId(site.id()).orElse(null);
         if (row == null) {
-            return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, "en", null, null, null, null, false, false));
+            return ApiResponse.ok(new WidgetConfigDto(
+                false,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "en",
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                DEFAULT_LAUNCHER_STYLE,
+                DEFAULT_THEME_MODE,
+                DEFAULT_COLOR_SETTINGS_MODE,
+                null,
+                DEFAULT_POSITION,
+                DEFAULT_Z_INDEX,
+                DEFAULT_LAUNCHER_TEXT,
+                DEFAULT_WIDTH,
+                DEFAULT_HEIGHT,
+                DEFAULT_AUTO_HEIGHT,
+                DEFAULT_AUTO_HEIGHT_MODE,
+                DEFAULT_MIN_HEIGHT,
+                DEFAULT_MAX_HEIGHT_RATIO,
+                DEFAULT_MOBILE_BREAKPOINT,
+                DEFAULT_MOBILE_FULLSCREEN,
+                DEFAULT_OFFSET_X,
+                DEFAULT_OFFSET_Y,
+                DEFAULT_DEBUG
+            ));
         }
         return ApiResponse.ok(new WidgetConfigDto(
                 row.preChatEnabled(),
@@ -57,7 +107,25 @@ public class AdminWidgetConfigController {
                 row.preChatNameLabel(),
                 row.preChatEmailLabel(),
                 row.preChatNameRequired(),
-                row.preChatEmailRequired()
+            row.preChatEmailRequired(),
+            normalizeLauncherStyle(row.launcherStyle()),
+            normalizeThemeMode(row.themeMode()),
+            normalizeColorSettingsMode(row.colorSettingsMode()),
+            normalizeJson(row.colorOverridesJson()),
+            normalizePosition(row.position()),
+            normalizeZIndex(row.zIndex()),
+            normalizeLauncherText(row.launcherText()),
+            normalizeWidth(row.width()),
+            normalizeHeight(row.height()),
+            normalizeAutoHeight(row.autoHeight()),
+            normalizeAutoHeightMode(row.autoHeightMode()),
+            normalizeMinHeight(row.minHeight()),
+            normalizeMaxHeightRatio(row.maxHeightRatio()),
+            normalizeMobileBreakpoint(row.mobileBreakpoint()),
+            normalizeMobileFullscreen(row.mobileFullscreen()),
+            normalizeOffsetX(row.offsetX()),
+            normalizeOffsetY(row.offsetY()),
+            normalizeDebug(row.debug())
         ));
     }
 
@@ -86,6 +154,26 @@ public class AdminWidgetConfigController {
         var preChatNameRequired = req != null && req.pre_chat_name_required();
         var preChatEmailRequired = req != null && req.pre_chat_email_required();
 
+        var launcherStyle = normalizeLauncherStyle(req == null ? null : req.launcher_style());
+        var themeMode = normalizeThemeMode(req == null ? null : req.theme_mode());
+        var colorSettingsMode = normalizeColorSettingsMode(req == null ? null : req.color_settings_mode());
+        var colorOverridesJson = normalizeJson(req == null ? null : req.color_overrides_json());
+
+        var position = normalizePosition(req == null ? null : req.position());
+        var zIndex = normalizeZIndex(req == null ? null : req.z_index());
+        var launcherText = normalizeLauncherText(req == null ? null : req.launcher_text());
+        var width = normalizeWidth(req == null ? null : req.width());
+        var height = normalizeHeight(req == null ? null : req.height());
+        var autoHeight = normalizeAutoHeight(req == null ? null : req.auto_height());
+        var autoHeightMode = normalizeAutoHeightMode(req == null ? null : req.auto_height_mode());
+        var minHeight = normalizeMinHeight(req == null ? null : req.min_height());
+        var maxHeightRatio = normalizeMaxHeightRatio(req == null ? null : req.max_height_ratio());
+        var mobileBreakpoint = normalizeMobileBreakpoint(req == null ? null : req.mobile_breakpoint());
+        var mobileFullscreen = normalizeMobileFullscreen(req == null ? null : req.mobile_fullscreen());
+        var offsetX = normalizeOffsetX(req == null ? null : req.offset_x());
+        var offsetY = normalizeOffsetY(req == null ? null : req.offset_y());
+        var debug = normalizeDebug(req == null ? null : req.debug());
+
         widgetConfigRepository.upsert(
                 site.id(),
         preChatEnabled,
@@ -100,12 +188,62 @@ public class AdminWidgetConfigController {
             preChatNameLabel,
             preChatEmailLabel,
             preChatNameRequired,
-            preChatEmailRequired
+            preChatEmailRequired,
+            launcherStyle,
+            themeMode,
+            colorSettingsMode,
+            colorOverridesJson,
+            position,
+            zIndex,
+            launcherText,
+            width,
+            height,
+            autoHeight,
+            autoHeightMode,
+            minHeight,
+            maxHeightRatio,
+            mobileBreakpoint,
+            mobileFullscreen,
+            offsetX,
+            offsetY,
+            debug
         );
 
         var row = widgetConfigRepository.findBySiteId(site.id()).orElse(null);
         if (row == null) {
-            return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, "en", null, null, null, null, false, false));
+            return ApiResponse.ok(new WidgetConfigDto(
+                false,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "en",
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                DEFAULT_LAUNCHER_STYLE,
+                DEFAULT_THEME_MODE,
+                DEFAULT_COLOR_SETTINGS_MODE,
+                null,
+                DEFAULT_POSITION,
+                DEFAULT_Z_INDEX,
+                DEFAULT_LAUNCHER_TEXT,
+                DEFAULT_WIDTH,
+                DEFAULT_HEIGHT,
+                DEFAULT_AUTO_HEIGHT,
+                DEFAULT_AUTO_HEIGHT_MODE,
+                DEFAULT_MIN_HEIGHT,
+                DEFAULT_MAX_HEIGHT_RATIO,
+                DEFAULT_MOBILE_BREAKPOINT,
+                DEFAULT_MOBILE_FULLSCREEN,
+                DEFAULT_OFFSET_X,
+                DEFAULT_OFFSET_Y,
+                DEFAULT_DEBUG
+            ));
         }
         return ApiResponse.ok(new WidgetConfigDto(
                 row.preChatEnabled(),
@@ -120,8 +258,59 @@ public class AdminWidgetConfigController {
                 row.preChatNameLabel(),
                 row.preChatEmailLabel(),
                 row.preChatNameRequired(),
-                row.preChatEmailRequired()
+            row.preChatEmailRequired(),
+            normalizeLauncherStyle(row.launcherStyle()),
+            normalizeThemeMode(row.themeMode()),
+            normalizeColorSettingsMode(row.colorSettingsMode()),
+            normalizeJson(row.colorOverridesJson()),
+            normalizePosition(row.position()),
+            normalizeZIndex(row.zIndex()),
+            normalizeLauncherText(row.launcherText()),
+            normalizeWidth(row.width()),
+            normalizeHeight(row.height()),
+            normalizeAutoHeight(row.autoHeight()),
+            normalizeAutoHeightMode(row.autoHeightMode()),
+            normalizeMinHeight(row.minHeight()),
+            normalizeMaxHeightRatio(row.maxHeightRatio()),
+            normalizeMobileBreakpoint(row.mobileBreakpoint()),
+            normalizeMobileFullscreen(row.mobileFullscreen()),
+            normalizeOffsetX(row.offsetX()),
+            normalizeOffsetY(row.offsetY()),
+            normalizeDebug(row.debug())
         ));
+    }
+
+    private static String normalizeLauncherStyle(String s) {
+        if (s == null) return DEFAULT_LAUNCHER_STYLE;
+        var t = s.trim().toLowerCase();
+        if (t.isBlank()) return DEFAULT_LAUNCHER_STYLE;
+        if ("bar".equals(t)) return "bar";
+        if ("bubble".equals(t)) return "bubble";
+        return DEFAULT_LAUNCHER_STYLE;
+    }
+
+    private static String normalizeThemeMode(String s) {
+        if (s == null) return DEFAULT_THEME_MODE;
+        var t = s.trim().toLowerCase();
+        if (t.isBlank()) return DEFAULT_THEME_MODE;
+        if ("dark".equals(t)) return "dark";
+        if ("light".equals(t)) return "light";
+        return DEFAULT_THEME_MODE;
+    }
+
+    private static String normalizeColorSettingsMode(String s) {
+        if (s == null) return DEFAULT_COLOR_SETTINGS_MODE;
+        var t = s.trim().toLowerCase();
+        if (t.isBlank()) return DEFAULT_COLOR_SETTINGS_MODE;
+        if ("advanced".equals(t)) return "advanced";
+        if ("theme".equals(t)) return "theme";
+        return DEFAULT_COLOR_SETTINGS_MODE;
+    }
+
+    private static String normalizeJson(String s) {
+        if (s == null) return null;
+        var t = s.trim();
+        return t.isBlank() ? null : t;
     }
 
     private JwtClaims requireAdminClaims(String authorization) {
@@ -159,5 +348,98 @@ public class AdminWidgetConfigController {
             case "lax" -> "Lax";
             default -> throw new IllegalArgumentException("invalid_cookie_samesite");
         };
+    }
+
+    private static String normalizePosition(String s) {
+        var t = emptyToNull(s);
+        if (t == null) return DEFAULT_POSITION;
+        var v = t.trim().toLowerCase();
+        return switch (v) {
+            case "bottom-right", "bottom_left", "bottom-left", "top-right", "top-left" -> v.replace("_", "-");
+            default -> DEFAULT_POSITION;
+        };
+    }
+
+    private static Integer normalizeZIndex(Integer v) {
+        if (v == null) return DEFAULT_Z_INDEX;
+        if (v < 1) return 1;
+        // Clamp to int32 max (CSS z-index in browsers is effectively bounded).
+        return Math.min(v, 2147483647);
+    }
+
+    private static String normalizeLauncherText(String s) {
+        var t = emptyToNull(s);
+        if (t == null) return DEFAULT_LAUNCHER_TEXT;
+        // Keep it short to avoid breaking launcher layout.
+        if (t.length() > 40) return t.substring(0, 40);
+        return t;
+    }
+
+    private static Integer normalizeWidth(Integer v) {
+        if (v == null) return DEFAULT_WIDTH;
+        if (v < 280) return 280;
+        return Math.min(v, 640);
+    }
+
+    private static Integer normalizeHeight(Integer v) {
+        if (v == null) return DEFAULT_HEIGHT;
+        if (v < 320) return 320;
+        return Math.min(v, 900);
+    }
+
+    private static Boolean normalizeAutoHeight(Boolean v) {
+        if (v == null) return DEFAULT_AUTO_HEIGHT;
+        return v;
+    }
+
+    private static String normalizeAutoHeightMode(String s) {
+        var t = emptyToNull(s);
+        if (t == null) return DEFAULT_AUTO_HEIGHT_MODE;
+        var v = t.trim().toLowerCase();
+        return switch (v) {
+            case "fixed", "grow-only", "dynamic" -> v;
+            default -> DEFAULT_AUTO_HEIGHT_MODE;
+        };
+    }
+
+    private static Integer normalizeMinHeight(Integer v) {
+        if (v == null) return DEFAULT_MIN_HEIGHT;
+        if (v < 240) return 240;
+        return Math.min(v, 900);
+    }
+
+    private static Double normalizeMaxHeightRatio(Double v) {
+        if (v == null) return DEFAULT_MAX_HEIGHT_RATIO;
+        if (v < 0.2) return 0.2;
+        if (v > 1.0) return 1.0;
+        return v;
+    }
+
+    private static Integer normalizeMobileBreakpoint(Integer v) {
+        if (v == null) return DEFAULT_MOBILE_BREAKPOINT;
+        if (v < 320) return 320;
+        return Math.min(v, 2000);
+    }
+
+    private static Boolean normalizeMobileFullscreen(Boolean v) {
+        if (v == null) return DEFAULT_MOBILE_FULLSCREEN;
+        return v;
+    }
+
+    private static Integer normalizeOffsetX(Integer v) {
+        if (v == null) return DEFAULT_OFFSET_X;
+        if (v < 0) return 0;
+        return Math.min(v, 200);
+    }
+
+    private static Integer normalizeOffsetY(Integer v) {
+        if (v == null) return DEFAULT_OFFSET_Y;
+        if (v < 0) return 0;
+        return Math.min(v, 200);
+    }
+
+    private static Boolean normalizeDebug(Boolean v) {
+        if (v == null) return DEFAULT_DEBUG;
+        return v;
     }
 }
