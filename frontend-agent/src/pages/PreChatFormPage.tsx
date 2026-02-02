@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Checkbox, Divider, Form, Input, Select, Space, Spin, Switch, Typography } from "antd";
+import { Alert, Button, Card, Checkbox, Divider, Form, Input, Select, Space, Spin, Switch, Tooltip, Typography } from "antd";
+import { HolderOutlined } from "@ant-design/icons";
+import { DndContext, PointerSensor, type DragEndEvent, useSensor, useSensors } from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useTranslation } from "react-i18next";
 
 import { http } from "../providers/http";
@@ -28,13 +33,17 @@ type WidgetConfigDto = {
 
 type PreChatFieldType = "info" | "name" | "email" | "text" | "textarea" | "select" | "multiselect";
 
-type PreChatField = {
+type PreChatFieldConfig = {
     id: string;
     type: PreChatFieldType;
     label?: string | null;
     required?: boolean;
     options?: string[];
     text?: string | null;
+};
+
+type PreChatField = PreChatFieldConfig & {
+    uid: string;
 };
 
 type PreChatFormValues = {
@@ -53,19 +62,33 @@ function makeId(prefix: string): string {
     return `${prefix}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
 }
 
+function isReservedKey(key: string): boolean {
+    const k = String(key || "").trim();
+    return k === "name" || k === "email";
+}
+
+function reservedTypeForKey(key: string): PreChatFieldType | null {
+    const k = String(key || "").trim();
+    if (k === "name") return "name";
+    if (k === "email") return "email";
+    return null;
+}
+
 function fromLegacy(cfg: WidgetConfigDto | null): PreChatField[] {
     const out: PreChatField[] = [];
     const msg = String(cfg?.pre_chat_message || "").trim();
     if (msg) {
-        out.push({ id: makeId("info"), type: "info", text: msg });
+        out.push({ uid: makeId("uid"), id: makeId("info"), type: "info", text: msg });
     }
     out.push({
+        uid: makeId("uid"),
         id: "name",
         type: "name",
         label: (cfg?.pre_chat_name_label ?? "") || null,
         required: Boolean(cfg?.pre_chat_name_required),
     });
     out.push({
+        uid: makeId("uid"),
         id: "email",
         type: "email",
         label: (cfg?.pre_chat_email_label ?? "") || null,
@@ -74,9 +97,9 @@ function fromLegacy(cfg: WidgetConfigDto | null): PreChatField[] {
     return out;
 }
 
-function normalizeFields(fields: PreChatField[]): PreChatField[] {
+function normalizeFields(fields: PreChatField[]): PreChatFieldConfig[] {
     const seen = new Set<string>();
-    const cleaned: PreChatField[] = [];
+    const cleaned: PreChatFieldConfig[] = [];
 
     for (const f of fields || []) {
         const id = String(f?.id || "").trim();
@@ -91,7 +114,7 @@ function normalizeFields(fields: PreChatField[]): PreChatField[] {
         const options = Array.isArray(f.options) ? f.options.map((x) => String(x).trim()).filter(Boolean) : undefined;
         const text = ("text" in f ? String(f.text || "").trim() : "") || null;
 
-        const next: PreChatField = { id, type };
+        const next: PreChatFieldConfig = { id, type };
         if (type === "info") {
             next.text = text;
         } else {
@@ -106,6 +129,240 @@ function normalizeFields(fields: PreChatField[]): PreChatField[] {
     }
 
     return cleaned;
+}
+
+function normalizeBuilderFields(items: unknown): PreChatField[] {
+    if (!Array.isArray(items)) return [];
+    const cleaned: PreChatField[] = [];
+    for (const raw of items) {
+        const r = raw as Partial<PreChatFieldConfig> | null;
+        const id = String(r?.id || "").trim();
+        const type = String(r?.type || "").trim() as PreChatFieldType;
+        if (!id) continue;
+        if (!type) continue;
+
+        const reservedType = reservedTypeForKey(id);
+        const finalType = reservedType || type;
+
+        const label = String((r as any)?.label || "").trim() || null;
+        const required = Boolean((r as any)?.required);
+        const options = Array.isArray((r as any)?.options) ? (r as any).options.map((x: unknown) => String(x).trim()).filter(Boolean) : undefined;
+        const text = String((r as any)?.text || "").trim() || null;
+
+        const f: PreChatField = { uid: makeId("uid"), id, type: finalType };
+        if (finalType === "info") {
+            f.text = text;
+        } else {
+            f.label = label;
+            f.required = required;
+            if (finalType === "select" || finalType === "multiselect") f.options = options;
+        }
+        cleaned.push(f);
+    }
+    return cleaned;
+}
+
+function computeKeyIssues(fields: PreChatField[]) {
+    const trimmedKeys = fields.map((f) => ({ uid: f.uid, key: String(f.id || "").trim() }));
+    const counts = new Map<string, number>();
+    for (const it of trimmedKeys) {
+        if (!it.key) continue;
+        counts.set(it.key, (counts.get(it.key) || 0) + 1);
+    }
+    const duplicateKeys = new Set<string>();
+    for (const [k, c] of counts.entries()) {
+        if (c > 1) duplicateKeys.add(k);
+    }
+
+    const issuesByUid: Record<string, "required" | "duplicate" | undefined> = {};
+    for (const it of trimmedKeys) {
+        if (!it.key) issuesByUid[it.uid] = "required";
+        else if (duplicateKeys.has(it.key)) issuesByUid[it.uid] = "duplicate";
+    }
+
+    const hasAny = fields.length > 0;
+    const hasRequiredErrors = Object.values(issuesByUid).some((v) => v === "required");
+    const hasDuplicateErrors = Object.values(issuesByUid).some((v) => v === "duplicate");
+    return { hasAny, hasRequiredErrors, hasDuplicateErrors, issuesByUid };
+}
+
+function SortableFieldCard(props: {
+    t: (k: string, opts?: Record<string, unknown>) => string;
+    field: PreChatField;
+    index: number;
+    fieldTypeOptions: { value: string; label: string }[];
+    isAdmin: boolean;
+    issuesByUid: Record<string, "required" | "duplicate" | undefined>;
+    onChange: (uid: string, patch: Partial<PreChatField>) => void;
+    onDelete: (uid: string) => void;
+}) {
+    const { t, field, index, fieldTypeOptions, isAdmin, issuesByUid, onChange, onDelete } = props;
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: field.uid });
+
+    const style: React.CSSProperties = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.65 : 1,
+        cursor: isDragging ? "grabbing" : undefined,
+    };
+
+    const type = field.type;
+    const isInfo = type === "info";
+    const isSelect = type === "select" || type === "multiselect";
+
+    const keyIssue = issuesByUid[field.uid];
+    const keyStatus = keyIssue ? "error" : "";
+
+    const keyTrimmed = String(field.id || "").trim();
+
+    const deleteDisabled = !isAdmin;
+    const deleteTooltip = "";
+
+    return (
+        <div ref={setNodeRef} style={style}>
+            <Card
+                size="small"
+                title={
+                    <Space size={10} align="center">
+                        <Tooltip title={t("preChatForm.fields.dragHint")}> 
+                            <span
+                                style={{ display: "inline-flex", alignItems: "center", color: "rgba(0,0,0,.45)", cursor: isAdmin ? "grab" : "not-allowed" }}
+                                {...attributes}
+                                {...(isAdmin ? listeners : {})}
+                            >
+                                <HolderOutlined />
+                            </span>
+                        </Tooltip>
+                        <span>{`${t("preChatForm.fields.field")} #${index + 1}`}</span>
+                    </Space>
+                }
+                extra={
+                    <Tooltip title={deleteTooltip}>
+                        <Button danger size="small" onClick={() => onDelete(field.uid)} disabled={deleteDisabled}>
+                            {t("preChatForm.fields.delete")}
+                        </Button>
+                    </Tooltip>
+                }
+            >
+                <Space direction="vertical" size={10} style={{ width: "100%" }}>
+                    <div>
+                        <Typography.Text type="secondary">{t("preChatForm.fields.type")}</Typography.Text>
+                        <div style={{ marginTop: 6 }}>
+                            <Select
+                                value={type}
+                                options={fieldTypeOptions}
+                                style={{ width: "100%" }}
+                                disabled={!isAdmin}
+                                onChange={(nextType) => {
+                                    const reservedType = reservedTypeForKey(String(field.id || "").trim());
+                                    const finalType = reservedType || (nextType as PreChatFieldType);
+                                    onChange(field.uid, { type: finalType });
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    {!isInfo ? (
+                        <div>
+                            <Typography.Text type="secondary">{t("preChatForm.fields.key")}</Typography.Text>
+                            <div style={{ marginTop: 6 }}>
+                                <Input
+                                    value={String(field.id || "")}
+                                    disabled={!isAdmin}
+                                    status={keyStatus as any}
+                                    placeholder={t("preChatForm.fields.keyPlaceholder")}
+                                    onChange={(e) => {
+                                        const nextId = e.target.value;
+                                        onChange(field.uid, { id: nextId });
+                                    }}
+                                />
+                            </div>
+                            {keyIssue === "required" ? (
+                                <Typography.Text type="danger" style={{ fontSize: 12 }}>
+                                    {t("preChatForm.fields.keyRequiredError")}
+                                </Typography.Text>
+                            ) : null}
+                            {keyIssue === "duplicate" ? (
+                                <Typography.Text type="danger" style={{ fontSize: 12 }}>
+                                    {t("preChatForm.fields.keyDuplicateError")}
+                                </Typography.Text>
+                            ) : null}
+                            {isReservedKey(keyTrimmed) ? (
+                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                    {t("preChatForm.fields.keyReservedHint")}
+                                </Typography.Text>
+                            ) : null}
+                        </div>
+                    ) : null}
+
+                    {isInfo ? (
+                        <div>
+                            <Typography.Text type="secondary">{t("preChatForm.fields.infoText")}</Typography.Text>
+                            <div style={{ marginTop: 6 }}>
+                                <Input.TextArea
+                                    autoSize={{ minRows: 2, maxRows: 6 }}
+                                    value={String(field.text || "")}
+                                    placeholder={t("preChatForm.information.messagePlaceholder")}
+                                    disabled={!isAdmin}
+                                    onChange={(e) => onChange(field.uid, { text: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <div>
+                                <Typography.Text type="secondary">{t("preChatForm.fields.label")}</Typography.Text>
+                                <div style={{ marginTop: 6 }}>
+                                    <Input
+                                        value={String(field.label || "")}
+                                        placeholder={t("preChatForm.fields.labelPlaceholder")}
+                                        disabled={!isAdmin}
+                                        onChange={(e) => onChange(field.uid, { label: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <Checkbox
+                                checked={Boolean(field.required)}
+                                disabled={!isAdmin}
+                                onChange={(e) => onChange(field.uid, { required: e.target.checked })}
+                            >
+                                {t("preChatForm.fields.required")}
+                            </Checkbox>
+
+                            {isSelect ? (
+                                <div>
+                                    <Typography.Text type="secondary">{t("preChatForm.fields.options")}</Typography.Text>
+                                    <div style={{ marginTop: 6 }}>
+                                        <Input.TextArea
+                                            autoSize={{ minRows: 2, maxRows: 6 }}
+                                            value={(field.options || []).join("\n")}
+                                            placeholder={t("preChatForm.fields.optionsPlaceholder")}
+                                            disabled={!isAdmin}
+                                            onChange={(e) => {
+                                                const nextOpts = e.target.value
+                                                    .split(/\r?\n/g)
+                                                    .map((s) => s.trim())
+                                                    .filter(Boolean);
+                                                onChange(field.uid, { options: nextOpts });
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            ) : null}
+                        </>
+                    )}
+                </Space>
+            </Card>
+        </div>
+    );
 }
 
 export function PreChatFormPage() {
@@ -208,7 +465,7 @@ export function PreChatFormPage() {
 
                 const parsed = safeJsonParse<unknown>(String(cfg?.pre_chat_fields_json || "").trim());
                 if (Array.isArray(parsed)) {
-                    setFields(normalizeFields(parsed as PreChatField[]));
+                    setFields(normalizeBuilderFields(parsed));
                 } else {
                     setFields(fromLegacy(cfg));
                 }
@@ -249,11 +506,32 @@ export function PreChatFormPage() {
         return JSON.stringify(normalized);
     }, [fields]);
 
+    const keyIssues = useMemo(() => computeKeyIssues(fields), [fields]);
+
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+    function onDragEnd(event: DragEndEvent) {
+        const { active, over } = event;
+        if (!over) return;
+        if (active.id === over.id) return;
+        setFields((prev) => {
+            const oldIndex = prev.findIndex((f) => f.uid === String(active.id));
+            const newIndex = prev.findIndex((f) => f.uid === String(over.id));
+            if (oldIndex < 0 || newIndex < 0) return prev;
+            return arrayMove(prev, oldIndex, newIndex);
+        });
+    }
+
     async function save(values: PreChatFormValues) {
         if (!siteId) return;
         setSaving(true);
         setCfgError("");
         try {
+            // Client-side validation: field keys must be non-empty and unique.
+            if (keyIssues.hasAny && (keyIssues.hasRequiredErrors || keyIssues.hasDuplicateErrors)) {
+                return;
+            }
+
             const pre_chat_enabled = Boolean(values.pre_chat_enabled);
 
             // Keep legacy fields in sync (for backward compatibility + server-side fallback).
@@ -283,7 +561,7 @@ export function PreChatFormPage() {
 
             const parsed = safeJsonParse<unknown>(String(res.data?.pre_chat_fields_json || "").trim());
             if (Array.isArray(parsed)) {
-                setFields(normalizeFields(parsed as PreChatField[]));
+                setFields(normalizeBuilderFields(parsed));
             }
 
             form.setFieldsValue({
@@ -339,142 +617,91 @@ export function PreChatFormPage() {
                                     {t("preChatForm.fields.hint")}
                                 </Typography.Paragraph>
 
+                                {keyIssues.hasRequiredErrors || keyIssues.hasDuplicateErrors ? (
+                                    <Alert
+                                        type="warning"
+                                        showIcon
+                                        message={t("preChatForm.fields.validationTitle")}
+                                        description={
+                                            keyIssues.hasDuplicateErrors
+                                                ? t("preChatForm.fields.validationDuplicate")
+                                                : t("preChatForm.fields.validationRequired")
+                                        }
+                                        style={{ marginBottom: 12 }}
+                                    />
+                                ) : null}
+
                                 <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                                    {fields.map((f, idx) => {
-                                        const type = f.type;
-                                        const isInfo = type === "info";
-                                        const isSelect = type === "select" || type === "multiselect";
-
-                                        return (
-                                            <Card
-                                                key={f.id}
-                                                size="small"
-                                                title={`${t("preChatForm.fields.field")} #${idx + 1}`}
-                                                extra={
-                                                    <Button
-                                                        danger
-                                                        size="small"
-                                                        onClick={() => setFields((prev) => prev.filter((x) => x.id !== f.id))}
-                                                    >
-                                                        {t("preChatForm.fields.delete")}
-                                                    </Button>
-                                                }
-                                            >
-                                                <Space direction="vertical" size={10} style={{ width: "100%" }}>
-                                                    <div>
-                                                        <Typography.Text type="secondary">{t("preChatForm.fields.type")}</Typography.Text>
-                                                        <div style={{ marginTop: 6 }}>
-                                                            <Select
-                                                                value={type}
-                                                                options={fieldTypeOptions}
-                                                                style={{ width: "100%" }}
-                                                                onChange={(nextType) =>
-                                                                    setFields((prev) =>
-                                                                        prev.map((x) => (x.id === f.id ? { ...x, type: nextType as PreChatFieldType } : x)),
-                                                                    )
-                                                                }
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    {isInfo ? (
-                                                        <div>
-                                                            <Typography.Text type="secondary">{t("preChatForm.fields.infoText")}</Typography.Text>
-                                                            <div style={{ marginTop: 6 }}>
-                                                                <Input.TextArea
-                                                                    autoSize={{ minRows: 2, maxRows: 6 }}
-                                                                    value={String(f.text || "")}
-                                                                    placeholder={t("preChatForm.information.messagePlaceholder")}
-                                                                    onChange={(e) =>
-                                                                        setFields((prev) =>
-                                                                            prev.map((x) => (x.id === f.id ? { ...x, text: e.target.value } : x)),
-                                                                        )
+                                    <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={onDragEnd}>
+                                        <SortableContext items={fields.map((f) => f.uid)} strategy={verticalListSortingStrategy}>
+                                            <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                                                {fields.map((f, idx) => (
+                                                    <SortableFieldCard
+                                                        key={f.uid}
+                                                        t={t}
+                                                        field={f}
+                                                        index={idx}
+                                                        fieldTypeOptions={fieldTypeOptions}
+                                                        isAdmin={isAdmin}
+                                                        issuesByUid={keyIssues.issuesByUid}
+                                                        onChange={(uid, patch) => {
+                                                            setFields((prev) =>
+                                                                prev.map((x) => {
+                                                                    if (x.uid !== uid) return x;
+                                                                    const next = { ...x, ...patch } as PreChatField;
+                                                                    const keyTrimmed = String(next.id || "").trim();
+                                                                    const reservedType = reservedTypeForKey(keyTrimmed);
+                                                                    if (reservedType) {
+                                                                        next.id = keyTrimmed;
+                                                                        next.type = reservedType;
                                                                     }
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <>
-                                                            <div>
-                                                                <Typography.Text type="secondary">{t("preChatForm.fields.label")}</Typography.Text>
-                                                                <div style={{ marginTop: 6 }}>
-                                                                    <Input
-                                                                        value={String(f.label || "")}
-                                                                        placeholder={t("preChatForm.fields.labelPlaceholder")}
-                                                                        onChange={(e) =>
-                                                                            setFields((prev) =>
-                                                                                prev.map((x) => (x.id === f.id ? { ...x, label: e.target.value } : x)),
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                </div>
-                                                            </div>
-
-                                                            <Checkbox
-                                                                checked={Boolean(f.required)}
-                                                                onChange={(e) =>
-                                                                    setFields((prev) =>
-                                                                        prev.map((x) => (x.id === f.id ? { ...x, required: e.target.checked } : x)),
-                                                                    )
-                                                                }
-                                                            >
-                                                                {t("preChatForm.fields.required")}
-                                                            </Checkbox>
-
-                                                            {isSelect ? (
-                                                                <div>
-                                                                    <Typography.Text type="secondary">{t("preChatForm.fields.options")}</Typography.Text>
-                                                                    <div style={{ marginTop: 6 }}>
-                                                                        <Input.TextArea
-                                                                            autoSize={{ minRows: 2, maxRows: 6 }}
-                                                                            value={(f.options || []).join("\n")}
-                                                                            placeholder={t("preChatForm.fields.optionsPlaceholder")}
-                                                                            onChange={(e) => {
-                                                                                const nextOpts = e.target.value
-                                                                                    .split(/\r?\n/g)
-                                                                                    .map((s) => s.trim())
-                                                                                    .filter(Boolean);
-                                                                                setFields((prev) =>
-                                                                                    prev.map((x) => (x.id === f.id ? { ...x, options: nextOpts } : x)),
-                                                                                );
-                                                                            }}
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            ) : null}
-                                                        </>
-                                                    )}
-                                                </Space>
-                                            </Card>
-                                        );
-                                    })}
+                                                                    return next;
+                                                                }),
+                                                            );
+                                                        }}
+                                                        onDelete={(uid) => {
+                                                            setFields((prev) => {
+                                                                const target = prev.find((x) => x.uid === uid);
+                                                                if (!target) return prev;
+                                                                return prev.filter((x) => x.uid !== uid);
+                                                            });
+                                                        }}
+                                                    />
+                                                ))}
+                                            </Space>
+                                        </SortableContext>
+                                    </DndContext>
 
                                     <Space wrap>
                                         <Button
                                             onClick={() =>
                                                 setFields((prev) => [
                                                     ...prev,
-                                                    { id: makeId("field"), type: "text", label: null, required: false },
+                                                    { uid: makeId("uid"), id: makeId("field"), type: "text", label: null, required: false },
                                                 ])
                                             }
                                         >
                                             {t("preChatForm.fields.add")}
                                         </Button>
                                         <Button
-                                            onClick={() => setFields((prev) => [...prev, { id: makeId("info"), type: "info", text: null }])}
+                                            onClick={() => setFields((prev) => [...prev, { uid: makeId("uid"), id: makeId("info"), type: "info", text: null }])}
                                         >
                                             {t("preChatForm.fields.addInfo")}
                                         </Button>
                                         <Button
                                             onClick={() =>
-                                                setFields((prev) => (prev.some((x) => x.id === "name") ? prev : [...prev, { id: "name", type: "name" }]))
+                                                setFields((prev) =>
+                                                    prev.some((x) => String(x.id || "").trim() === "name") ? prev : [...prev, { uid: makeId("uid"), id: "name", type: "name" }],
+                                                )
                                             }
                                         >
                                             {t("preChatForm.fields.addName")}
                                         </Button>
                                         <Button
                                             onClick={() =>
-                                                setFields((prev) => (prev.some((x) => x.id === "email") ? prev : [...prev, { id: "email", type: "email" }]))
+                                                setFields((prev) =>
+                                                    prev.some((x) => String(x.id || "").trim() === "email") ? prev : [...prev, { uid: makeId("uid"), id: "email", type: "email" }],
+                                                )
                                             }
                                         >
                                             {t("preChatForm.fields.addEmail")}
