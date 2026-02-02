@@ -101,6 +101,15 @@ export type ConversationDetail = {
         visit_count?: number | null;
         chat_count?: number | null;
     } | null;
+
+    pre_chat_fields?:
+        | {
+              field_key: string;
+              field_label?: string | null;
+              field_type?: string | null;
+              value_json?: string | null;
+          }[]
+        | null;
     starred?: boolean;
 };
 

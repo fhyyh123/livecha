@@ -3,6 +3,7 @@ package com.chatlive.support.publicchat.service;
 import com.chatlive.support.auth.service.crypto.PasswordHasher;
 import com.chatlive.support.auth.service.jwt.JwtClaims;
 import com.chatlive.support.chat.repo.ConversationRepository;
+import com.chatlive.support.chat.repo.ConversationPreChatFieldRepository;
 import com.chatlive.support.chat.service.AssignmentService;
 import com.chatlive.support.chat.service.MessageService;
 import com.chatlive.support.chat.ws.WsBroadcaster;
@@ -15,6 +16,8 @@ import com.chatlive.support.publicchat.api.PublicSendTextMessageRequest;
 import com.chatlive.support.user.repo.UserAccountRepository;
 import com.chatlive.support.widget.repo.VisitorRepository;
 import com.chatlive.support.widget.repo.WidgetConfigRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
@@ -33,6 +36,8 @@ public class PublicConversationService {
     private final MessageService messageService;
     private final WsBroadcaster wsBroadcaster;
     private final VisitorGeoUpdater visitorGeoUpdater;
+    private final ConversationPreChatFieldRepository conversationPreChatFieldRepository;
+    private final ObjectMapper objectMapper;
 
     public PublicConversationService(
             WidgetConfigRepository widgetConfigRepository,
@@ -43,7 +48,9 @@ public class PublicConversationService {
             AssignmentService assignmentService,
             MessageService messageService,
             WsBroadcaster wsBroadcaster,
-            VisitorGeoUpdater visitorGeoUpdater
+            VisitorGeoUpdater visitorGeoUpdater,
+            ConversationPreChatFieldRepository conversationPreChatFieldRepository,
+            ObjectMapper objectMapper
     ) {
         this.widgetConfigRepository = widgetConfigRepository;
         this.visitorRepository = visitorRepository;
@@ -54,6 +61,18 @@ public class PublicConversationService {
         this.messageService = messageService;
         this.wsBroadcaster = wsBroadcaster;
         this.visitorGeoUpdater = visitorGeoUpdater;
+        this.conversationPreChatFieldRepository = conversationPreChatFieldRepository;
+        this.objectMapper = objectMapper;
+    }
+
+    private record PreChatFieldConfig(
+            String id,
+            String type,
+            String label,
+            Boolean required,
+            java.util.List<String> options,
+            String text
+    ) {
     }
 
     public com.chatlive.support.chat.api.MessageItem sendText(HttpServletRequest request, JwtClaims claims, String conversationId, PublicSendTextMessageRequest req) {
@@ -108,18 +127,56 @@ public class PublicConversationService {
         var nameRequired = config != null && config.preChatNameRequired();
         var emailRequired = config != null && config.preChatEmailRequired();
 
+        var submitted = req == null ? null : req.pre_chat_fields();
+        if (submitted == null) submitted = java.util.Map.of();
+
         var name = safeTrim(req == null ? null : req.name());
         var email = safeTrim(req == null ? null : req.email());
 
         if (preChatEnabled) {
-            if (nameRequired && (name == null || name.isBlank())) {
-                throw new IllegalArgumentException("identity_required");
-            }
-            if (emailRequired && (email == null || email.isBlank())) {
-                throw new IllegalArgumentException("identity_required");
-            }
-            if (!nameRequired && !emailRequired) {
-                if ((name == null || name.isBlank()) && (email == null || email.isBlank())) {
+            var cfgs = parsePreChatFields(config == null ? null : config.preChatFieldsJson());
+
+            // Backward compatibility: if no dynamic config exists yet, fallback to legacy name/email behavior.
+            if (cfgs == null || cfgs.isEmpty()) {
+                if (nameRequired && (name == null || name.isBlank())) {
+                    throw new IllegalArgumentException("identity_required");
+                }
+                if (emailRequired && (email == null || email.isBlank())) {
+                    throw new IllegalArgumentException("identity_required");
+                }
+                if (!nameRequired && !emailRequired) {
+                    if ((name == null || name.isBlank()) && (email == null || email.isBlank())) {
+                        throw new IllegalArgumentException("identity_required");
+                    }
+                }
+            } else {
+                // Dynamic validation: required fields must be provided.
+                boolean hasAnyInputField = false;
+                boolean hasRequiredInput = false;
+                boolean hasAnyValue = false;
+
+                for (var f : cfgs) {
+                    var type = safeTrim(f.type());
+                    if (type == null) continue;
+                    if ("info".equals(type)) continue;
+                    hasAnyInputField = true;
+                    var required = Boolean.TRUE.equals(f.required());
+                    if (required) hasRequiredInput = true;
+
+                    Object raw = null;
+                    if ("name".equals(type)) raw = name;
+                    else if ("email".equals(type)) raw = email;
+                    else raw = submitted.get(f.id());
+
+                    if (isNonEmptyValue(raw)) {
+                        hasAnyValue = true;
+                    } else if (required) {
+                        throw new IllegalArgumentException("identity_required");
+                    }
+                }
+
+                // If user configured only optional fields, require at least one value.
+                if (hasAnyInputField && !hasRequiredInput && !hasAnyValue) {
                     throw new IllegalArgumentException("identity_required");
                 }
             }
@@ -146,44 +203,164 @@ public class PublicConversationService {
         var passwordHash = passwordHasher.hash(randomPassword);
         userAccountRepository.ensureVisitorCustomerExists(claims.tenantId(), visitorId, emptyToNull(email), passwordHash);
 
+        String conversationId;
+        boolean recovered;
+
         var active = conversationRepository.findActiveBySiteVisitor(claims.tenantId(), claims.siteId(), visitorId).orElse(null);
         if (active != null) {
-            return new CreateOrRecoverConversationResponse(active, true);
+            conversationId = active;
+            recovered = true;
+        } else {
+            // If the latest conversation is closed, keep reusing it. The first inbound message will reopen it.
+            var latest = conversationRepository.findLatestBySiteVisitor(claims.tenantId(), claims.siteId(), visitorId).orElse(null);
+            if (latest != null) {
+                conversationId = latest;
+                recovered = true;
+            } else {
+                var channel = safeTrim(req == null ? null : req.channel());
+                if (channel == null || channel.isBlank()) {
+                    channel = "web";
+                }
+                var subject = safeTrim(req == null ? null : req.subject());
+                var skillGroupId = safeTrim(req == null ? null : req.skill_group_id());
+
+                conversationId = conversationRepository.createForVisitor(
+                        claims.tenantId(),
+                        visitorId,
+                        channel,
+                        skillGroupId,
+                        subject,
+                        claims.siteId(),
+                        visitorId
+                );
+
+                // Persist a "started" system event for timeline/history (LiveChat-style).
+                var started = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+                started.put("mode", "visitor_created");
+                started.put("site_id", claims.siteId());
+                started.put("visitor_id", visitorId);
+                wsBroadcaster.broadcastConversationEvent(claims.tenantId(), conversationId, "started", started);
+
+                assignmentService.autoAssignNewConversation(claims.tenantId(), conversationId, skillGroupId);
+                recovered = false;
+            }
         }
 
-        // If the latest conversation is closed, keep reusing it. The first inbound message will reopen it.
-        var latest = conversationRepository.findLatestBySiteVisitor(claims.tenantId(), claims.siteId(), visitorId).orElse(null);
-        if (latest != null) {
-            return new CreateOrRecoverConversationResponse(latest, true);
+        // Persist pre-chat form submissions (best-effort; do not block conversation creation).
+        if (preChatEnabled) {
+            try {
+                persistPreChatFields(claims.tenantId(), conversationId, config == null ? null : config.preChatFieldsJson(), name, email, submitted);
+            } catch (Exception ignore) {
+                // ignore
+            }
         }
 
-        var channel = safeTrim(req == null ? null : req.channel());
-        if (channel == null || channel.isBlank()) {
-            channel = "web";
+        return new CreateOrRecoverConversationResponse(conversationId, recovered);
+    }
+
+    private java.util.List<PreChatFieldConfig> parsePreChatFields(String preChatFieldsJson) {
+        var json = safeTrim(preChatFieldsJson);
+        if (json == null || json.isBlank()) return java.util.List.of();
+        try {
+            JsonNode node = objectMapper.readTree(json);
+            if (node == null || !node.isArray()) return java.util.List.of();
+            var out = new java.util.ArrayList<PreChatFieldConfig>();
+            for (var item : node) {
+                if (item == null || !item.isObject()) continue;
+                var id = safeTrim(item.path("id").asText(null));
+                var type = safeTrim(item.path("type").asText(null));
+                var label = safeTrim(item.path("label").asText(null));
+                Boolean required = null;
+                if (item.has("required") && item.get("required").isBoolean()) {
+                    required = item.get("required").asBoolean();
+                }
+
+                java.util.List<String> options = null;
+                if (item.has("options") && item.get("options").isArray()) {
+                    var opts = new java.util.ArrayList<String>();
+                    for (var opt : item.get("options")) {
+                        var s = safeTrim(opt == null ? null : opt.asText(null));
+                        if (s != null && !s.isBlank()) opts.add(s);
+                    }
+                    options = opts;
+                }
+
+                var text = safeTrim(item.path("text").asText(null));
+                if (id == null || id.isBlank()) continue;
+                if (type == null || type.isBlank()) continue;
+                out.add(new PreChatFieldConfig(id, type, label, required, options, text));
+            }
+            return out;
+        } catch (Exception ignore) {
+            return java.util.List.of();
         }
-        var subject = safeTrim(req == null ? null : req.subject());
-        var skillGroupId = safeTrim(req == null ? null : req.skill_group_id());
+    }
 
-        var conversationId = conversationRepository.createForVisitor(
-                claims.tenantId(),
-                visitorId,
-                channel,
-                skillGroupId,
-                subject,
-                claims.siteId(),
-                visitorId
-        );
+    private void persistPreChatFields(
+            String tenantId,
+            String conversationId,
+            String preChatFieldsJson,
+            String name,
+            String email,
+            java.util.Map<String, Object> submitted
+    ) {
+        if (tenantId == null || tenantId.isBlank()) return;
+        if (conversationId == null || conversationId.isBlank()) return;
 
-        // Persist a "started" system event for timeline/history (LiveChat-style).
-        var started = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
-        started.put("mode", "visitor_created");
-        started.put("site_id", claims.siteId());
-        started.put("visitor_id", visitorId);
-        wsBroadcaster.broadcastConversationEvent(claims.tenantId(), conversationId, "started", started);
+        var cfgs = parsePreChatFields(preChatFieldsJson);
+        if (cfgs == null || cfgs.isEmpty()) {
+            // Legacy mode: persist provided identity as fields.
+            if (name != null && !name.isBlank()) {
+                upsertPreChatField(tenantId, conversationId, "name", "Name", "name", name);
+            }
+            if (email != null && !email.isBlank()) {
+                upsertPreChatField(tenantId, conversationId, "email", "Email", "email", email);
+            }
+            return;
+        }
 
-        assignmentService.autoAssignNewConversation(claims.tenantId(), conversationId, skillGroupId);
+        for (var f : cfgs) {
+            if (f == null) continue;
+            var type = safeTrim(f.type());
+            if (type == null || type.isBlank()) continue;
+            if ("info".equals(type)) continue;
 
-        return new CreateOrRecoverConversationResponse(conversationId, false);
+            Object raw;
+            if ("name".equals(type)) raw = name;
+            else if ("email".equals(type)) raw = email;
+            else raw = submitted.get(f.id());
+
+            if (!isNonEmptyValue(raw)) continue;
+
+            var label = safeTrim(f.label());
+            if (label == null || label.isBlank()) {
+                label = f.id();
+            }
+            upsertPreChatField(tenantId, conversationId, f.id(), label, type, raw);
+        }
+    }
+
+    private void upsertPreChatField(String tenantId, String conversationId, String fieldKey, String fieldLabel, String fieldType, Object raw) {
+        try {
+            var json = objectMapper.writeValueAsString(raw);
+            conversationPreChatFieldRepository.upsert(tenantId, conversationId, fieldKey, fieldLabel, fieldType, json);
+        } catch (Exception ignore) {
+            // ignore
+        }
+    }
+
+    private static boolean isNonEmptyValue(Object raw) {
+        if (raw == null) return false;
+        if (raw instanceof String s) {
+            return !s.trim().isBlank();
+        }
+        if (raw instanceof java.util.Collection<?> c) {
+            return !c.isEmpty();
+        }
+        if (raw instanceof java.util.Map<?, ?> m) {
+            return !m.isEmpty();
+        }
+        return true;
     }
 
     public void recordPageView(HttpServletRequest request, JwtClaims claims, String conversationId, PublicPageViewEventRequest req) {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Checkbox, Divider, Form, Input, Space, Spin, Switch, Typography } from "antd";
+import { Alert, Button, Card, Checkbox, Divider, Form, Input, Select, Space, Spin, Switch, Typography } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { http } from "../providers/http";
@@ -14,6 +14,7 @@ type SiteItem = {
 
 type WidgetConfigDto = {
     pre_chat_enabled: boolean;
+    pre_chat_fields_json?: string | null;
     theme_color?: string | null;
     welcome_text?: string | null;
     cookie_domain?: string | null;
@@ -25,14 +26,87 @@ type WidgetConfigDto = {
     pre_chat_email_required?: boolean;
 };
 
+type PreChatFieldType = "info" | "name" | "email" | "text" | "textarea" | "select" | "multiselect";
+
+type PreChatField = {
+    id: string;
+    type: PreChatFieldType;
+    label?: string | null;
+    required?: boolean;
+    options?: string[];
+    text?: string | null;
+};
+
 type PreChatFormValues = {
     pre_chat_enabled: boolean;
-    pre_chat_message?: string | null;
-    pre_chat_name_label?: string | null;
-    pre_chat_email_label?: string | null;
-    pre_chat_name_required?: boolean;
-    pre_chat_email_required?: boolean;
 };
+
+function safeJsonParse<T>(s: string): T | null {
+    try {
+        return JSON.parse(s) as T;
+    } catch {
+        return null;
+    }
+}
+
+function makeId(prefix: string): string {
+    return `${prefix}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+}
+
+function fromLegacy(cfg: WidgetConfigDto | null): PreChatField[] {
+    const out: PreChatField[] = [];
+    const msg = String(cfg?.pre_chat_message || "").trim();
+    if (msg) {
+        out.push({ id: makeId("info"), type: "info", text: msg });
+    }
+    out.push({
+        id: "name",
+        type: "name",
+        label: (cfg?.pre_chat_name_label ?? "") || null,
+        required: Boolean(cfg?.pre_chat_name_required),
+    });
+    out.push({
+        id: "email",
+        type: "email",
+        label: (cfg?.pre_chat_email_label ?? "") || null,
+        required: Boolean(cfg?.pre_chat_email_required),
+    });
+    return out;
+}
+
+function normalizeFields(fields: PreChatField[]): PreChatField[] {
+    const seen = new Set<string>();
+    const cleaned: PreChatField[] = [];
+
+    for (const f of fields || []) {
+        const id = String(f?.id || "").trim();
+        const type = String(f?.type || "").trim() as PreChatFieldType;
+        if (!id) continue;
+        if (!type) continue;
+        if (seen.has(id)) continue;
+        seen.add(id);
+
+        const label = ("label" in f ? String(f.label || "").trim() : "") || null;
+        const required = Boolean(f.required);
+        const options = Array.isArray(f.options) ? f.options.map((x) => String(x).trim()).filter(Boolean) : undefined;
+        const text = ("text" in f ? String(f.text || "").trim() : "") || null;
+
+        const next: PreChatField = { id, type };
+        if (type === "info") {
+            next.text = text;
+        } else {
+            next.label = label;
+            next.required = required;
+            if (type === "select" || type === "multiselect") {
+                next.options = options;
+            }
+        }
+
+        cleaned.push(next);
+    }
+
+    return cleaned;
+}
 
 export function PreChatFormPage() {
     const { t } = useTranslation();
@@ -51,6 +125,7 @@ export function PreChatFormPage() {
     const [saving, setSaving] = useState(false);
 
     const [currentCfg, setCurrentCfg] = useState<WidgetConfigDto | null>(null);
+    const [fields, setFields] = useState<PreChatField[]>([]);
 
     const [form] = Form.useForm<PreChatFormValues>();
 
@@ -130,13 +205,16 @@ export function PreChatFormPage() {
                 if (!mounted) return;
                 const cfg = res.data;
                 setCurrentCfg(cfg);
+
+                const parsed = safeJsonParse<unknown>(String(cfg?.pre_chat_fields_json || "").trim());
+                if (Array.isArray(parsed)) {
+                    setFields(normalizeFields(parsed as PreChatField[]));
+                } else {
+                    setFields(fromLegacy(cfg));
+                }
+
                 form.setFieldsValue({
                     pre_chat_enabled: Boolean(cfg?.pre_chat_enabled),
-                    pre_chat_message: cfg?.pre_chat_message ?? null,
-                    pre_chat_name_label: cfg?.pre_chat_name_label ?? null,
-                    pre_chat_email_label: cfg?.pre_chat_email_label ?? null,
-                    pre_chat_name_required: Boolean(cfg?.pre_chat_name_required),
-                    pre_chat_email_required: Boolean(cfg?.pre_chat_email_required),
                 });
             })
             .catch((e: unknown) => {
@@ -153,20 +231,47 @@ export function PreChatFormPage() {
         };
     }, [form, isAdmin, meLoading, siteId]);
 
+    const fieldTypeOptions = useMemo(
+        () => [
+            { value: "info", label: t("preChatForm.fields.types.info") },
+            { value: "name", label: t("preChatForm.fields.types.name") },
+            { value: "email", label: t("preChatForm.fields.types.email") },
+            { value: "text", label: t("preChatForm.fields.types.text") },
+            { value: "textarea", label: t("preChatForm.fields.types.textarea") },
+            { value: "select", label: t("preChatForm.fields.types.select") },
+            { value: "multiselect", label: t("preChatForm.fields.types.multiselect") },
+        ],
+        [t],
+    );
+
+    const normalizedFieldsJson = useMemo(() => {
+        const normalized = normalizeFields(fields);
+        return JSON.stringify(normalized);
+    }, [fields]);
+
     async function save(values: PreChatFormValues) {
         if (!siteId) return;
         setSaving(true);
         setCfgError("");
         try {
             const pre_chat_enabled = Boolean(values.pre_chat_enabled);
-            const pre_chat_message = (values.pre_chat_message ?? "").trim() || null;
-            const pre_chat_name_label = (values.pre_chat_name_label ?? "").trim() || null;
-            const pre_chat_email_label = (values.pre_chat_email_label ?? "").trim() || null;
-            const pre_chat_name_required = Boolean(values.pre_chat_name_required);
-            const pre_chat_email_required = Boolean(values.pre_chat_email_required);
+
+            // Keep legacy fields in sync (for backward compatibility + server-side fallback).
+            const normalized = normalizeFields(fields);
+            const info = normalized.find((f) => f.type === "info" && String(f.text || "").trim());
+            const nameField = normalized.find((f) => f.id === "name" || f.type === "name");
+            const emailField = normalized.find((f) => f.id === "email" || f.type === "email");
+
+            const pre_chat_message = info ? String(info.text || "").trim() || null : null;
+            const pre_chat_name_label = nameField ? String(nameField.label || "").trim() || null : null;
+            const pre_chat_email_label = emailField ? String(emailField.label || "").trim() || null : null;
+            const pre_chat_name_required = Boolean(nameField?.required);
+            const pre_chat_email_required = Boolean(emailField?.required);
+
             const payload: WidgetConfigDto = {
                 ...(currentCfg || { pre_chat_enabled: false }),
                 pre_chat_enabled,
+                pre_chat_fields_json: normalizedFieldsJson,
                 pre_chat_message,
                 pre_chat_name_label,
                 pre_chat_email_label,
@@ -175,13 +280,14 @@ export function PreChatFormPage() {
             };
             const res = await http.put<WidgetConfigDto>(`/api/v1/admin/sites/${encodeURIComponent(siteId)}/widget-config`, payload);
             setCurrentCfg(res.data);
+
+            const parsed = safeJsonParse<unknown>(String(res.data?.pre_chat_fields_json || "").trim());
+            if (Array.isArray(parsed)) {
+                setFields(normalizeFields(parsed as PreChatField[]));
+            }
+
             form.setFieldsValue({
                 pre_chat_enabled: Boolean(res.data?.pre_chat_enabled),
-                pre_chat_message: res.data?.pre_chat_message ?? null,
-                pre_chat_name_label: res.data?.pre_chat_name_label ?? null,
-                pre_chat_email_label: res.data?.pre_chat_email_label ?? null,
-                pre_chat_name_required: Boolean(res.data?.pre_chat_name_required),
-                pre_chat_email_required: Boolean(res.data?.pre_chat_email_required),
             });
         } catch (e: unknown) {
             setCfgError(errorMessage(e, "save_widget_config_failed"));
@@ -228,42 +334,165 @@ export function PreChatFormPage() {
 
                                 <Divider style={{ margin: "12px 0" }} />
 
-                                <Typography.Text strong>{t("preChatForm.information.title")}</Typography.Text>
+                                <Typography.Text strong>{t("preChatForm.fields.title")}</Typography.Text>
                                 <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>
-                                    {t("preChatForm.information.hint")}
+                                    {t("preChatForm.fields.hint")}
                                 </Typography.Paragraph>
-                                <Form.Item label={t("preChatForm.information.messageLabel")} name="pre_chat_message">
-                                    <Input.TextArea
-                                        autoSize={{ minRows: 2, maxRows: 6 }}
-                                        placeholder={t("preChatForm.information.messagePlaceholder")}
-                                    />
-                                </Form.Item>
 
-                                <Divider style={{ margin: "12px 0" }} />
+                                <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                                    {fields.map((f, idx) => {
+                                        const type = f.type;
+                                        const isInfo = type === "info";
+                                        const isSelect = type === "select" || type === "multiselect";
 
-                                <Typography.Text strong>{t("preChatForm.name.title")}</Typography.Text>
-                                <Form.Item label={t("preChatForm.name.labelLabel")} name="pre_chat_name_label">
-                                    <Input placeholder={t("preChatForm.name.labelPlaceholder")} />
-                                </Form.Item>
-                                <Form.Item name="pre_chat_name_required" valuePropName="checked">
-                                    <Checkbox>{t("preChatForm.name.required")}</Checkbox>
-                                </Form.Item>
+                                        return (
+                                            <Card
+                                                key={f.id}
+                                                size="small"
+                                                title={`${t("preChatForm.fields.field")} #${idx + 1}`}
+                                                extra={
+                                                    <Button
+                                                        danger
+                                                        size="small"
+                                                        onClick={() => setFields((prev) => prev.filter((x) => x.id !== f.id))}
+                                                    >
+                                                        {t("preChatForm.fields.delete")}
+                                                    </Button>
+                                                }
+                                            >
+                                                <Space direction="vertical" size={10} style={{ width: "100%" }}>
+                                                    <div>
+                                                        <Typography.Text type="secondary">{t("preChatForm.fields.type")}</Typography.Text>
+                                                        <div style={{ marginTop: 6 }}>
+                                                            <Select
+                                                                value={type}
+                                                                options={fieldTypeOptions}
+                                                                style={{ width: "100%" }}
+                                                                onChange={(nextType) =>
+                                                                    setFields((prev) =>
+                                                                        prev.map((x) => (x.id === f.id ? { ...x, type: nextType as PreChatFieldType } : x)),
+                                                                    )
+                                                                }
+                                                            />
+                                                        </div>
+                                                    </div>
 
-                                <Divider style={{ margin: "12px 0" }} />
+                                                    {isInfo ? (
+                                                        <div>
+                                                            <Typography.Text type="secondary">{t("preChatForm.fields.infoText")}</Typography.Text>
+                                                            <div style={{ marginTop: 6 }}>
+                                                                <Input.TextArea
+                                                                    autoSize={{ minRows: 2, maxRows: 6 }}
+                                                                    value={String(f.text || "")}
+                                                                    placeholder={t("preChatForm.information.messagePlaceholder")}
+                                                                    onChange={(e) =>
+                                                                        setFields((prev) =>
+                                                                            prev.map((x) => (x.id === f.id ? { ...x, text: e.target.value } : x)),
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <div>
+                                                                <Typography.Text type="secondary">{t("preChatForm.fields.label")}</Typography.Text>
+                                                                <div style={{ marginTop: 6 }}>
+                                                                    <Input
+                                                                        value={String(f.label || "")}
+                                                                        placeholder={t("preChatForm.fields.labelPlaceholder")}
+                                                                        onChange={(e) =>
+                                                                            setFields((prev) =>
+                                                                                prev.map((x) => (x.id === f.id ? { ...x, label: e.target.value } : x)),
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </div>
+                                                            </div>
 
-                                <Typography.Text strong>{t("preChatForm.email.title")}</Typography.Text>
-                                <Form.Item label={t("preChatForm.email.labelLabel")} name="pre_chat_email_label">
-                                    <Input placeholder={t("preChatForm.email.labelPlaceholder")} />
-                                </Form.Item>
-                                <Form.Item name="pre_chat_email_required" valuePropName="checked">
-                                    <Checkbox>{t("preChatForm.email.required")}</Checkbox>
-                                </Form.Item>
+                                                            <Checkbox
+                                                                checked={Boolean(f.required)}
+                                                                onChange={(e) =>
+                                                                    setFields((prev) =>
+                                                                        prev.map((x) => (x.id === f.id ? { ...x, required: e.target.checked } : x)),
+                                                                    )
+                                                                }
+                                                            >
+                                                                {t("preChatForm.fields.required")}
+                                                            </Checkbox>
+
+                                                            {isSelect ? (
+                                                                <div>
+                                                                    <Typography.Text type="secondary">{t("preChatForm.fields.options")}</Typography.Text>
+                                                                    <div style={{ marginTop: 6 }}>
+                                                                        <Input.TextArea
+                                                                            autoSize={{ minRows: 2, maxRows: 6 }}
+                                                                            value={(f.options || []).join("\n")}
+                                                                            placeholder={t("preChatForm.fields.optionsPlaceholder")}
+                                                                            onChange={(e) => {
+                                                                                const nextOpts = e.target.value
+                                                                                    .split(/\r?\n/g)
+                                                                                    .map((s) => s.trim())
+                                                                                    .filter(Boolean);
+                                                                                setFields((prev) =>
+                                                                                    prev.map((x) => (x.id === f.id ? { ...x, options: nextOpts } : x)),
+                                                                                );
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            ) : null}
+                                                        </>
+                                                    )}
+                                                </Space>
+                                            </Card>
+                                        );
+                                    })}
+
+                                    <Space wrap>
+                                        <Button
+                                            onClick={() =>
+                                                setFields((prev) => [
+                                                    ...prev,
+                                                    { id: makeId("field"), type: "text", label: null, required: false },
+                                                ])
+                                            }
+                                        >
+                                            {t("preChatForm.fields.add")}
+                                        </Button>
+                                        <Button
+                                            onClick={() => setFields((prev) => [...prev, { id: makeId("info"), type: "info", text: null }])}
+                                        >
+                                            {t("preChatForm.fields.addInfo")}
+                                        </Button>
+                                        <Button
+                                            onClick={() =>
+                                                setFields((prev) => (prev.some((x) => x.id === "name") ? prev : [...prev, { id: "name", type: "name" }]))
+                                            }
+                                        >
+                                            {t("preChatForm.fields.addName")}
+                                        </Button>
+                                        <Button
+                                            onClick={() =>
+                                                setFields((prev) => (prev.some((x) => x.id === "email") ? prev : [...prev, { id: "email", type: "email" }]))
+                                            }
+                                        >
+                                            {t("preChatForm.fields.addEmail")}
+                                        </Button>
+                                    </Space>
+                                </Space>
 
                                 <Space>
                                     <Button type="primary" htmlType="submit" loading={saving} disabled={!isAdmin}>
                                         {t("common.save")}
                                     </Button>
-                                    <Button onClick={() => form.resetFields()} disabled={saving || !isAdmin}>
+                                    <Button
+                                        onClick={() => {
+                                            form.resetFields();
+                                            setFields(fromLegacy(currentCfg));
+                                        }}
+                                        disabled={saving || !isAdmin}
+                                    >
                                         {t("common.reset")}
                                     </Button>
                                 </Space>

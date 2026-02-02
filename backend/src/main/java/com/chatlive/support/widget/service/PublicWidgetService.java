@@ -55,13 +55,14 @@ public class PublicWidgetService {
             throw new IllegalArgumentException("site_disabled");
         }
 
-        if (!allowlistRepository.isAllowed(site.id(), host)) {
+        if (site.allowlistEnabled() && !allowlistRepository.isAllowed(site.id(), host)) {
             throw new IllegalArgumentException("origin_not_allowed");
         }
 
         var config = widgetConfigRepository.findBySiteId(site.id())
             .map(r -> new WidgetConfigDto(
                 r.preChatEnabled(),
+                r.preChatFieldsJson(),
                 r.themeColor(),
                 r.welcomeText(),
                 r.cookieDomain(),
@@ -72,7 +73,7 @@ public class PublicWidgetService {
                 r.preChatNameRequired(),
                 r.preChatEmailRequired()
             ))
-            .orElseGet(() -> new WidgetConfigDto(false, null, null, null, null, null, null, null, false, false));
+            .orElseGet(() -> new WidgetConfigDto(false, null, null, null, null, null, null, null, null, false, false));
 
         String visitorId;
         if (req.visitor_id() != null && !req.visitor_id().isBlank()) {

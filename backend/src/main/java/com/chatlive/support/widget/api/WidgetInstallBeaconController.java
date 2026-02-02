@@ -87,7 +87,9 @@ public class WidgetInstallBeaconController {
             if (siteKey != null && !siteKey.isBlank() && origin != null && !origin.isBlank()) {
                 var host = extractHost(origin);
                 var site = siteRepository.findByPublicKey(siteKey).orElse(null);
-                if (site != null && "active".equals(site.status()) && allowlistRepository.isAllowed(site.id(), host)) {
+                if (site != null
+                        && "active".equals(site.status())
+                        && (!site.allowlistEnabled() || allowlistRepository.isAllowed(site.id(), host))) {
                     var ua = request.getHeader("User-Agent");
                     var ip = extractClientIp(request);
                     var safeOrigin = truncate(origin, 300);

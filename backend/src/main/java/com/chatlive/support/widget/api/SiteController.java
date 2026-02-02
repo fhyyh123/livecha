@@ -69,11 +69,12 @@ public class SiteController {
 
         var row = widgetConfigRepository.findBySiteId(site.id()).orElse(null);
         if (row == null) {
-            return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, null, null, false, false));
+            return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, null, null, null, false, false));
         }
 
         return ApiResponse.ok(new WidgetConfigDto(
                 row.preChatEnabled(),
+                row.preChatFieldsJson(),
                 row.themeColor(),
                 row.welcomeText(),
                 row.cookieDomain(),

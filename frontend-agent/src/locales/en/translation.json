@@ -50,7 +50,7 @@
     "adminOnlyHint": "Admin only",
     "selectSite": "Site",
     "selectSitePlaceholder": "Select a site",
-    "hint": "When enabled, visitors will be asked for details before starting a chat. If neither Name nor Email is marked as required, at least one of them is still required.",
+    "hint": "When enabled, visitors will be asked for details before starting a chat.",
     "enabled": {
       "label": "Enable pre-chat form"
     },
@@ -71,6 +71,32 @@
       "labelLabel": "Label",
       "labelPlaceholder": "E-mail:",
       "required": "Required"
+    },
+    "fields": {
+      "title": "Fields",
+      "hint": "Add, remove, and customize fields shown before chat starts.",
+      "field": "Field",
+      "add": "Add field",
+      "addInfo": "Add info block",
+      "addName": "Add name",
+      "addEmail": "Add email",
+      "delete": "Delete",
+      "type": "Type",
+      "label": "Label",
+      "labelPlaceholder": "e.g. Company",
+      "required": "Required",
+      "options": "Options (one per line)",
+      "optionsPlaceholder": "Option A\nOption B",
+      "infoText": "Text",
+      "types": {
+        "info": "Information",
+        "name": "Name",
+        "email": "Email",
+        "text": "Text",
+        "textarea": "Textarea",
+        "select": "Dropdown",
+        "multiselect": "Multi-select"
+      }
     },
     "previewTitle": "Preview",
     "previewEmpty": "Select a site to preview"
@@ -544,6 +570,7 @@
     "transferTo": "Transfer to...",
     "selectAgent": "Select an agent...",
     "visitor": "Visitor",
+    "preChatFields": "Pre-chat fields",
     "visitorName": "Name: {{name}}",
     "visitorEmail": "Email: {{email}}",
     "visitorLocation": "Location: {{location}}",
@@ -659,6 +686,12 @@
     "selectSite": "Site",
     "selectSitePlaceholder": "Select a site",
     "manageTitle": "Manage domains",
+    "enforcement": {
+      "label": "Enforcement",
+      "hint": "When off, the widget can load on any domain.",
+      "disabledTitle": "Trusted domains enforcement is disabled",
+      "disabledDesc": "The allowlist is not enforced for widget bootstrap. You can still manage the list for later."
+    },
     "tabs": {
       "trusted": "Trusted ({{count}})",
       "detected": "Detected ({{count}})"
@@ -731,7 +764,8 @@
       "emailLabel": "E-mail:",
       "nameRequiredError": "Name is required",
       "emailRequiredError": "Email is required",
-      "atLeastOneError": "Please provide at least name or email"
+      "requiredError": "{{label}} is required",
+      "atLeastOneError": "Please provide at least one field"
     },
     "conversationLabel": "Conversation: {{id}}",
     "recovered": "(recovered)",

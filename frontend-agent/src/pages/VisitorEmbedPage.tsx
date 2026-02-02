@@ -1,5 +1,5 @@
 import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, ConfigProvider, Input, Modal, Popover, Tooltip } from "antd";
+import { Alert, Button, ConfigProvider, Input, Modal, Popover, Select, Tooltip } from "antd";
 import type { TextAreaRef } from "antd/es/input/TextArea";
 import { ArrowUpOutlined, FileAddOutlined, LeftOutlined, MinusOutlined, PlusOutlined, ScanOutlined, SmileOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
@@ -19,8 +19,52 @@ function getErrorFields(err: unknown): { name?: string; message?: string } {
     return { name, message };
 }
 
+function safeJsonParse<T>(s: string): T | null {
+    try {
+        return JSON.parse(s) as T;
+    } catch {
+        return null;
+    }
+}
+
+type PreChatFieldType = "info" | "name" | "email" | "text" | "textarea" | "select" | "multiselect";
+type PreChatField = {
+    id: string;
+    type: PreChatFieldType;
+    label?: string | null;
+    required?: boolean;
+    options?: string[];
+    text?: string | null;
+};
+
+function normalizePreChatFields(fields: PreChatField[]): PreChatField[] {
+    const seen = new Set<string>();
+    const out: PreChatField[] = [];
+    for (const f of fields || []) {
+        const id = String(f?.id || "").trim();
+        const type = String(f?.type || "").trim() as PreChatFieldType;
+        if (!id || !type) continue;
+        if (seen.has(id)) continue;
+        seen.add(id);
+
+        const next: PreChatField = { id, type };
+        if (type === "info") {
+            next.text = String(f?.text || "").trim() || null;
+        } else {
+            next.label = String(f?.label || "").trim() || null;
+            next.required = Boolean(f?.required);
+            if (type === "select" || type === "multiselect") {
+                next.options = Array.isArray(f?.options) ? f.options.map((x) => String(x).trim()).filter(Boolean) : undefined;
+            }
+        }
+        out.push(next);
+    }
+    return out;
+}
+
 type WidgetConfig = {
     pre_chat_enabled: boolean;
+    pre_chat_fields_json?: string | null;
     theme_color?: string | null;
     welcome_text?: string | null;
     cookie_domain?: string | null;
@@ -451,6 +495,8 @@ export function VisitorEmbedPage() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
 
+    const [preChatCustom, setPreChatCustom] = useState<Record<string, unknown>>({});
+
     const [identityName, setIdentityName] = useState("");
     const [identityEmail, setIdentityEmail] = useState("");
     const [identityModalOpen, setIdentityModalOpen] = useState(false);
@@ -536,11 +582,32 @@ export function VisitorEmbedPage() {
     const [unread, setUnread] = useState(0);
 
     const preChatEnabled = Boolean(bootstrap?.widget_config?.pre_chat_enabled);
-    const preChatMessage = (bootstrap?.widget_config?.pre_chat_message || "").trim();
-    const preChatNameLabel = (bootstrap?.widget_config?.pre_chat_name_label || "").trim();
-    const preChatEmailLabel = (bootstrap?.widget_config?.pre_chat_email_label || "").trim();
-    const preChatNameRequired = Boolean(bootstrap?.widget_config?.pre_chat_name_required);
-    const preChatEmailRequired = Boolean(bootstrap?.widget_config?.pre_chat_email_required);
+    const legacyPreChatMessage = (bootstrap?.widget_config?.pre_chat_message || "").trim();
+    const legacyPreChatNameLabel = (bootstrap?.widget_config?.pre_chat_name_label || "").trim();
+    const legacyPreChatEmailLabel = (bootstrap?.widget_config?.pre_chat_email_label || "").trim();
+    const legacyPreChatNameRequired = Boolean(bootstrap?.widget_config?.pre_chat_name_required);
+    const legacyPreChatEmailRequired = Boolean(bootstrap?.widget_config?.pre_chat_email_required);
+
+    const preChatFields = useMemo(() => {
+        const json = String(bootstrap?.widget_config?.pre_chat_fields_json || "").trim();
+        const parsed = safeJsonParse<unknown>(json);
+        if (Array.isArray(parsed)) {
+            return normalizePreChatFields(parsed as PreChatField[]);
+        }
+        // legacy fallback
+        const list: PreChatField[] = [];
+        if (legacyPreChatMessage) {
+            list.push({ id: "info_1", type: "info", text: legacyPreChatMessage });
+        }
+        list.push({ id: "name", type: "name", label: legacyPreChatNameLabel || null, required: legacyPreChatNameRequired });
+        list.push({ id: "email", type: "email", label: legacyPreChatEmailLabel || null, required: legacyPreChatEmailRequired });
+        return list;
+    }, [bootstrap?.widget_config?.pre_chat_fields_json, legacyPreChatEmailLabel, legacyPreChatEmailRequired, legacyPreChatMessage, legacyPreChatNameLabel, legacyPreChatNameRequired]);
+
+    const preChatInfoText = useMemo(() => {
+        const info = preChatFields.find((f) => f.type === "info" && String(f.text || "").trim());
+        return String(info?.text || "").trim() || "";
+    }, [preChatFields]);
 
     const uiPrimary = safeHexColor(themeColor) || safeHexColor(bootstrap?.widget_config?.theme_color) || "#fbbf24";
     const uiPrimaryText = textColorForBg(uiPrimary);
@@ -1089,10 +1156,19 @@ export function VisitorEmbedPage() {
             try {
                 const reqName = (override?.name ?? (preChatEnabled ? name : identityName)).trim();
                 const reqEmail = (override?.email ?? (preChatEnabled ? email : identityEmail)).trim();
+
+                const pre_chat_fields = preChatEnabled ? preChatCustom : {};
+
                 const res = await apiFetch<CreateOrRecoverRes>("/api/v1/public/conversations", {
                     method: "POST",
                     headers: { Authorization: `Bearer ${bootstrap.visitor_token}` },
-                    body: JSON.stringify({ channel: "web", subject: "", name: reqName || undefined, email: reqEmail || undefined }),
+                    body: JSON.stringify({
+                        channel: "web",
+                        subject: "",
+                        name: reqName || undefined,
+                        email: reqEmail || undefined,
+                        pre_chat_fields,
+                    }),
                 });
                 setConversation(res);
                 return res;
@@ -1729,35 +1805,102 @@ export function VisitorEmbedPage() {
                         {preChatEnabled && !conversation ? (
                             <div style={{ background: "#fff", borderRadius: 14, padding: 12, border: "1px solid rgba(15,23,42,.06)", marginBottom: 12 }}>
                                 <div style={{ color: "rgba(15,23,42,.65)", fontSize: 13, marginBottom: 10 }}>
-                                    {preChatMessage || t("visitorEmbed.identityRequiredDetail")}
+                                    {preChatInfoText || t("visitorEmbed.identityRequiredDetail")}
                                 </div>
                                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                                    <div>
-                                        <div style={{ fontSize: 12, color: "rgba(15,23,42,.55)", marginBottom: 4 }}>
-                                            {(preChatNameLabel || t("visitorEmbed.preChat.nameLabel")) + (preChatNameRequired ? " *" : "")}
-                                        </div>
-                                        <Input
-                                            value={name}
-                                            onChange={(e) => {
-                                                setName(e.target.value);
-                                                setPreChatError("");
-                                            }}
-                                            placeholder={t("visitorEmbed.nameOptional")}
-                                        />
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: 12, color: "rgba(15,23,42,.55)", marginBottom: 4 }}>
-                                            {(preChatEmailLabel || t("visitorEmbed.preChat.emailLabel")) + (preChatEmailRequired ? " *" : "")}
-                                        </div>
-                                        <Input
-                                            value={email}
-                                            onChange={(e) => {
-                                                setEmail(e.target.value);
-                                                setPreChatError("");
-                                            }}
-                                            placeholder={t("visitorEmbed.emailOptional")}
-                                        />
-                                    </div>
+                                    {preChatFields
+                                        .filter((f) => f.type !== "info")
+                                        .map((f) => {
+                                            const label =
+                                                String(f.label || "").trim() ||
+                                                (f.type === "name" ? t("visitorEmbed.preChat.nameLabel") : f.type === "email" ? t("visitorEmbed.preChat.emailLabel") : f.id);
+                                            const required = Boolean(f.required);
+                                            const star = required ? " *" : "";
+
+                                            if (f.type === "name") {
+                                                return (
+                                                    <div key={f.id}>
+                                                        <div style={{ fontSize: 12, color: "rgba(15,23,42,.55)", marginBottom: 4 }}>{label + star}</div>
+                                                        <Input
+                                                            value={name}
+                                                            onChange={(e) => {
+                                                                setName(e.target.value);
+                                                                setPreChatError("");
+                                                            }}
+                                                            placeholder={t("visitorEmbed.nameOptional")}
+                                                        />
+                                                    </div>
+                                                );
+                                            }
+
+                                            if (f.type === "email") {
+                                                return (
+                                                    <div key={f.id}>
+                                                        <div style={{ fontSize: 12, color: "rgba(15,23,42,.55)", marginBottom: 4 }}>{label + star}</div>
+                                                        <Input
+                                                            value={email}
+                                                            onChange={(e) => {
+                                                                setEmail(e.target.value);
+                                                                setPreChatError("");
+                                                            }}
+                                                            placeholder={t("visitorEmbed.emailOptional")}
+                                                        />
+                                                    </div>
+                                                );
+                                            }
+
+                                            if (f.type === "textarea") {
+                                                return (
+                                                    <div key={f.id}>
+                                                        <div style={{ fontSize: 12, color: "rgba(15,23,42,.55)", marginBottom: 4 }}>{label + star}</div>
+                                                        <Input.TextArea
+                                                            autoSize={{ minRows: 2, maxRows: 6 }}
+                                                            value={String(preChatCustom[f.id] || "")}
+                                                            onChange={(e) => {
+                                                                setPreChatCustom((prev) => ({ ...prev, [f.id]: e.target.value }));
+                                                                setPreChatError("");
+                                                            }}
+                                                        />
+                                                    </div>
+                                                );
+                                            }
+
+                                            if (f.type === "select" || f.type === "multiselect") {
+                                                const options = (f.options || []).map((x) => ({ value: x, label: x }));
+                                                const multiple = f.type === "multiselect";
+                                                const v = preChatCustom[f.id];
+                                                const value = multiple ? (Array.isArray(v) ? v.map(String) : []) : typeof v === "string" ? v : undefined;
+                                                return (
+                                                    <div key={f.id}>
+                                                        <div style={{ fontSize: 12, color: "rgba(15,23,42,.55)", marginBottom: 4 }}>{label + star}</div>
+                                                        <Select
+                                                            style={{ width: "100%" }}
+                                                            options={options}
+                                                            mode={multiple ? "multiple" : undefined}
+                                                            value={value as any}
+                                                            onChange={(next) => {
+                                                                setPreChatCustom((prev) => ({ ...prev, [f.id]: next }));
+                                                                setPreChatError("");
+                                                            }}
+                                                        />
+                                                    </div>
+                                                );
+                                            }
+
+                                            // default: text
+                                            return (
+                                                <div key={f.id}>
+                                                    <div style={{ fontSize: 12, color: "rgba(15,23,42,.55)", marginBottom: 4 }}>{label + star}</div>
+                                                    <Input
+                                                        value={String(preChatCustom[f.id] || "")}
+                                                        onChange={(e) => {
+                                                            setPreChatCustom((prev) => ({ ...prev, [f.id]: e.target.value }));
+                                                            setPreChatError("");
+                                                        }}
+                                                    />
+                                                </div>
+                                            );
+                                        })}
 
                                     {preChatError ? <Alert type="warning" showIcon message={preChatError} /> : null}
 
@@ -1765,18 +1908,47 @@ export function VisitorEmbedPage() {
                                         onClick={() => {
                                             const n = name.trim();
                                             const e = email.trim();
-                                            if (preChatNameRequired && !n) {
-                                                setPreChatError(t("visitorEmbed.preChat.nameRequiredError"));
-                                                return;
+                                            const inputs = preChatFields.filter((f) => f.type !== "info");
+
+                                            let hasAnyInput = false;
+                                            let hasRequired = false;
+                                            let hasAnyValue = false;
+
+                                            for (const f of inputs) {
+                                                hasAnyInput = true;
+                                                const required = Boolean(f.required);
+                                                if (required) hasRequired = true;
+
+                                                let v: unknown;
+                                                if (f.type === "name") v = n;
+                                                else if (f.type === "email") v = e;
+                                                else v = preChatCustom[f.id];
+
+                                                const nonEmpty =
+                                                    (typeof v === "string" && v.trim()) ||
+                                                    (Array.isArray(v) && v.length) ||
+                                                    (v && typeof v === "object" && Object.keys(v as object).length) ||
+                                                    (!!v && typeof v !== "string");
+                                                if (nonEmpty) hasAnyValue = true;
+
+                                                if (required && !nonEmpty) {
+                                                    const label =
+                                                        String(f.label || "").trim() ||
+                                                        (f.type === "name"
+                                                            ? t("visitorEmbed.preChat.nameLabel")
+                                                            : f.type === "email"
+                                                                ? t("visitorEmbed.preChat.emailLabel")
+                                                                : f.id);
+                                                    setPreChatError(t("visitorEmbed.preChat.requiredError", { label }));
+                                                    return;
+                                                }
                                             }
-                                            if (preChatEmailRequired && !e) {
-                                                setPreChatError(t("visitorEmbed.preChat.emailRequiredError"));
-                                                return;
-                                            }
-                                            if (!preChatNameRequired && !preChatEmailRequired && !n && !e) {
+
+                                            if (hasAnyInput && !hasRequired && !hasAnyValue) {
                                                 setPreChatError(t("visitorEmbed.preChat.atLeastOneError"));
                                                 return;
                                             }
+
                                             void createOrRecover();
                                         }}
                                         loading={loading}

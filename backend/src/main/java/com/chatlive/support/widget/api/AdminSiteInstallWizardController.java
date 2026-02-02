@@ -29,6 +29,12 @@ public class AdminSiteInstallWizardController {
     ) {
     }
 
+        public record AllowlistConfigResponse(boolean enabled) {
+        }
+
+        public record AllowlistConfigUpdateRequest(boolean enabled) {
+        }
+
     private final JwtService jwtService;
     private final SiteRepository siteRepository;
     private final SiteDomainAllowlistRepository allowlistRepository;
@@ -101,6 +107,33 @@ public class AdminSiteInstallWizardController {
         var installed = row.lastSeenAt() != null;
         return ApiResponse.ok(new InstallStatusResponse(installed, row.lastSeenAt(), row.lastOrigin(), row.lastPageUrl()));
     }
+
+        @GetMapping("/{id}/allowlist-config")
+        public ApiResponse<AllowlistConfigResponse> getAllowlistConfig(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @PathVariable("id") String siteId
+        ) {
+        var claims = requireAdmin(authorization);
+        var site = siteRepository.findById(claims.tenantId(), siteId)
+            .orElseThrow(() -> new IllegalArgumentException("site_not_found"));
+        return ApiResponse.ok(new AllowlistConfigResponse(site.allowlistEnabled()));
+        }
+
+        @PostMapping("/{id}/allowlist-config")
+        public ApiResponse<AllowlistConfigResponse> updateAllowlistConfig(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @PathVariable("id") String siteId,
+            @RequestBody AllowlistConfigUpdateRequest req
+        ) {
+        var claims = requireAdmin(authorization);
+        siteRepository.findById(claims.tenantId(), siteId)
+            .orElseThrow(() -> new IllegalArgumentException("site_not_found"));
+
+        var enabled = req != null && req.enabled();
+        var ok = siteRepository.setAllowlistEnabled(claims.tenantId(), siteId, enabled);
+        if (!ok) throw new IllegalArgumentException("site_not_found");
+        return ApiResponse.ok(new AllowlistConfigResponse(enabled));
+        }
 
     private JwtClaims requireAdmin(String authorization) {
         var token = JwtService.extractBearerToken(authorization)

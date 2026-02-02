@@ -45,6 +45,7 @@ public class SiteWizardService {
         widgetConfigRepository.upsert(
                 site.id(),
             false,
+                null,
                 emptyToNull(themeColor),
                 emptyToNull(welcomeText),
                 emptyToNull(cookieDomain),

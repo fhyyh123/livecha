@@ -11,6 +11,7 @@ export type SiteItem = {
 
 export type WidgetConfig = {
     pre_chat_enabled: boolean;
+    pre_chat_fields_json?: string | null;
     theme_color?: string | null;
     welcome_text?: string | null;
     cookie_domain?: string | null;

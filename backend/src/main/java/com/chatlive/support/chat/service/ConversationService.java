@@ -4,6 +4,7 @@ import com.chatlive.support.auth.service.jwt.JwtClaims;
 import com.chatlive.support.chat.api.*;
 import com.chatlive.support.chat.repo.AgentProfileRepository;
 import com.chatlive.support.chat.repo.ConversationMarkRepository;
+import com.chatlive.support.chat.repo.ConversationPreChatFieldRepository;
 import com.chatlive.support.chat.repo.ConversationRepository;
 import com.chatlive.support.chat.repo.SkillGroupRepository;
 import com.chatlive.support.chat.ws.WsSessionRegistry;
@@ -30,6 +31,7 @@ public class ConversationService {
     private final SkillGroupRepository skillGroupRepository;
     private final ConversationMarkRepository conversationMarkRepository;
     private final AgentProfileRepository agentProfileRepository;
+    private final ConversationPreChatFieldRepository conversationPreChatFieldRepository;
 
     public ConversationService(
             ConversationRepository conversationRepository,
@@ -40,7 +42,8 @@ public class ConversationService {
             VisitorRepository visitorRepository,
             SkillGroupRepository skillGroupRepository,
             ConversationMarkRepository conversationMarkRepository,
-            AgentProfileRepository agentProfileRepository
+            AgentProfileRepository agentProfileRepository,
+            ConversationPreChatFieldRepository conversationPreChatFieldRepository
     ) {
         this.conversationRepository = conversationRepository;
         this.wsSessionRegistry = wsSessionRegistry;
@@ -51,6 +54,7 @@ public class ConversationService {
         this.skillGroupRepository = skillGroupRepository;
         this.conversationMarkRepository = conversationMarkRepository;
         this.agentProfileRepository = agentProfileRepository;
+        this.conversationPreChatFieldRepository = conversationPreChatFieldRepository;
     }
 
     private String resolveAgentLabel(String userId) {
@@ -172,6 +176,16 @@ public class ConversationService {
 
         Long activeDurationSeconds = conversationRepository.findActiveDurationSeconds(claims.tenantId(), conversationId);
 
+        var preChatFields = conversationPreChatFieldRepository.listByConversation(claims.tenantId(), conversationId)
+            .stream()
+            .map(r -> new ConversationPreChatFieldItem(
+                r.fieldKey(),
+                r.fieldLabel(),
+                r.fieldType(),
+                r.valueJson()
+            ))
+            .toList();
+
         return new ConversationDetailResponse(
                 detail.id(),
                 detail.status(),
@@ -189,6 +203,7 @@ public class ConversationService {
                 activeDurationSeconds,
                 customer,
                 visitor,
+            preChatFields,
                 starred
         );
     }

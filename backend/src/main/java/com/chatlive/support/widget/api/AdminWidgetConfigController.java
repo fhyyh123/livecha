@@ -42,10 +42,11 @@ public class AdminWidgetConfigController {
 
         var row = widgetConfigRepository.findBySiteId(site.id()).orElse(null);
         if (row == null) {
-            return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, null, null, false, false));
+            return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, null, null, null, false, false));
         }
         return ApiResponse.ok(new WidgetConfigDto(
                 row.preChatEnabled(),
+                row.preChatFieldsJson(),
                 row.themeColor(),
                 row.welcomeText(),
                 row.cookieDomain(),
@@ -69,6 +70,7 @@ public class AdminWidgetConfigController {
                 .orElseThrow(() -> new IllegalArgumentException("site_not_found"));
 
             var preChatEnabled = req != null && req.pre_chat_enabled();
+        var preChatFieldsJson = emptyToNull(req == null ? null : req.pre_chat_fields_json());
         var themeColor = emptyToNull(req == null ? null : req.theme_color());
         var welcomeText = emptyToNull(req == null ? null : req.welcome_text());
         var cookieDomain = emptyToNull(req == null ? null : req.cookie_domain());
@@ -82,6 +84,7 @@ public class AdminWidgetConfigController {
         widgetConfigRepository.upsert(
                 site.id(),
         preChatEnabled,
+            preChatFieldsJson,
                 themeColor,
                 welcomeText,
                 cookieDomain,
@@ -95,10 +98,11 @@ public class AdminWidgetConfigController {
 
         var row = widgetConfigRepository.findBySiteId(site.id()).orElse(null);
         if (row == null) {
-            return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, null, null, false, false));
+            return ApiResponse.ok(new WidgetConfigDto(false, null, null, null, null, null, null, null, null, false, false));
         }
         return ApiResponse.ok(new WidgetConfigDto(
                 row.preChatEnabled(),
+                row.preChatFieldsJson(),
                 row.themeColor(),
                 row.welcomeText(),
                 row.cookieDomain(),

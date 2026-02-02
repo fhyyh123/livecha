@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Input, Space, Spin, Tabs, Table, Typography } from "antd";
+import { Alert, Button, Card, Input, Space, Spin, Switch, Tabs, Table, Typography } from "antd";
 import { DeleteOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 
@@ -25,6 +25,10 @@ type InstallStatusDto = {
     last_seen_at?: string | null;
     last_origin?: string | null;
     last_page_url?: string | null;
+};
+
+type AllowlistConfigDto = {
+    enabled: boolean;
 };
 
 type DetectedDomainRow = {
@@ -76,6 +80,10 @@ export function TrustedDomainsPage() {
     const [installStatus, setInstallStatus] = useState<InstallStatusDto | null>(null);
     const [installStatusLoading, setInstallStatusLoading] = useState(false);
     const [installStatusError, setInstallStatusError] = useState<string>("");
+
+    const [allowlistEnabled, setAllowlistEnabled] = useState<boolean>(true);
+    const [allowlistConfigLoading, setAllowlistConfigLoading] = useState<boolean>(false);
+    const [allowlistConfigError, setAllowlistConfigError] = useState<string>("");
 
     const selectedSiteLabel = useMemo(() => {
         const s = sites.find((x) => x.id === siteId) || sites[0];
@@ -190,6 +198,23 @@ export function TrustedDomainsPage() {
         setInstallStatusError("");
         setInstallStatus(null);
 
+        setAllowlistConfigError("");
+        setAllowlistConfigLoading(true);
+        http
+            .get<AllowlistConfigDto>(`/api/v1/admin/sites/${encodeURIComponent(siteId)}/allowlist-config`)
+            .then((res) => {
+                if (!mounted) return;
+                setAllowlistEnabled(Boolean(res.data?.enabled));
+            })
+            .catch((e: unknown) => {
+                if (!mounted) return;
+                setAllowlistConfigError(errorMessage(e, "load_allowlist_config_failed"));
+            })
+            .finally(() => {
+                if (!mounted) return;
+                setAllowlistConfigLoading(false);
+            });
+
         setAllowlistLoading(true);
         http
             .get<string[]>(`/api/v1/admin/sites/${encodeURIComponent(siteId)}/allowlist`)
@@ -226,6 +251,26 @@ export function TrustedDomainsPage() {
             mounted = false;
         };
     }, [siteId, isAdmin, meLoading]);
+
+    const setTrustedDomainsEnabled = useCallback(
+        async (enabled: boolean) => {
+            if (!siteId) return;
+            setAllowlistConfigLoading(true);
+            setAllowlistConfigError("");
+            try {
+                const res = await http.post<AllowlistConfigDto>(
+                    `/api/v1/admin/sites/${encodeURIComponent(siteId)}/allowlist-config`,
+                    { enabled },
+                );
+                setAllowlistEnabled(Boolean(res.data?.enabled));
+            } catch (e: unknown) {
+                setAllowlistConfigError(errorMessage(e, "save_allowlist_config_failed"));
+            } finally {
+                setAllowlistConfigLoading(false);
+            }
+        },
+        [siteId],
+    );
 
     async function refreshAllowlist() {
         if (!siteId) return;
@@ -400,6 +445,7 @@ export function TrustedDomainsPage() {
                 {sitesError ? <Alert type="error" message={sitesError} showIcon style={{ marginBottom: 12 }} /> : null}
                 {allowlistError ? <Alert type="error" message={allowlistError} showIcon style={{ marginBottom: 12 }} /> : null}
                 {installStatusError ? <Alert type="error" message={installStatusError} showIcon style={{ marginBottom: 12 }} /> : null}
+                {allowlistConfigError ? <Alert type="error" message={allowlistConfigError} showIcon style={{ marginBottom: 12 }} /> : null}
 
                 <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
                     {t("trustedDomains.subtitle")}
@@ -411,6 +457,26 @@ export function TrustedDomainsPage() {
                         <Typography.Text code>{selectedSiteLabel || "-"}</Typography.Text>
                         {sitesLoading ? <Spin size="small" /> : null}
                     </Space>
+
+                    <Space wrap align="center" size={12}>
+                        <Typography.Text strong>{t("trustedDomains.enforcement.label")}</Typography.Text>
+                        <Switch
+                            checked={allowlistEnabled}
+                            onChange={(v) => setTrustedDomainsEnabled(Boolean(v))}
+                            loading={allowlistConfigLoading}
+                            disabled={!isAdmin}
+                        />
+                        <Typography.Text type="secondary">{t("trustedDomains.enforcement.hint")}</Typography.Text>
+                    </Space>
+
+                    {!allowlistEnabled ? (
+                        <Alert
+                            type="info"
+                            showIcon
+                            message={t("trustedDomains.enforcement.disabledTitle")}
+                            description={t("trustedDomains.enforcement.disabledDesc")}
+                        />
+                    ) : null}
 
                     <Typography.Title level={5} style={{ margin: "8px 0 0" }}>
                         {t("trustedDomains.manageTitle")}

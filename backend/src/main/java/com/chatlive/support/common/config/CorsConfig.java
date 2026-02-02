@@ -77,7 +77,7 @@ public class CorsConfig {
             if (siteKey != null && !siteKey.isBlank()) {
                 var site = siteRepository.findByPublicKey(siteKey).orElse(null);
                 if (site != null && "active".equals(site.status())) {
-                    allowed = allowlistRepository.isAllowed(site.id(), originHost);
+                    allowed = !site.allowlistEnabled() || allowlistRepository.isAllowed(site.id(), originHost);
                 }
             } else {
                 allowed = allowlistRepository.isAllowedByAnyActiveSite(originHost);

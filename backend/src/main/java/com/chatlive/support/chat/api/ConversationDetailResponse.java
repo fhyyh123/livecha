@@ -17,6 +17,7 @@ public record ConversationDetailResponse(
         Long active_duration_seconds,
         UserPublicProfile customer,
         VisitorPublicProfile visitor,
+        java.util.List<ConversationPreChatFieldItem> pre_chat_fields,
         boolean starred
 ) {
 }

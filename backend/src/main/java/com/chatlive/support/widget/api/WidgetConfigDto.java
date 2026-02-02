@@ -2,6 +2,7 @@ package com.chatlive.support.widget.api;
 
 public record WidgetConfigDto(
         boolean pre_chat_enabled,
+        String pre_chat_fields_json,
         String theme_color,
         String welcome_text,
         String cookie_domain,

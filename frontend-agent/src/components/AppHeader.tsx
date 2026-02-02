@@ -15,7 +15,7 @@ import {
     UserAddOutlined,
     UserOutlined,
 } from "@ant-design/icons";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -44,13 +44,6 @@ export function AppHeader() {
     const isChatListRoute = isConversations || isArchives;
 
     const starredOnly = String(searchParams.get("starred") || "") === "1";
-
-    const selectedSiteLabel = useMemo(() => {
-        const cur = String(currentSiteId || "");
-        const s = (sites || []).find((x) => String(x.id) === cur) || (sites || [])[0];
-        if (!s) return "";
-        return `${s.name} (${s.public_key})`;
-    }, [currentSiteId, sites]);
 
     function onChangeSite(next: string) {
         const nextSiteId = String(next || "");
@@ -97,9 +90,9 @@ export function AppHeader() {
                     style={{ height: 30, width: "auto", display: "block" }}
                 />
 
-                <Space size={8} wrap>
-                    <Typography.Text style={{ color: "#fff" }}>{t("sites.selectSite")}</Typography.Text>
-                    {sites.length > 1 ? (
+                {sites.length > 1 ? (
+                    <Space size={8} wrap>
+                        <Typography.Text style={{ color: "#fff" }}>{t("sites.selectSite")}</Typography.Text>
                         <Select
                             style={{ minWidth: 260 }}
                             placeholder={t("sites.selectSitePlaceholder")}
@@ -110,12 +103,8 @@ export function AppHeader() {
                             showSearch
                             optionFilterProp="label"
                         />
-                    ) : (
-                        <Tag style={{ marginInlineEnd: 0, background: "rgba(255,255,255,0.06)", color: "#fff" }}>
-                            {selectedSiteLabel || "-"}
-                        </Tag>
-                    )}
-                </Space>
+                    </Space>
+                ) : null}
             </div>
 
             {/* Right: status/billing, invite, notifications, avatar */}
