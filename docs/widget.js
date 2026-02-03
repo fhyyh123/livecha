@@ -524,7 +524,7 @@
         "display:flex!important;align-items:center!important;justify-content:center!important;gap:10px;" +
         (isBar
           ? "height:56px!important;width:auto!important;min-width:120px!important;padding:0 18px!important;border-radius:16px!important;"
-          : "width:56px!important;height:56px!important;border-radius:999px!important;") +
+          : "height:48px!important;width:auto!important;min-width:88px!important;padding:0 16px!important;border-radius:999px!important;") +
         "box-shadow: 0 10px 25px rgba(0,0,0,0.18);" +
         "font-size:14px!important;font-weight:600!important;" +
         "user-select:none!important;" +
@@ -599,27 +599,18 @@
       var cfg = state.config || DEFAULTS;
       var style = String(cfg.launcherStyle || "bubble").trim().toLowerCase();
       var isBar = style === "bar";
-      var icon = null;
-      try {
-        icon = state.button.querySelector("[data-chatlive-button-icon='1']");
-      } catch (e0) {
-        icon = null;
-      }
 
       if (state.open) {
         // When open, show a close glyph and hide icon.
         state.buttonLabel.textContent = "×";
-        if (icon) icon.style.display = "none";
         return;
       }
 
       if (isBar) {
         state.buttonLabel.textContent = cfg.launcherText || "Chat";
-        if (icon) icon.style.display = "inline-flex";
       } else {
-        // Bubble: prefer icon-only look.
-        state.buttonLabel.textContent = "";
-        if (icon) icon.style.display = "inline-flex";
+        // Bubble: show text if no icon.
+        state.buttonLabel.textContent = cfg.launcherText || "Chat";
       }
     } catch (e) {
       // ignore
@@ -1044,24 +1035,6 @@
     } catch (e) {
       // ignore
     }
-
-    // Button icon
-    var buttonIcon = document.createElement("span");
-    buttonIcon.setAttribute("data-chatlive-button-icon", "1");
-    ensureCssText(
-      buttonIcon,
-      "display:inline-flex;align-items:center;justify-content:center;" +
-        "width:22px;height:22px;" +
-        "line-height:22px;" +
-        "color:inherit;" +
-        "pointer-events:none;",
-    );
-    buttonIcon.innerHTML =
-      "<svg width='22' height='22' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>" +
-      "<path d='M7 8h10M7 12h6' stroke='currentColor' stroke-width='2' stroke-linecap='round'/>" +
-      "<path d='M21 12c0 4.418-4.03 8-9 8-1.015 0-2-.145-2.93-.414L3 21l1.62-4.12A7.42 7.42 0 0 1 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8Z' stroke='currentColor' stroke-width='2' stroke-linejoin='round'/>" +
-      "</svg>";
-    button.appendChild(buttonIcon);
 
     // Button label (do not use button.textContent later; it would clear the badge node)
     var buttonLabel = document.createElement("span");

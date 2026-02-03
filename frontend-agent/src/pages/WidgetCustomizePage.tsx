@@ -617,6 +617,19 @@ export function WidgetCustomizePage() {
                                 onFinish={save}
                                 disabled={cfgLoading || !isAdmin}
                             >
+                                <Form.Item name="launcher_style" hidden>
+                                    <Input />
+                                </Form.Item>
+                                <Form.Item name="theme_mode" hidden>
+                                    <Input />
+                                </Form.Item>
+                                <Form.Item name="color_settings_mode" hidden>
+                                    <Input />
+                                </Form.Item>
+                                <Form.Item name="color_overrides_json" hidden>
+                                    <Input />
+                                </Form.Item>
+
                                 <Form.Item name="pre_chat_enabled" hidden valuePropName="checked">
                                     <Switch />
                                 </Form.Item>
@@ -639,14 +652,10 @@ export function WidgetCustomizePage() {
                                                                 label={t("widgetCustomize.appearance.minimizedBar")}
                                                                 onClick={() => form.setFieldsValue({ launcher_style: "bar" })}
                                                                 icon={
-                                                                    <div
-                                                                        style={{
-                                                                            width: 56,
-                                                                            height: 20,
-                                                                            borderRadius: 10,
-                                                                            border: "1px solid rgba(0,0,0,0.12)",
-                                                                            background: "rgba(0,0,0,0.04)",
-                                                                        }}
+                                                                    <img
+                                                                        src="/LiveChats.png"
+                                                                        alt={t("widgetCustomize.appearance.minimizedBar")}
+                                                                        style={{ width: 64, height: 26, objectFit: "contain" }}
                                                                     />
                                                                 }
                                                             />
@@ -655,14 +664,10 @@ export function WidgetCustomizePage() {
                                                                 label={t("widgetCustomize.appearance.minimizedBubble")}
                                                                 onClick={() => form.setFieldsValue({ launcher_style: "bubble" })}
                                                                 icon={
-                                                                    <div
-                                                                        style={{
-                                                                            width: 34,
-                                                                            height: 34,
-                                                                            borderRadius: 999,
-                                                                            border: "1px solid rgba(0,0,0,0.12)",
-                                                                            background: "rgba(0,0,0,0.04)",
-                                                                        }}
+                                                                    <img
+                                                                        src="/window.png"
+                                                                        alt={t("widgetCustomize.appearance.minimizedBubble")}
+                                                                        style={{ width: 36, height: 36, objectFit: "contain" }}
                                                                     />
                                                                 }
                                                             />
