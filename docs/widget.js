@@ -812,6 +812,53 @@
     }
   }
 
+  function setPlacement(next) {
+    try {
+      if (!state.config) return;
+      if (!next || typeof next !== "object") return;
+
+      var changed = false;
+
+      if (typeof next.position === "string" && next.position) {
+        var p = String(next.position).trim();
+        if (p && state.config.position !== p) {
+          state.config.position = p;
+          changed = true;
+        }
+      }
+
+      if (typeof next.zIndex === "number" && Number.isFinite(next.zIndex)) {
+        if (state.config.zIndex !== next.zIndex) {
+          state.config.zIndex = next.zIndex;
+          changed = true;
+        }
+      }
+
+      if (typeof next.offsetX === "number" && Number.isFinite(next.offsetX)) {
+        if (state.config.offsetX !== next.offsetX) {
+          state.config.offsetX = next.offsetX;
+          changed = true;
+        }
+      }
+
+      if (typeof next.offsetY === "number" && Number.isFinite(next.offsetY)) {
+        if (state.config.offsetY !== next.offsetY) {
+          state.config.offsetY = next.offsetY;
+          changed = true;
+        }
+      }
+
+      if (!changed) return;
+
+      // Re-apply layout to move launcher/panel without a full reload.
+      if (state.root && state.button && state.iframe) {
+        applyResponsiveLayout();
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
   function setUnread(n) {
     state.unread = Number.isFinite(n) ? n : 0;
     if (!state.badge) return;
@@ -1096,6 +1143,9 @@
       if (typeof payload.launcherStyle === "string") {
         setLauncherStyle(payload.launcherStyle);
       }
+
+      // Placement sync (no snippet re-paste required): position / offsets / z-index.
+      setPlacement(payload);
       return;
     }
 

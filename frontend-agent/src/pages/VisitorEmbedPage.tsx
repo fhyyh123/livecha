@@ -1217,6 +1217,14 @@ export function VisitorEmbedPage() {
 
             const cfgTheme = data?.widget_config?.theme_color || null;
             const cfgLauncherStyle = String((data as unknown as { widget_config?: { launcher_style?: unknown } })?.widget_config?.launcher_style || "").trim();
+            const cfgPosition = String((data as unknown as { widget_config?: { position?: unknown } })?.widget_config?.position || "").trim();
+            const cfgZIndexRaw = (data as unknown as { widget_config?: { z_index?: unknown } })?.widget_config?.z_index;
+            const cfgOffsetXRaw = (data as unknown as { widget_config?: { offset_x?: unknown } })?.widget_config?.offset_x;
+            const cfgOffsetYRaw = (data as unknown as { widget_config?: { offset_y?: unknown } })?.widget_config?.offset_y;
+
+            const cfgZIndex = typeof cfgZIndexRaw === "number" ? cfgZIndexRaw : Number.isFinite(Number(cfgZIndexRaw)) ? Number(cfgZIndexRaw) : null;
+            const cfgOffsetX = typeof cfgOffsetXRaw === "number" ? cfgOffsetXRaw : Number.isFinite(Number(cfgOffsetXRaw)) ? Number(cfgOffsetXRaw) : null;
+            const cfgOffsetY = typeof cfgOffsetYRaw === "number" ? cfgOffsetYRaw : Number.isFinite(Number(cfgOffsetYRaw)) ? Number(cfgOffsetYRaw) : null;
 
             // In preview mode, prefer host-provided (unsaved) visuals.
             if (typeof cfgTheme === "string" && cfgTheme && (!isHostPreview || !hostInitThemeColorRef.current)) {
@@ -1229,6 +1237,10 @@ export function VisitorEmbedPage() {
                 postToHost(MSG.WIDGET_THEME, {
                     themeColor: typeof cfgTheme === "string" && cfgTheme ? cfgTheme : null,
                     launcherStyle: cfgLauncherStyle || null,
+                    position: cfgPosition || null,
+                    zIndex: cfgZIndex,
+                    offsetX: cfgOffsetX,
+                    offsetY: cfgOffsetY,
                 });
             }
         } catch (e: unknown) {
