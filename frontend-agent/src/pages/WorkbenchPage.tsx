@@ -268,6 +268,10 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
 
             if (!key || !ts) continue;
 
+            // page_view is a tracking event used by the Context panel (Visited pages).
+            // Don't render it in the chat timeline.
+            if (key === "page_view") continue;
+
             const fromAgent = String(data.from_agent_display_name ?? data.from_agent_user_id ?? "").trim();
             const toAgent = String(data.to_agent_display_name ?? data.to_agent_user_id ?? "").trim();
             const byUser = String(data.by_display_name ?? data.by_user_id ?? "").trim();

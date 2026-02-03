@@ -334,16 +334,6 @@ export function WidgetCustomizePage() {
 
     const selectedSite = useMemo(() => sites.find((x) => x.id === siteId) || sites[0] || null, [siteId, sites]);
 
-    const selectedSiteLabel = useMemo(() => {
-        if (!selectedSite) return "";
-        return `${selectedSite.name} (${selectedSite.public_key})`;
-    }, [selectedSite]);
-
-    const siteOptions = useMemo(
-        () => sites.map((s) => ({ value: s.id, label: `${s.name} (${s.public_key})` })),
-        [sites],
-    );
-
     useEffect(() => {
         let mounted = true;
         setMeLoading(true);
@@ -673,25 +663,11 @@ export function WidgetCustomizePage() {
                 <Col xs={24} lg={12}>
                     <Card>
                         <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                            <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
-                                <Space wrap>
-                                    <Typography.Text strong>{t("widgetCustomize.selectSite")}</Typography.Text>
-                                    {sitesLoading ? <Spin size="small" /> : null}
-                                    {cfgLoading ? <Spin size="small" /> : null}
-                                    {snippetLoading ? <Spin size="small" /> : null}
-                                </Space>
-
-                                <Select
-                                    style={{ minWidth: 320 }}
-                                    value={siteId || undefined}
-                                    options={siteOptions}
-                                    onChange={(v) => setSiteId(String(v || ""))}
-                                    placeholder={t("widgetCustomize.selectSitePlaceholder")}
-                                    disabled={sitesLoading || !isAdmin}
-                                />
+                            <Space wrap style={{ width: "100%", justifyContent: "flex-end" }}>
+                                {sitesLoading ? <Spin size="small" /> : null}
+                                {cfgLoading ? <Spin size="small" /> : null}
+                                {snippetLoading ? <Spin size="small" /> : null}
                             </Space>
-
-                            <Typography.Text type="secondary">{selectedSiteLabel || "-"}</Typography.Text>
 
                             <Form
                                 form={form}
