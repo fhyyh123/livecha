@@ -27,6 +27,81 @@
     return "";
   })();
 
+  function getWidgetScriptOrigin() {
+    // Try multiple strategies; some host pages load the widget in ways where
+    // document.currentScript is unavailable or does not expose a stable src.
+    try {
+      if (SCRIPT_ORIGIN) return String(SCRIPT_ORIGIN);
+    } catch (e0) {
+      // ignore
+    }
+
+    // Prefer deriving from the production config script tag (<script data-chatlive-site-key ... src="...">)
+    try {
+      var el = typeof findConfigScript === "function" ? findConfigScript() : null;
+      var src = el && el.src ? String(el.src) : "";
+      if (src) {
+        return new URL(String(src), window.location && window.location.href ? window.location.href : undefined).origin;
+      }
+    } catch (e1) {
+      // ignore
+    }
+
+    // Last resort: scan <script> tags.
+    try {
+      var list = document && document.getElementsByTagName ? document.getElementsByTagName("script") : null;
+      if (list && list.length) {
+        for (var i = 0; i < list.length; i++) {
+          var s = list[i];
+          if (!s) continue;
+          var hasKey = false;
+          try {
+            hasKey = !!(s.dataset && s.dataset.chatliveSiteKey);
+          } catch (e2) {
+            hasKey = false;
+          }
+          var src2 = "";
+          try {
+            src2 = s.src ? String(s.src) : "";
+          } catch (e3) {
+            src2 = "";
+          }
+          if (!src2) continue;
+          if (hasKey || src2.indexOf("widget.js") >= 0) {
+            try {
+              return new URL(String(src2), window.location && window.location.href ? window.location.href : undefined).origin;
+            } catch (e4) {
+              // ignore
+            }
+          }
+        }
+      }
+    } catch (e5) {
+      // ignore
+    }
+
+    return "";
+  }
+
+  function getBootstrapApiOrigin(seedConfig) {
+    // Preferred: widget script origin (backend hosts the widget asset).
+    var base = "";
+    try {
+      base = getWidgetScriptOrigin() || "";
+    } catch (e0) {
+      base = "";
+    }
+    if (base) return base;
+
+    // Fallback: embedUrl origin (useful when widget JS is bundled/inline).
+    try {
+      var u = safeParseUrl(String(seedConfig && seedConfig.embedUrl ? seedConfig.embedUrl : ""));
+      return u && u.origin ? String(u.origin) : "";
+    } catch (e1) {
+      return "";
+    }
+  }
+
   var DEFAULTS = {
     siteKey: "",
     embedUrl: "",
@@ -390,11 +465,11 @@
     }
   }
 
-  function prefetchBootstrapConfig(siteKey, origin) {
+  function prefetchBootstrapConfig(siteKey, origin, baseOverride) {
     return new Promise(function (resolve) {
       try {
         // Use the widget script origin as the API origin.
-        var base = SCRIPT_ORIGIN || "";
+        var base = String(baseOverride || "") || getWidgetScriptOrigin() || "";
         if (!base) {
           resolve(null);
           return;
@@ -427,7 +502,20 @@
           })
           .then(function (data) {
             try {
-              var wc = data && data.widget_config ? data.widget_config : null;
+              // Backend response may be either:
+              // 1) { widget_config: {...} }
+              // 2) { ok: true, data: { widget_config: {...} } }
+              // Keep this tolerant to avoid breaking the prefetch gate.
+              var wc = null;
+              if (data && data.widget_config) {
+                wc = data.widget_config;
+              } else if (data && data.data && data.data.widget_config) {
+                wc = data.data.widget_config;
+              } else if (data && data.data && data.data.widgetConfig) {
+                wc = data.data.widgetConfig;
+              } else if (data && data.widgetConfig) {
+                wc = data.widgetConfig;
+              }
               resolve(mapBootstrapToWidgetConfig(wc));
             } catch (e0) {
               resolve(null);
@@ -1236,7 +1324,8 @@
         // Prefer pulling server-side widget_config first so the launcher doesn't flash defaults.
         // This is used in both production and admin preview; preview can still override by
         // calling init() again (e.g. via postMessage from the admin UI).
-        var canPrefetch = !!seed.siteKey && !!SCRIPT_ORIGIN && typeof fetch === "function";
+        var apiBase = getBootstrapApiOrigin(seed) || "";
+        var canPrefetch = !!seed.siteKey && !!apiBase && typeof fetch === "function";
         if (!canPrefetch) {
           state.prefetchDone = true;
         } else {
@@ -1263,7 +1352,7 @@
             state.prefetchTimeoutId = null;
           }
 
-          prefetchBootstrapConfig(seed.siteKey, computeOrigin(seed))
+          prefetchBootstrapConfig(seed.siteKey, computeOrigin(seed), apiBase)
             .then(function (patch) {
               // If we already rendered a fallback due to timeout, don't apply late patches
               // to avoid a visible style switch.
@@ -1802,7 +1891,6 @@
     state.handlers.docClick = null;
     state.handlers.onMessage = null;
     state.handlers.onResize = null;
-    state.handlers.onVvChange = null;
     state.handlers.onVvChange = null;
   }
 
