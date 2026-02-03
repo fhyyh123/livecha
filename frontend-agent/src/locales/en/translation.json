@@ -45,6 +45,18 @@
       "ticketForm": "Ticket form"
     }
   },
+  "chatPage": {
+    "title": "Chat page",
+    "subtitle": "Share a link so visitors can start chatting without installing the widget.",
+    "linkLabel": "Chat page link",
+    "linkPlaceholder": "Select a site to generate a link",
+    "copy": "Copy link",
+    "copied": "Copied",
+    "open": "Open",
+    "customize": "Customize",
+    "hint": "Anyone with this link can open your chat page and start a conversation.",
+    "noSite": "No site available. Create a site first."
+  },
   "preChatForm": {
     "title": "Pre-chat form",
     "adminOnlyHint": "Admin only",

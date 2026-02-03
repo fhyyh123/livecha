@@ -46,6 +46,18 @@
       "ticketForm": "工单表单"
     }
   },
+  "chatPage": {
+    "title": "聊天页面",
+    "subtitle": "生成一个链接，访客无需安装小部件代码，直接访问即可开始聊天。",
+    "linkLabel": "聊天页面链接",
+    "linkPlaceholder": "请选择一个站点以生成链接",
+    "copy": "复制链接",
+    "copied": "已复制",
+    "open": "打开",
+    "customize": "定制",
+    "hint": "把这个链接发给访客即可开始聊天。",
+    "noSite": "暂无站点，请先创建站点。"
+  },
   "preChatForm": {
     "title": "预聊天表单",
     "adminOnlyHint": "仅管理员可操作",

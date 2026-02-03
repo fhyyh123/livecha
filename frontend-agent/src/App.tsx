@@ -32,6 +32,7 @@ const HomePage = lazy(() => import("./pages/HomePage").then((m) => ({ default: m
 const WorkbenchPage = lazy(() => import("./pages/WorkbenchPage").then((m) => ({ default: m.WorkbenchPage })));
 const ArchivesPage = lazy(() => import("./pages/ArchivesPage").then((m) => ({ default: m.ArchivesPage })));
 const VisitorEmbedPage = lazy(() => import("./pages/VisitorEmbedPage").then((m) => ({ default: m.VisitorEmbedPage })));
+const ChatPagePublic = lazy(() => import("./pages/ChatPagePublic").then((m) => ({ default: m.ChatPagePublic })));
 const SitesPage = lazy(() => import("./pages/SitesPage").then((m) => ({ default: m.SitesPage })));
 const TrustedDomainsPage = lazy(() => import("./pages/TrustedDomainsPage").then((m) => ({ default: m.TrustedDomainsPage })));
 const WidgetCustomizePage = lazy(() => import("./pages/WidgetCustomizePage").then((m) => ({ default: m.WidgetCustomizePage })));
@@ -44,6 +45,7 @@ const InactivityTimeoutsPage = lazy(() => import("./pages/InactivityTimeoutsPage
 const InvitesPage = lazy(() => import("./pages/InvitesPage").then((m) => ({ default: m.InvitesPage })));
 const TeamPage = lazy(() => import("./pages/TeamPage").then((m) => ({ default: m.TeamPage })));
 const ProfilePage = lazy(() => import("./pages/ProfilePage").then((m) => ({ default: m.ProfilePage })));
+const ChatPageSettingsPage = lazy(() => import("./pages/ChatPageSettingsPage").then((m) => ({ default: m.ChatPageSettingsPage })));
 const SettingsPlaceholderPage = lazy(() => import("./pages/SettingsPlaceholderPage").then((m) => ({ default: m.SettingsPlaceholderPage })));
 
 const WelcomeNamePage = lazy(() => import("./pages/welcome/WelcomeNamePage").then((m) => ({ default: m.WelcomeNamePage })));
@@ -127,9 +129,10 @@ function RequireEmailVerified({ children }: { children: React.ReactNode }) {
 function App() {
   const { t } = useTranslation();
 
-  // Public visitor embed route: should not require agent auth nor trigger /auth/me.
+  // Public visitor routes: should not require agent auth nor trigger /auth/me.
   // We intentionally keep this as a plain (non-hook) computation.
-  const isVisitorEmbed = typeof window !== "undefined" && window.location.pathname.startsWith("/visitor/embed");
+  const path = typeof window !== "undefined" ? window.location.pathname : "";
+  const isPublicVisitor = !!path && (path.startsWith("/visitor/embed") || path.startsWith("/chat/"));
 
   const resources = useMemo(() => {
     return [
@@ -161,8 +164,8 @@ function App() {
     ];
   }, [t]);
 
-  // Embed-only mode: do not mount Refine/auth providers to avoid /auth/me requests.
-  if (isVisitorEmbed) {
+  // Public visitor mode: do not mount Refine/auth providers to avoid /auth/me requests.
+  if (isPublicVisitor) {
     return (
       <BrowserRouter>
         <Routes>
@@ -172,6 +175,16 @@ function App() {
               <Suspense fallback={<RouteFallback />}>
                 <I18nextProvider i18n={embedI18n}>
                   <VisitorEmbedPage />
+                </I18nextProvider>
+              </Suspense>
+            }
+          />
+          <Route
+            path="/chat/:siteKey"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <I18nextProvider i18n={embedI18n}>
+                  <ChatPagePublic />
                 </I18nextProvider>
               </Suspense>
             }
@@ -362,6 +375,14 @@ function App() {
                 element={
                   <Suspense fallback={<RouteFallback />}>
                     <WidgetLanguagePage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/settings/chat-page"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <ChatPageSettingsPage />
                   </Suspense>
                 }
               />

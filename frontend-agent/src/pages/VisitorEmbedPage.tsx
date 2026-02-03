@@ -474,10 +474,10 @@ function formatTimeShort(epochSeconds: number): string {
     }
 }
 
-export function VisitorEmbedPage() {
+export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } = {}) {
     const { t, i18n } = useTranslation();
     const q = useMemo(() => new URLSearchParams(location.search), []);
-    const siteKey = q.get("site_key") || "";
+    const siteKey = String(siteKeyProp || q.get("site_key") || "");
     const debugUi = q.get("debug") === "1";
     const isHostPreview = q.get("chatlive_preview") === "1";
 
