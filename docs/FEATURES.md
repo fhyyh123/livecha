@@ -298,12 +298,16 @@ snippet 生成逻辑要点：
 ```html
 <script
   defer
-  src="https://your-api.example.com/chatlive/widget/<version>/widget.js"
+  src="https://your-api.example.com/chatlive/widget.js"
   data-chatlive-site-key="pk_xxx"
   data-chatlive-embed-url="https://your-app.example.com/visitor/embed"
-  data-chatlive-auto-height="true"
 ></script>
 ```
+
+说明：
+
+- 默认推荐使用稳定脚本 `/chatlive/widget.js`，这样后端部署/升级后不需要让租户重新替换安装代码。
+- 如确实需要“超长缓存 + immutable”，再使用版本化脚本 `/chatlive/widget/{version}/widget.js`。
 
 ### 5.3 安装检测（beacon）
 

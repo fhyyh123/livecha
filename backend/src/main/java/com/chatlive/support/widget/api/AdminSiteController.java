@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -126,6 +127,7 @@ public class AdminSiteController {
     public ApiResponse<WidgetSnippetResponse> snippet(
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @PathVariable("id") String siteId,
+            @RequestParam(value = "script", required = false) String script,
             HttpServletRequest request
     ) {
         var token = JwtService.extractBearerToken(authorization)
@@ -144,6 +146,12 @@ public class AdminSiteController {
 
         var widgetScriptUrl = scriptBase + "/chatlive/widget.js";
         var widgetScriptVersionedUrl = scriptBase + "/chatlive/widget/" + widgetAssetInfo.versionSegment() + "/widget.js";
+
+        // Default to stable URL so integrations don't require reinstall after deployments.
+        // Optional override for advanced caching: ?script=versioned
+        var snippetScriptUrl = (script != null && script.trim().equalsIgnoreCase("versioned"))
+            ? widgetScriptVersionedUrl
+            : widgetScriptUrl;
 
         var widgetConfig = widgetConfigRepository.findBySiteId(site.id()).orElse(null);
         var themeColor = widgetConfig != null ? widgetConfig.themeColor() : null;
@@ -173,7 +181,7 @@ public class AdminSiteController {
         var snippet = buildSnippetHtml(
             site.publicKey(),
             publicEmbedUrl,
-            widgetScriptVersionedUrl,
+            snippetScriptUrl,
             themeColor,
             cookieDomain,
             cookieSameSite,
@@ -241,70 +249,6 @@ public class AdminSiteController {
         sb.append("  src=\"").append(escapeAttr(scriptUrl)).append("\"\n");
         sb.append("  data-chatlive-site-key=\"").append(escapeAttr(siteKey)).append("\"\n");
         sb.append("  data-chatlive-embed-url=\"").append(escapeAttr(embedUrl)).append("\"\n");
-
-        // Backward-compatible default: keep auto-height enabled unless explicitly disabled.
-        sb.append("  data-chatlive-auto-height=\"").append(Boolean.FALSE.equals(autoHeight) ? "false" : "true").append("\"\n");
-
-        if (themeColor != null && !themeColor.isBlank()) {
-            sb.append("  data-chatlive-theme-color=\"").append(escapeAttr(themeColor)).append("\"\n");
-        }
-        if (launcherStyle != null && !launcherStyle.isBlank()) {
-            sb.append("  data-chatlive-launcher-style=\"").append(escapeAttr(launcherStyle)).append("\"\n");
-        }
-        if (themeMode != null && !themeMode.isBlank()) {
-            sb.append("  data-chatlive-theme-mode=\"").append(escapeAttr(themeMode)).append("\"\n");
-        }
-        if (colorSettingsMode != null && !colorSettingsMode.isBlank()) {
-            sb.append("  data-chatlive-color-settings-mode=\"").append(escapeAttr(colorSettingsMode)).append("\"\n");
-        }
-        if (colorOverridesJson != null && !colorOverridesJson.isBlank()) {
-            sb.append("  data-chatlive-color-overrides-json=\"").append(escapeAttr(colorOverridesJson)).append("\"\n");
-        }
-        if (position != null && !position.isBlank()) {
-            sb.append("  data-chatlive-position=\"").append(escapeAttr(position)).append("\"\n");
-        }
-        if (zIndex != null) {
-            sb.append("  data-chatlive-z-index=\"").append(zIndex).append("\"\n");
-        }
-        if (launcherText != null && !launcherText.isBlank()) {
-            sb.append("  data-chatlive-launcher-text=\"").append(escapeAttr(launcherText)).append("\"\n");
-        }
-        if (width != null) {
-            sb.append("  data-chatlive-width=\"").append(width).append("\"\n");
-        }
-        if (height != null) {
-            sb.append("  data-chatlive-height=\"").append(height).append("\"\n");
-        }
-        if (autoHeightMode != null && !autoHeightMode.isBlank()) {
-            sb.append("  data-chatlive-auto-height-mode=\"").append(escapeAttr(autoHeightMode)).append("\"\n");
-        }
-        if (minHeight != null) {
-            sb.append("  data-chatlive-min-height=\"").append(minHeight).append("\"\n");
-        }
-        if (maxHeightRatio != null) {
-            sb.append("  data-chatlive-max-height-ratio=\"").append(maxHeightRatio).append("\"\n");
-        }
-        if (mobileBreakpoint != null) {
-            sb.append("  data-chatlive-mobile-breakpoint=\"").append(mobileBreakpoint).append("\"\n");
-        }
-        if (mobileFullscreen != null) {
-            sb.append("  data-chatlive-mobile-fullscreen=\"").append(Boolean.TRUE.equals(mobileFullscreen) ? "true" : "false").append("\"\n");
-        }
-        if (offsetX != null) {
-            sb.append("  data-chatlive-offset-x=\"").append(offsetX).append("\"\n");
-        }
-        if (offsetY != null) {
-            sb.append("  data-chatlive-offset-y=\"").append(offsetY).append("\"\n");
-        }
-        if (debug != null) {
-            sb.append("  data-chatlive-debug=\"").append(Boolean.TRUE.equals(debug) ? "true" : "false").append("\"\n");
-        }
-        if (cookieDomain != null && !cookieDomain.isBlank()) {
-            sb.append("  data-chatlive-cookie-domain=\"").append(escapeAttr(cookieDomain)).append("\"\n");
-        }
-        if (cookieSameSite != null && !cookieSameSite.isBlank()) {
-            sb.append("  data-chatlive-cookie-samesite=\"").append(escapeAttr(cookieSameSite)).append("\"\n");
-        }
         sb.append("></script>");
         return sb.toString();
     }

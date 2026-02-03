@@ -295,63 +295,14 @@ function buildPreviewScriptTagHtml(params: {
     embedUrl: string;
     values: Partial<WidgetConfigDto> | null | undefined;
 }): string {
-    const { scriptUrl, siteKey, embedUrl, values } = params;
-    const v = values || {};
-
-    const themeColor = String(v.theme_color || "").trim();
-    const cookieDomain = String(v.cookie_domain || "").trim();
-    const cookieSameSite = String(v.cookie_samesite || "").trim();
-    const position = String(v.position || "").trim();
-    const launcherText = String(v.launcher_text || "").trim();
-    const launcherStyle = String(v.launcher_style || "").trim();
-    const themeMode = String(v.theme_mode || "").trim();
-    const colorSettingsMode = String(v.color_settings_mode || "").trim();
-    const colorOverridesJson = String(v.color_overrides_json || "").trim();
-    const autoHeightMode = String(v.auto_height_mode || "").trim();
-
-    const zIndex = v.z_index;
-    const width = v.width;
-    const height = v.height;
-    const minHeight = v.min_height;
-    const maxHeightRatio = v.max_height_ratio;
-    const mobileBreakpoint = v.mobile_breakpoint;
-    const mobileFullscreen = v.mobile_fullscreen;
-    const offsetX = v.offset_x;
-    const offsetY = v.offset_y;
-    const debug = v.debug;
-
-    // Backward-compatible default: keep auto-height enabled unless explicitly disabled.
-    const autoHeightAttr = v.auto_height === false ? "false" : "true";
-
+    const { scriptUrl, siteKey, embedUrl } = params;
+    // Keep preview close to production: only pass identity (siteKey) + entry (embedUrl).
     const lines: string[] = [];
     lines.push("<script");
     lines.push("  defer");
     lines.push(`  src=\"${escapeAttr(scriptUrl)}\"`);
     lines.push(`  data-chatlive-site-key=\"${escapeAttr(siteKey)}\"`);
     lines.push(`  data-chatlive-embed-url=\"${escapeAttr(embedUrl)}\"`);
-    lines.push(`  data-chatlive-auto-height=\"${autoHeightAttr}\"`);
-
-    if (themeColor) lines.push(`  data-chatlive-theme-color=\"${escapeAttr(themeColor)}\"`);
-    if (launcherStyle) lines.push(`  data-chatlive-launcher-style=\"${escapeAttr(launcherStyle)}\"`);
-    if (themeMode) lines.push(`  data-chatlive-theme-mode=\"${escapeAttr(themeMode)}\"`);
-    if (colorSettingsMode) lines.push(`  data-chatlive-color-settings-mode=\"${escapeAttr(colorSettingsMode)}\"`);
-    if (colorOverridesJson) lines.push(`  data-chatlive-color-overrides-json=\"${escapeAttr(colorOverridesJson)}\"`);
-    if (position) lines.push(`  data-chatlive-position=\"${escapeAttr(position)}\"`);
-    if (typeof zIndex === "number" && Number.isFinite(zIndex)) lines.push(`  data-chatlive-z-index=\"${zIndex}\"`);
-    if (launcherText) lines.push(`  data-chatlive-launcher-text=\"${escapeAttr(launcherText)}\"`);
-    if (typeof width === "number" && Number.isFinite(width)) lines.push(`  data-chatlive-width=\"${width}\"`);
-    if (typeof height === "number" && Number.isFinite(height)) lines.push(`  data-chatlive-height=\"${height}\"`);
-    if (autoHeightMode) lines.push(`  data-chatlive-auto-height-mode=\"${escapeAttr(autoHeightMode)}\"`);
-    if (typeof minHeight === "number" && Number.isFinite(minHeight)) lines.push(`  data-chatlive-min-height=\"${minHeight}\"`);
-    if (typeof maxHeightRatio === "number" && Number.isFinite(maxHeightRatio)) lines.push(`  data-chatlive-max-height-ratio=\"${maxHeightRatio}\"`);
-    if (typeof mobileBreakpoint === "number" && Number.isFinite(mobileBreakpoint)) lines.push(`  data-chatlive-mobile-breakpoint=\"${mobileBreakpoint}\"`);
-    if (typeof mobileFullscreen === "boolean") lines.push(`  data-chatlive-mobile-fullscreen=\"${mobileFullscreen ? "true" : "false"}\"`);
-    if (typeof offsetX === "number" && Number.isFinite(offsetX)) lines.push(`  data-chatlive-offset-x=\"${offsetX}\"`);
-    if (typeof offsetY === "number" && Number.isFinite(offsetY)) lines.push(`  data-chatlive-offset-y=\"${offsetY}\"`);
-    if (typeof debug === "boolean") lines.push(`  data-chatlive-debug=\"${debug ? "true" : "false"}\"`);
-    if (cookieDomain) lines.push(`  data-chatlive-cookie-domain=\"${escapeAttr(cookieDomain)}\"`);
-    if (cookieSameSite) lines.push(`  data-chatlive-cookie-samesite=\"${escapeAttr(cookieSameSite)}\"`);
-
     lines.push("></script>");
     return lines.join("\n");
 }
@@ -594,18 +545,19 @@ export function WidgetCustomizePage() {
                 const win = previewIframeRef.current?.contentWindow;
                 if (!win) return;
                 win.postMessage({ type: "chatlive.preview.config", config: previewConfig }, "*");
-        }, [previewConfig, previewReload, selectedSite?.public_key, snippet?.widget_script_versioned_url]);
+        }, [previewConfig, previewReload, selectedSite?.public_key, snippet?.widget_script_url]);
 
         const previewSrcDoc = useMemo(() => {
                 if (!selectedSite?.public_key) return null;
-                if (!snippet?.widget_script_versioned_url) return null;
+            if (!snippet?.widget_script_url) return null;
                 if (!snippet?.embed_url) return null;
 
-                // Keep preview embed in a dedicated mode to avoid server bootstrap overwriting host preview.
-                const previewEmbedUrl = appendQueryParams(snippet.embed_url, { chatlive_preview: "1" });
+            // Host preview mode: still allow iframe UI to know it's preview.
+            // Widget shell will fetch server config; unsaved changes are applied via postMessage overrides.
+            const previewEmbedUrl = appendQueryParams(snippet.embed_url, { chatlive_preview: "1" });
 
                 const scriptTag = buildPreviewScriptTagHtml({
-                        scriptUrl: snippet.widget_script_versioned_url,
+                scriptUrl: snippet.widget_script_url,
                         siteKey: selectedSite.public_key,
                         embedUrl: previewEmbedUrl,
                         // Initial values are kept minimal; parent page will live-sync unsaved changes via postMessage.
@@ -623,13 +575,31 @@ export function WidgetCustomizePage() {
 
                 const bridge = `
                     (function(){
+                        var BASE = { siteKey: ${JSON.stringify(selectedSite.public_key)}, embedUrl: ${JSON.stringify(previewEmbedUrl)} };
+
+                        function merge(a, b){
+                            var out = {};
+                            try {
+                                if (a && typeof a === 'object') {
+                                    for (var k in a) out[k] = a[k];
+                                }
+                                if (b && typeof b === 'object') {
+                                    for (var k2 in b) out[k2] = b[k2];
+                                }
+                            } catch (e) {
+                                // ignore
+                            }
+                            return out;
+                        }
+
                         function apply(cfg){
                             try {
-                                if (cfg && typeof cfg === 'object' && window.ChatLiveWidget && typeof window.ChatLiveWidget.init === 'function') {
-                                    window.ChatLiveWidget.init(cfg);
+                                var next = merge(BASE, cfg || {});
+                                if (window.ChatLiveWidget && typeof window.ChatLiveWidget.init === 'function') {
+                                    window.ChatLiveWidget.init(next);
                                 }
 
-                                var mode = (cfg && cfg.themeMode ? String(cfg.themeMode) : '').trim().toLowerCase();
+                                var mode = (next && next.themeMode ? String(next.themeMode) : '').trim().toLowerCase();
                                 var isDark = mode === 'dark';
                                 var page = document.querySelector('.page');
                                 if (page) page.style.background = isDark ? '#111827' : '#f5f5f5';
@@ -644,6 +614,9 @@ export function WidgetCustomizePage() {
                                 // ignore
                             }
                         }
+
+                        // Ensure initial init happens even if parent hasn't posted config yet.
+                        try { apply({}); } catch (e) { /* ignore */ }
 
                         window.addEventListener('message', function(ev){
                             try {
@@ -675,7 +648,7 @@ export function WidgetCustomizePage() {
 </html>`;
                 // Remount is handled by iframe key.
                 // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, [selectedSite?.public_key, snippet?.embed_url, snippet?.widget_script_versioned_url, previewReload, t]);
+        }, [selectedSite?.public_key, snippet?.embed_url, snippet?.widget_script_url, previewReload, t]);
 
         const previewIframeStyle: CSSProperties = useMemo(
                 () => ({ width: "100%", height: "100%", border: 0, borderRadius: 12, overflow: "hidden" }),
@@ -726,6 +699,9 @@ export function WidgetCustomizePage() {
                                 onFinish={save}
                                 disabled={cfgLoading || !isAdmin}
                             >
+                                <Form.Item name="welcome_text" hidden>
+                                    <Input />
+                                </Form.Item>
                                 <Form.Item name="launcher_style" hidden>
                                     <Input />
                                 </Form.Item>
@@ -744,7 +720,8 @@ export function WidgetCustomizePage() {
                                 </Form.Item>
 
                                 <Collapse
-                                    defaultActiveKey={["appearance", "position"]}
+                                    accordion
+                                    defaultActiveKey={"appearance"}
                                     items={[
                                         {
                                             key: "appearance",
@@ -908,14 +885,6 @@ export function WidgetCustomizePage() {
                                                             </div>
                                                         </div>
                                                     )}
-
-                                                    <Form.Item label={t("widgetCustomize.widgetConfig.welcomeText.label")} name="welcome_text">
-                                                        <Input.TextArea
-                                                            placeholder={t("widgetCustomize.widgetConfig.welcomeText.placeholder")}
-                                                            autoSize={{ minRows: 2, maxRows: 4 }}
-                                                        />
-                                                    </Form.Item>
-
                                                     <Form.Item label={t("widgetCustomize.fields.launcherText")} name="launcher_text">
                                                         <Input placeholder={DEFAULTS.launcher_text} />
                                                     </Form.Item>

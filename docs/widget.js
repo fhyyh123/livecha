@@ -350,6 +350,14 @@
       if (!widgetConfig || typeof widgetConfig !== "object") return null;
       var ws = widgetConfig;
       var out = {};
+      // NOTE: The backend returns snake_case fields (WidgetConfigDto). This mapper converts them
+      // to the widget's camelCase config shape.
+
+      // Cookie / identity hints (forwarded to iframe as query params)
+      if (typeof ws.cookie_domain === "string" && ws.cookie_domain) out.cookieDomain = ws.cookie_domain;
+      if (typeof ws.cookie_samesite === "string" && ws.cookie_samesite) out.cookieSameSite = ws.cookie_samesite;
+
+      // Launcher + visuals
       if (typeof ws.launcher_style === "string" && ws.launcher_style) out.launcherStyle = ws.launcher_style;
       if (typeof ws.theme_color === "string" && ws.theme_color) out.themeColor = ws.theme_color;
       if (typeof ws.theme_mode === "string" && ws.theme_mode) out.themeMode = ws.theme_mode;
@@ -360,6 +368,22 @@
       if (typeof ws.z_index === "number") out.zIndex = ws.z_index;
       if (typeof ws.offset_x === "number") out.offsetX = ws.offset_x;
       if (typeof ws.offset_y === "number") out.offsetY = ws.offset_y;
+
+      // Panel geometry
+      if (typeof ws.width === "number") out.width = ws.width;
+      if (typeof ws.height === "number") out.height = ws.height;
+      if (typeof ws.auto_height === "boolean") out.autoHeight = ws.auto_height;
+      if (typeof ws.auto_height_mode === "string" && ws.auto_height_mode) out.autoHeightMode = ws.auto_height_mode;
+      if (typeof ws.min_height === "number") out.minHeight = ws.min_height;
+      if (typeof ws.max_height_ratio === "number") out.maxHeightRatio = ws.max_height_ratio;
+
+      // Responsive behavior
+      if (typeof ws.mobile_breakpoint === "number") out.mobileBreakpoint = ws.mobile_breakpoint;
+      if (typeof ws.mobile_fullscreen === "boolean") out.mobileFullscreen = ws.mobile_fullscreen;
+
+      // Diagnostics
+      if (typeof ws.debug === "boolean") out.debug = ws.debug;
+
       return out;
     } catch (e) {
       return null;
@@ -1209,8 +1233,11 @@
     if (!state.prefetchDone && !state.prefetchInFlight) {
       try {
         var seed = merge(merge({}, DEFAULTS), userConfig || {});
-        // Skip in admin preview mode.
-        if (isPreviewEmbedUrl(seed.embedUrl)) {
+        // Prefer pulling server-side widget_config first so the launcher doesn't flash defaults.
+        // This is used in both production and admin preview; preview can still override by
+        // calling init() again (e.g. via postMessage from the admin UI).
+        var canPrefetch = !!seed.siteKey && !!SCRIPT_ORIGIN && typeof fetch === "function";
+        if (!canPrefetch) {
           state.prefetchDone = true;
         } else {
           state.prefetchInFlight = true;
