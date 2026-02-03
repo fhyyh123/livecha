@@ -78,7 +78,7 @@ const DEFAULTS = {
     offset_y: 20,
     debug: false,
 } as const;
- 
+
 const THEME_COLORS = [
     "#000000",
     "#7c3aed",
@@ -622,48 +622,8 @@ export function WidgetCustomizePage() {
                                 </Form.Item>
 
                                 <Collapse
-                                    defaultActiveKey={["install", "appearance", "position"]}
+                                    defaultActiveKey={["appearance", "position"]}
                                     items={[
-                                        {
-                                            key: "install",
-                                            label: t("widgetCustomize.sections.install"),
-                                            children: (
-                                                <Space direction="vertical" size={8} style={{ width: "100%" }}>
-                                                    <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
-                                                        {t("widgetCustomize.install.hint")}
-                                                    </Typography.Paragraph>
-
-                                                    <Input.TextArea
-                                                        value={snippet?.snippet_html || ""}
-                                                        rows={6}
-                                                        readOnly
-                                                        placeholder={t("widgetCustomize.install.snippetPlaceholder")}
-                                                    />
-                                                    <Space wrap>
-                                                        <Button
-                                                            onClick={async () => {
-                                                                const txt = snippet?.snippet_html || "";
-                                                                if (!txt) return;
-                                                                try {
-                                                                    await navigator.clipboard.writeText(txt);
-                                                                } catch {
-                                                                    // ignore
-                                                                }
-                                                            }}
-                                                            disabled={!snippet?.snippet_html}
-                                                        >
-                                                            {t("widgetCustomize.install.copy")}
-                                                        </Button>
-                                                    </Space>
-
-                                                    {snippet ? (
-                                                        <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-                                                            {t("widgetCustomize.install.script")} {snippet.widget_script_versioned_url}
-                                                        </Typography.Paragraph>
-                                                    ) : null}
-                                                </Space>
-                                            ),
-                                        },
                                         {
                                             key: "appearance",
                                             label: t("widgetCustomize.sections.appearance"),
