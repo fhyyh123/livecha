@@ -106,6 +106,12 @@
     unread: 0,
     pmQueue: [],
     outsideBound: false,
+    prefetchDone: false,
+    prefetchInFlight: false,
+    prefetchUserConfig: null,
+    prefetchTimeoutId: null,
+    prefetchFallbackRendered: false,
+    prefetchIgnoreLatePatch: false,
     _keepAliveTimer: null,
     _autoHeightTimer: null,
     _autoHeightPending: null,
@@ -329,6 +335,89 @@
     }
   }
 
+  function isPreviewEmbedUrl(embedUrl) {
+    try {
+      var u = safeParseUrl(embedUrl);
+      if (!u) return false;
+      return u.searchParams && u.searchParams.get("chatlive_preview") === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function mapBootstrapToWidgetConfig(widgetConfig) {
+    try {
+      if (!widgetConfig || typeof widgetConfig !== "object") return null;
+      var ws = widgetConfig;
+      var out = {};
+      if (typeof ws.launcher_style === "string" && ws.launcher_style) out.launcherStyle = ws.launcher_style;
+      if (typeof ws.theme_color === "string" && ws.theme_color) out.themeColor = ws.theme_color;
+      if (typeof ws.theme_mode === "string" && ws.theme_mode) out.themeMode = ws.theme_mode;
+      if (typeof ws.color_settings_mode === "string" && ws.color_settings_mode) out.colorSettingsMode = ws.color_settings_mode;
+      if (typeof ws.color_overrides_json === "string" && ws.color_overrides_json) out.colorOverridesJson = ws.color_overrides_json;
+      if (typeof ws.launcher_text === "string" && ws.launcher_text) out.launcherText = ws.launcher_text;
+      if (typeof ws.position === "string" && ws.position) out.position = ws.position;
+      if (typeof ws.z_index === "number") out.zIndex = ws.z_index;
+      if (typeof ws.offset_x === "number") out.offsetX = ws.offset_x;
+      if (typeof ws.offset_y === "number") out.offsetY = ws.offset_y;
+      return out;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function prefetchBootstrapConfig(siteKey, origin) {
+    return new Promise(function (resolve) {
+      try {
+        // Use the widget script origin as the API origin.
+        var base = SCRIPT_ORIGIN || "";
+        if (!base) {
+          resolve(null);
+          return;
+        }
+
+        // Cache-bust to avoid any intermediate caching (even though it's POST).
+        var url =
+          base +
+          "/api/v1/public/widget/bootstrap?site_key=" +
+          encodeURIComponent(String(siteKey || "")) +
+          "&_ts=" +
+          String(Date.now());
+
+        if (typeof fetch !== "function") {
+          resolve(null);
+          return;
+        }
+
+        fetch(url, {
+          method: "POST",
+          mode: "cors",
+          credentials: "omit",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ site_key: String(siteKey || ""), origin: String(origin || "") }),
+        })
+          .then(function (r) {
+            if (!r || !r.ok) return null;
+            return r.json();
+          })
+          .then(function (data) {
+            try {
+              var wc = data && data.widget_config ? data.widget_config : null;
+              resolve(mapBootstrapToWidgetConfig(wc));
+            } catch (e0) {
+              resolve(null);
+            }
+          })
+          .catch(function () {
+            resolve(null);
+          });
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  }
+
   function isValidEnvelope(data) {
     if (!data || typeof data !== "object") return false;
     if (data.channel !== PM_CHANNEL) return false;
@@ -518,19 +607,24 @@
         // Avoid `all:unset` which can reset important UA properties in surprising ways.
         "appearance:none!important;-webkit-appearance:none!important;" +
         "border:0!important;padding:0!important;margin:0!important;" +
-        "background:#111827!important;color:#fff!important;" +
+        // High-contrast launcher default (can be overridden by themeColor / overrides)
+        "background:#FF5A1F!important;color:#fff!important;" +
         "cursor:pointer;" +
         "position:fixed!important;" +
-        "display:flex!important;align-items:center!important;justify-content:center!important;gap:10px;" +
+        "display:flex!important;align-items:center!important;justify-content:center!important;gap:" +
+        (isBar ? "10px" : "0px") +
+        ";" +
         (isBar
           ? "height:56px!important;width:auto!important;min-width:120px!important;padding:0 18px!important;border-radius:16px!important;"
-          : "height:48px!important;width:auto!important;min-width:88px!important;padding:0 16px!important;border-radius:999px!important;") +
-        "box-shadow: 0 10px 25px rgba(0,0,0,0.18);" +
+          : "width:56px!important;height:56px!important;min-width:56px!important;padding:0!important;border-radius:999px!important;") +
+        // Material-ish shadow
+        "box-shadow: 0 10px 25px rgba(0,0,0,0.22);" +
         "font-size:14px!important;font-weight:600!important;" +
         "user-select:none!important;" +
         "visibility:visible!important;opacity:1!important;" +
         "pointer-events:auto!important;" +
         "transform:none!important;" +
+        "transition: box-shadow 140ms ease, transform 140ms ease, filter 140ms ease;" +
         "touch-action:manipulation;" +
         "-webkit-tap-highlight-color: transparent;",
       badge:
@@ -600,17 +694,45 @@
       var style = String(cfg.launcherStyle || "bubble").trim().toLowerCase();
       var isBar = style === "bar";
 
+      var icon = null;
+      try {
+        icon = state.button.querySelector("[data-chatlive-button-icon='1']");
+      } catch (e0) {
+        icon = null;
+      }
+
       if (state.open) {
         // When open, show a close glyph and hide icon.
         state.buttonLabel.textContent = "×";
+        state.buttonLabel.style.display = "inline-block";
+        if (icon) icon.style.display = "none";
+        try {
+          state.button.style.gap = "0px";
+        } catch (e1) {
+          // ignore
+        }
         return;
       }
 
       if (isBar) {
         state.buttonLabel.textContent = cfg.launcherText || "Chat";
+        state.buttonLabel.style.display = "inline-block";
+        if (icon) icon.style.display = "inline-flex";
+        try {
+          state.button.style.gap = "10px";
+        } catch (e2) {
+          // ignore
+        }
       } else {
-        // Bubble: show text if no icon.
-        state.buttonLabel.textContent = cfg.launcherText || "Chat";
+        // Bubble: icon-only (LiveChat-like)
+        state.buttonLabel.textContent = "";
+        state.buttonLabel.style.display = "none";
+        if (icon) icon.style.display = "inline-flex";
+        try {
+          state.button.style.gap = "0px";
+        } catch (e3) {
+          // ignore
+        }
       }
     } catch (e) {
       // ignore
@@ -655,7 +777,8 @@
 
       var overrides = parseColorOverrides(state.config.colorOverridesJson);
       var bg = overrides.minimized_bubble || normalizeHexColor(state.config.themeColor) || "";
-      if (!bg) bg = "#111827";
+      // Default to a high-contrast orange launcher if not configured.
+      if (!bg) bg = "#FF5A1F";
       var fg = overrides.minimized_icon || "#FFFFFF";
 
       state.button.style.background = String(bg);
@@ -668,6 +791,25 @@
   function setThemeColor(color) {
     state.config.themeColor = color || null;
     applyLauncherTheme();
+  }
+
+  function setLauncherStyle(style) {
+    try {
+      if (!state.config || !state.button) return;
+      var next = String(style || "").trim().toLowerCase();
+      if (next !== "bar" && next !== "bubble") return;
+      if (String(state.config.launcherStyle || "").trim().toLowerCase() === next) return;
+
+      state.config.launcherStyle = next;
+      // Re-apply button layout CSS for the new style.
+      var css = layoutStyles(state.config);
+      ensureCssText(state.button, css.button);
+      // Restore configured theme overrides after cssText overwrite.
+      applyLauncherTheme();
+      applyLauncherVisual();
+    } catch (e) {
+      // ignore
+    }
   }
 
   function setUnread(n) {
@@ -945,8 +1087,15 @@
     }
 
     if (data.type === MSG.WIDGET_THEME) {
-      if (!payload || typeof payload.themeColor !== "string") return;
-      setThemeColor(payload.themeColor);
+      if (!payload || typeof payload !== "object") return;
+      if (typeof payload.themeColor === "string") {
+        setThemeColor(payload.themeColor);
+      } else if (payload.themeColor === null) {
+        setThemeColor(null);
+      }
+      if (typeof payload.launcherStyle === "string") {
+        setLauncherStyle(payload.launcherStyle);
+      }
       return;
     }
 
@@ -1005,6 +1154,96 @@
       return;
     }
 
+    // First-load prefetch: try to fetch server-side widget_config before rendering,
+    // so the launcher doesn't flash defaults and then switch after iframe bootstraps.
+    if (!state.prefetchDone && !state.prefetchInFlight) {
+      try {
+        var seed = merge(merge({}, DEFAULTS), userConfig || {});
+        // Skip in admin preview mode.
+        if (isPreviewEmbedUrl(seed.embedUrl)) {
+          state.prefetchDone = true;
+        } else {
+          state.prefetchInFlight = true;
+          state.prefetchUserConfig = userConfig || {};
+
+          // Timeout: block rendering briefly to avoid flashing old snippet styles.
+          // If it times out, we render once using the snippet config and then ignore late patches
+          // to avoid "old -> new" switching.
+          try {
+            state.prefetchTimeoutId = setTimeout(function () {
+              try {
+                state.prefetchDone = true;
+                state.prefetchInFlight = false;
+                state.prefetchTimeoutId = null;
+                state.prefetchFallbackRendered = true;
+                state.prefetchIgnoreLatePatch = true;
+                init(state.prefetchUserConfig || {});
+              } catch (e0) {
+                // ignore
+              }
+            }, 10000);
+          } catch (e1) {
+            state.prefetchTimeoutId = null;
+          }
+
+          prefetchBootstrapConfig(seed.siteKey, computeOrigin(seed))
+            .then(function (patch) {
+              // If we already rendered a fallback due to timeout, don't apply late patches
+              // to avoid a visible style switch.
+              if (state.prefetchIgnoreLatePatch && state.prefetchFallbackRendered) {
+                state.prefetchDone = true;
+                state.prefetchInFlight = false;
+                return;
+              }
+              try {
+                if (state.prefetchTimeoutId) {
+                  clearTimeout(state.prefetchTimeoutId);
+                  state.prefetchTimeoutId = null;
+                }
+              } catch (e2) {
+                state.prefetchTimeoutId = null;
+              }
+
+              state.prefetchDone = true;
+              state.prefetchInFlight = false;
+              if (patch && typeof patch === "object") {
+                state.prefetchUserConfig = merge(merge({}, state.prefetchUserConfig || {}), patch);
+              }
+              init(state.prefetchUserConfig || {});
+            })
+            .catch(function () {
+              if (state.prefetchIgnoreLatePatch && state.prefetchFallbackRendered) {
+                state.prefetchDone = true;
+                state.prefetchInFlight = false;
+                return;
+              }
+              try {
+                if (state.prefetchTimeoutId) {
+                  clearTimeout(state.prefetchTimeoutId);
+                  state.prefetchTimeoutId = null;
+                }
+              } catch (e3) {
+                state.prefetchTimeoutId = null;
+              }
+              state.prefetchDone = true;
+              state.prefetchInFlight = false;
+              init(state.prefetchUserConfig || {});
+            });
+
+          return;
+        }
+      } catch (e4) {
+        state.prefetchDone = true;
+        state.prefetchInFlight = false;
+      }
+    }
+
+    if (state.prefetchInFlight) {
+      // If someone calls init() while prefetching, merge their config so it isn't lost.
+      state.prefetchUserConfig = merge(merge({}, state.prefetchUserConfig || {}), userConfig || {});
+      return;
+    }
+
     var config = merge(merge({}, DEFAULTS), userConfig || {});
     state.config = config;
 
@@ -1035,6 +1274,25 @@
     } catch (e) {
       // ignore
     }
+
+    // Button icon (centered, minimal noise)
+    var buttonIcon = document.createElement("span");
+    buttonIcon.setAttribute("data-chatlive-button-icon", "1");
+    buttonIcon.setAttribute("aria-hidden", "true");
+    ensureCssText(
+      buttonIcon,
+      "display:inline-flex;align-items:center;justify-content:center;" +
+        "width:24px;height:24px;" +
+        "line-height:24px;" +
+        "color:inherit;" +
+        "pointer-events:none;",
+    );
+    buttonIcon.innerHTML =
+      "<svg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>" +
+      "<path d='M21 12c0 4.418-4.03 8-9 8-1.015 0-2-.145-2.93-.414L3 21l1.62-4.12A7.42 7.42 0 0 1 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8Z' stroke='currentColor' stroke-width='2' stroke-linejoin='round'/>" +
+      "<path d='M8 12h.01M12 12h.01M16 12h.01' stroke='currentColor' stroke-width='3' stroke-linecap='round'/>" +
+      "</svg>";
+    button.appendChild(buttonIcon);
 
     // Button label (do not use button.textContent later; it would clear the badge node)
     var buttonLabel = document.createElement("span");

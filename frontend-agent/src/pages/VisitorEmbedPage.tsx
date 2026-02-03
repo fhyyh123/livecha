@@ -80,6 +80,7 @@ type WidgetConfig = {
     pre_chat_enabled: boolean;
     pre_chat_fields_json?: string | null;
     theme_color?: string | null;
+    launcher_style?: string | null;
     theme_mode?: string | null;
     color_settings_mode?: string | null;
     color_overrides_json?: string | null;
@@ -478,6 +479,7 @@ export function VisitorEmbedPage() {
     const q = useMemo(() => new URLSearchParams(location.search), []);
     const siteKey = q.get("site_key") || "";
     const debugUi = q.get("debug") === "1";
+    const isHostPreview = q.get("chatlive_preview") === "1";
 
     const isTopLevel = typeof window !== "undefined" && window === window.parent;
 
@@ -499,6 +501,7 @@ export function VisitorEmbedPage() {
     const unreadRef = useRef(0);
     const lastReadRef = useRef<StoredLastRead | null>(null);
     const pendingPageViewsRef = useRef<HostPageViewPayload[]>([]);
+    const hostInitThemeColorRef = useRef<string | null>(null);
 
     // In some cross-origin iframe contexts, iframe document visibility/focus can be unreliable.
     // Host page (widget.js) can optionally send HOST_VISIBILITY so we can decide read receipts correctly.
@@ -1068,6 +1071,7 @@ export function VisitorEmbedPage() {
                 hostOpenRef.current = open;
                 setHostOpen(open);
                 const themeColor = typeof payloadRec?.themeColor === "string" ? payloadRec.themeColor : null;
+                hostInitThemeColorRef.current = themeColor || null;
                 if (themeColor) setThemeColor(themeColor);
 
                 if (typeof payloadRec?.themeMode === "string") setHostThemeMode(payloadRec.themeMode);
@@ -1212,9 +1216,20 @@ export function VisitorEmbedPage() {
             }
 
             const cfgTheme = data?.widget_config?.theme_color || null;
-            if (typeof cfgTheme === "string" && cfgTheme) {
+            const cfgLauncherStyle = String((data as unknown as { widget_config?: { launcher_style?: unknown } })?.widget_config?.launcher_style || "").trim();
+
+            // In preview mode, prefer host-provided (unsaved) visuals.
+            if (typeof cfgTheme === "string" && cfgTheme && (!isHostPreview || !hostInitThemeColorRef.current)) {
                 setThemeColor(cfgTheme);
-                postToHost(MSG.WIDGET_THEME, { themeColor: cfgTheme });
+            }
+
+            if (!isHostPreview) {
+                // Sync host launcher UI with server-side widget config.
+                // This allows changing launcher_style (bubble/bar) from admin without re-pasting the snippet.
+                postToHost(MSG.WIDGET_THEME, {
+                    themeColor: typeof cfgTheme === "string" && cfgTheme ? cfgTheme : null,
+                    launcherStyle: cfgLauncherStyle || null,
+                });
             }
         } catch (e: unknown) {
             setError(getErrorFields(e).message || "bootstrap_failed");

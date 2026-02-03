@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Card, Col, Collapse, Divider, Form, Input, InputNumber, Radio, Row, Select, Space, Spin, Switch, Typography } from "antd";
 import { useTranslation } from "react-i18next";
 
@@ -267,6 +267,28 @@ function escapeAttr(s: string): string {
         .replaceAll(">", "&gt;");
 }
 
+function appendQueryParams(rawUrl: string, params: Record<string, string>): string {
+    const input = String(rawUrl || "").trim();
+    if (!input) return input;
+    try {
+        const base = typeof window !== "undefined" ? window.location.href : "http://localhost/";
+        const u = new URL(input, base);
+        for (const [k, v] of Object.entries(params || {})) {
+            if (!k) continue;
+            u.searchParams.set(k, String(v));
+        }
+        return u.toString();
+    } catch {
+        // Fallback: best-effort append (assume absolute URL).
+        const qs = Object.entries(params || {})
+            .filter(([k, v]) => k && v !== undefined)
+            .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+            .join("&");
+        if (!qs) return input;
+        return input + (input.includes("?") ? "&" : "?") + qs;
+    }
+}
+
 function buildPreviewScriptTagHtml(params: {
     scriptUrl: string;
     siteKey: string;
@@ -355,6 +377,7 @@ export function WidgetCustomizePage() {
     const [snippet, setSnippet] = useState<WidgetSnippetResponse | null>(null);
 
     const [previewReload, setPreviewReload] = useState(0);
+    const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
 
     const [form] = Form.useForm<WidgetConfigDto>();
 
@@ -527,26 +550,111 @@ export function WidgetCustomizePage() {
             form.setFieldsValue({ color_overrides_json: json } as Partial<WidgetConfigDto>);
         }
 
+        const previewConfig = useMemo(() => {
+                const v = (watchAll || {}) as Partial<WidgetConfigDto>;
+
+                const asStr = (x: unknown): string | undefined => {
+                        const s = String(x ?? "").trim();
+                        return s ? s : undefined;
+                };
+                const asNum = (x: unknown): number | undefined => (typeof x === "number" && Number.isFinite(x) ? x : undefined);
+                const asBool = (x: unknown): boolean | undefined => (typeof x === "boolean" ? x : undefined);
+
+                // Keep consistent with preview snippet behavior: autoHeight defaults to true unless explicitly false.
+                const autoHeight = v.auto_height === false ? false : true;
+
+                return {
+                        themeColor: asStr(v.theme_color),
+                        launcherStyle: asStr(v.launcher_style),
+                        themeMode: asStr(v.theme_mode),
+                        colorSettingsMode: asStr(v.color_settings_mode),
+                        colorOverridesJson: asStr(v.color_overrides_json),
+
+                        position: asStr(v.position),
+                        zIndex: asNum(v.z_index),
+                        launcherText: asStr(v.launcher_text),
+                        width: asNum(v.width),
+                        height: asNum(v.height),
+                        autoHeight,
+                        autoHeightMode: asStr(v.auto_height_mode),
+                        minHeight: asNum(v.min_height),
+                        maxHeightRatio: asNum(v.max_height_ratio),
+                        mobileBreakpoint: asNum(v.mobile_breakpoint),
+                        mobileFullscreen: asBool(v.mobile_fullscreen),
+                        offsetX: asNum(v.offset_x),
+                        offsetY: asNum(v.offset_y),
+                        debug: asBool(v.debug),
+
+                        cookieDomain: asStr(v.cookie_domain),
+                        cookieSameSite: asStr(v.cookie_samesite),
+                };
+        }, [watchAll]);
+
+        useEffect(() => {
+                const win = previewIframeRef.current?.contentWindow;
+                if (!win) return;
+                win.postMessage({ type: "chatlive.preview.config", config: previewConfig }, "*");
+        }, [previewConfig, previewReload, selectedSite?.public_key, snippet?.widget_script_versioned_url]);
+
         const previewSrcDoc = useMemo(() => {
                 if (!selectedSite?.public_key) return null;
                 if (!snippet?.widget_script_versioned_url) return null;
                 if (!snippet?.embed_url) return null;
 
+                // Keep preview embed in a dedicated mode to avoid server bootstrap overwriting host preview.
+                const previewEmbedUrl = appendQueryParams(snippet.embed_url, { chatlive_preview: "1" });
+
                 const scriptTag = buildPreviewScriptTagHtml({
                         scriptUrl: snippet.widget_script_versioned_url,
                         siteKey: selectedSite.public_key,
-                        embedUrl: snippet.embed_url,
-                        values: watchAll,
+                        embedUrl: previewEmbedUrl,
+                        // Initial values are kept minimal; parent page will live-sync unsaved changes via postMessage.
+                        values: {},
                 });
 
-                const pageBg = String(watchThemeMode || "").trim().toLowerCase() === "dark" ? "#111827" : "#f5f5f5";
                 const css = `
                     html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-                    .page { height: 100%; background: ${pageBg}; position: relative; overflow: hidden; }
+                    .page { height: 100%; background: #f5f5f5; position: relative; overflow: hidden; }
                         .topbar { position: absolute; left: 16px; top: 16px; right: 16px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.85);
                                             display: flex; align-items: center; padding: 0 12px; color: #666; font-size: 12px; }
                         .content { position: absolute; left: 16px; right: 16px; top: 68px; bottom: 16px; border-radius: 14px;
                                              background: rgba(255,255,255,0.6); }
+                `;
+
+                const bridge = `
+                    (function(){
+                        function apply(cfg){
+                            try {
+                                if (cfg && typeof cfg === 'object' && window.ChatLiveWidget && typeof window.ChatLiveWidget.init === 'function') {
+                                    window.ChatLiveWidget.init(cfg);
+                                }
+
+                                var mode = (cfg && cfg.themeMode ? String(cfg.themeMode) : '').trim().toLowerCase();
+                                var isDark = mode === 'dark';
+                                var page = document.querySelector('.page');
+                                if (page) page.style.background = isDark ? '#111827' : '#f5f5f5';
+                                var topbar = document.querySelector('.topbar');
+                                if (topbar) {
+                                    topbar.style.background = isDark ? 'rgba(17,24,39,0.85)' : 'rgba(255,255,255,0.85)';
+                                    topbar.style.color = isDark ? 'rgba(255,255,255,0.72)' : '#666';
+                                }
+                                var content = document.querySelector('.content');
+                                if (content) content.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.6)';
+                            } catch (e) {
+                                // ignore
+                            }
+                        }
+
+                        window.addEventListener('message', function(ev){
+                            try {
+                                var d = ev && ev.data;
+                                if (!d || typeof d !== 'object') return;
+                                if (d.type === 'chatlive.preview.config') apply(d.config || {});
+                            } catch (e) {
+                                // ignore
+                            }
+                        });
+                    })();
                 `;
 
                 return `<!doctype html>
@@ -562,11 +670,12 @@ export function WidgetCustomizePage() {
             <div class="content"></div>
         </div>
         ${scriptTag}
+        <script>${bridge}</script>
     </body>
 </html>`;
                 // Remount is handled by iframe key.
                 // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, [selectedSite?.public_key, snippet?.embed_url, snippet?.widget_script_versioned_url, watchAll, watchThemeMode, previewReload]);
+        }, [selectedSite?.public_key, snippet?.embed_url, snippet?.widget_script_versioned_url, previewReload, t]);
 
         const previewIframeStyle: CSSProperties = useMemo(
                 () => ({ width: "100%", height: "100%", border: 0, borderRadius: 12, overflow: "hidden" }),
@@ -988,6 +1097,12 @@ export function WidgetCustomizePage() {
                                     srcDoc={previewSrcDoc}
                                     style={previewIframeStyle}
                                     sandbox="allow-scripts allow-same-origin allow-forms"
+                                    ref={previewIframeRef}
+                                    onLoad={() => {
+                                        const win = previewIframeRef.current?.contentWindow;
+                                        if (!win) return;
+                                        win.postMessage({ type: "chatlive.preview.config", config: previewConfig }, "*");
+                                    }}
                                 />
                             ) : (
                                 <div style={{ color: "rgba(0,0,0,.45)" }}>{t("preChatForm.previewEmpty")}</div>
