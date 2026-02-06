@@ -4,6 +4,7 @@ import { Button, Spin, Typography } from "antd";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { ConversationDetail, MessageItem } from "../store/chatStore";
+import { isPreviewableImage } from "../utils/attachments";
 import { ChatComposer } from "./ChatComposer";
 
 import "./chatView.css";
@@ -36,6 +37,7 @@ export type ChatViewProps = {
 
     onSendText: () => void;
     onDownload: (attachmentId?: string) => void;
+    getAttachmentUrl?: (attachmentId: string) => Promise<string | null>;
     onOpenQuickReplies: () => void;
 
     onReopen?: () => Promise<void> | void;
@@ -123,6 +125,100 @@ function hashHue(s: string) {
     return h % 360;
 }
 
+function AttachmentImageBubble(props: {
+    t: (key: string, options?: Record<string, unknown>) => string;
+    attachmentId?: string;
+    filename?: string;
+    sizeBytes?: number;
+    getAttachmentUrl?: (attachmentId: string) => Promise<string | null>;
+    onDownload: (attachmentId?: string) => void;
+    cacheRef: { current: Record<string, string> };
+    pendingRef: { current: Record<string, Promise<string | null>> };
+}) {
+    const { t, attachmentId, filename, sizeBytes, getAttachmentUrl, onDownload, cacheRef, pendingRef } = props;
+    const [url, setUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        let alive = true;
+        const id = String(attachmentId || "");
+        if (!id || !getAttachmentUrl) return;
+
+        const cached = cacheRef.current[id];
+        if (cached) {
+            setUrl(cached);
+            return;
+        }
+
+        const pending = pendingRef.current[id];
+        const p =
+            pending ||
+            (pendingRef.current[id] = getAttachmentUrl(id)
+                .then((u) => {
+                    const next = u || null;
+                    if (next) cacheRef.current[id] = next;
+                    return next;
+                })
+                .catch(() => null)
+                .finally(() => {
+                    delete pendingRef.current[id];
+                }));
+
+        void p.then((u) => {
+            if (!alive) return;
+            setUrl(u);
+        });
+
+        return () => {
+            alive = false;
+        };
+    }, [attachmentId, getAttachmentUrl, cacheRef, pendingRef]);
+
+    if (!attachmentId || !getAttachmentUrl) {
+        return (
+            <div className="cl-attachmentRow">
+                <FileOutlined />
+                <Typography.Text>{filename || attachmentId || "file"}</Typography.Text>
+                <Typography.Text type="secondary">{formatBytes(sizeBytes)}</Typography.Text>
+                <Button type="link" onClick={() => onDownload(attachmentId)} disabled={!attachmentId}>
+                    {t("common.download")}
+                </Button>
+            </div>
+        );
+    }
+
+    if (!url) {
+        return (
+            <div className="cl-attachmentRow">
+                <Spin size="small" />
+                <Typography.Text>{filename || attachmentId || "file"}</Typography.Text>
+                <Typography.Text type="secondary">{formatBytes(sizeBytes)}</Typography.Text>
+                <Button type="link" onClick={() => onDownload(attachmentId)} disabled={!attachmentId}>
+                    {t("common.download")}
+                </Button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="cl-attachmentImageWrap">
+            <img
+                className="cl-attachmentImage"
+                src={url}
+                alt={filename || "image"}
+                loading="lazy"
+                onClick={() => window.open(url, "_blank")}
+            />
+            <div className="cl-attachmentImageMeta">
+                <Typography.Text>{filename || attachmentId || "image"}</Typography.Text>
+                <Typography.Text type="secondary">{formatBytes(sizeBytes)}</Typography.Text>
+                <Button type="link" onClick={() => window.open(url, "_blank")}>
+                    {t("common.download")}
+                </Button>
+            </div>
+        </div>
+    );
+}
+
 export function ChatView({
     t,
     messages,
@@ -137,6 +233,7 @@ export function ChatView({
     uploadProps,
     onSendText,
     onDownload,
+    getAttachmentUrl,
     onOpenQuickReplies,
     onReopen,
     onLoadOlder,
@@ -148,6 +245,9 @@ export function ChatView({
     const lastTailSigRef = useRef<string>("");
     const forceToBottomRef = useRef(false);
     const [newTailCount, setNewTailCount] = useState(0);
+
+    const attachmentUrlCacheRef = useRef<Record<string, string>>({});
+    const attachmentUrlPendingRef = useRef<Record<string, Promise<string | null>>>({});
 
     useEffect(() => {
         // Reset window when switching conversations.
@@ -534,22 +634,35 @@ export function ChatView({
                                                 {m.content_type === "text" ? (
                                                     <div className="cl-bubbleBody">{m.content?.text || ""}</div>
                                                 ) : (
-                                                    <div className="cl-attachmentRow">
-                                                        <FileOutlined />
-                                                        <Typography.Text>
-                                                            {m.content?.filename || m.content?.attachment_id || "file"}
-                                                        </Typography.Text>
-                                                        <Typography.Text type="secondary">
-                                                            {formatBytes(m.content?.size_bytes)}
-                                                        </Typography.Text>
-                                                        <Button
-                                                            type="link"
-                                                            onClick={() => onDownload(m.content?.attachment_id)}
-                                                            disabled={!m.content?.attachment_id}
-                                                        >
-                                                            {t("common.download")}
-                                                        </Button>
-                                                    </div>
+                                                    isPreviewableImage(m.content?.mime, m.content?.filename) ? (
+                                                        <AttachmentImageBubble
+                                                            t={t}
+                                                            attachmentId={m.content?.attachment_id}
+                                                            filename={m.content?.filename}
+                                                            sizeBytes={m.content?.size_bytes}
+                                                            getAttachmentUrl={getAttachmentUrl}
+                                                            onDownload={onDownload}
+                                                            cacheRef={attachmentUrlCacheRef}
+                                                            pendingRef={attachmentUrlPendingRef}
+                                                        />
+                                                    ) : (
+                                                        <div className="cl-attachmentRow">
+                                                            <FileOutlined />
+                                                            <Typography.Text>
+                                                                {m.content?.filename || m.content?.attachment_id || "file"}
+                                                            </Typography.Text>
+                                                            <Typography.Text type="secondary">
+                                                                {formatBytes(m.content?.size_bytes)}
+                                                            </Typography.Text>
+                                                            <Button
+                                                                type="link"
+                                                                onClick={() => onDownload(m.content?.attachment_id)}
+                                                                disabled={!m.content?.attachment_id}
+                                                            >
+                                                                {t("common.download")}
+                                                            </Button>
+                                                        </div>
+                                                    )
                                                 )}
                                             </div>
 

@@ -1,4 +1,4 @@
-import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, ConfigProvider, Input, Modal, Popover, Select, Tooltip } from "antd";
 import type { TextAreaRef } from "antd/es/input/TextArea";
 import { ArrowUpOutlined, FileAddOutlined, LeftOutlined, MinusOutlined, PlusOutlined, ScanOutlined, SmileOutlined } from "@ant-design/icons";
@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { WsClient, type WsInboundEvent, type WsStatus } from "../ws/wsClient";
 import { applyWidgetPhrasesToEmbedI18n, normalizeWidgetLanguage } from "../i18nEmbed";
+import { isPreviewableImage } from "../utils/attachments";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
     if (!value || typeof value !== "object") return null;
@@ -539,6 +540,9 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
     const [uploading, setUploading] = useState(false);
 
     const wsRef = useRef<WsClient | null>(null);
+
+    const attachmentUrlCacheRef = useRef<Record<string, string>>({});
+    const attachmentUrlPendingRef = useRef<Record<string, Promise<string | null>>>({});
 
     const createOrRecoverInFlightRef = useRef<Promise<CreateOrRecoverRes | null> | null>(null);
 
@@ -1415,6 +1419,87 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
         postToHost(MSG.WIDGET_UNREAD, { unread: nextUnread });
     }
 
+    const getAttachmentUrl = useCallback(
+        async (attachmentId?: string): Promise<string | null> => {
+            const id = String(attachmentId || "");
+            if (!id) return null;
+            if (!bootstrap?.visitor_token) return null;
+
+            const cached = attachmentUrlCacheRef.current[id];
+            if (cached) return cached;
+
+            const pending = attachmentUrlPendingRef.current[id];
+            const p =
+                pending ||
+                (attachmentUrlPendingRef.current[id] = apiFetch<PresignDownloadResponse>(
+                    `/api/v1/attachments/${encodeURIComponent(id)}/presign-download`,
+                    {
+                        method: "GET",
+                        headers: { Authorization: `Bearer ${bootstrap.visitor_token}` },
+                    },
+                )
+                    .then((res) => {
+                        const url = res?.download_url ? String(res.download_url) : "";
+                        if (url) attachmentUrlCacheRef.current[id] = url;
+                        return url || null;
+                    })
+                    .catch(() => null)
+                    .finally(() => {
+                        delete attachmentUrlPendingRef.current[id];
+                    }));
+
+            return await p;
+        },
+        [bootstrap?.visitor_token],
+    );
+
+    function InlineImageAttachment(props: { attachmentId?: string; filename?: string; sizeKb?: number | null }) {
+        const { attachmentId, filename, sizeKb } = props;
+        const [url, setUrl] = useState<string | null>(null);
+
+        useEffect(() => {
+            let alive = true;
+            void getAttachmentUrl(attachmentId).then((u) => {
+                if (!alive) return;
+                setUrl(u);
+            });
+            return () => {
+                alive = false;
+            };
+        }, [attachmentId, getAttachmentUrl]);
+
+        if (!url) {
+            return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ fontWeight: 600 }}>{filename || attachmentId || "image"}</div>
+                    {sizeKb !== null ? <div style={{ fontSize: 12, color: "rgba(17,24,39,.65)" }}>{sizeKb} KB</div> : null}
+                    <Button type="link" onClick={() => onDownload(attachmentId)} disabled={!attachmentId} style={{ padding: 0, height: "auto" }}>
+                        {t("common.download")}
+                    </Button>
+                </div>
+            );
+        }
+
+        return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <img
+                    src={url}
+                    alt={filename || "image"}
+                    loading="lazy"
+                    style={{ display: "block", maxWidth: "min(260px, 65vw)", maxHeight: 320, height: "auto", borderRadius: 10, cursor: "pointer" }}
+                    onClick={() => window.open(url, "_blank")}
+                />
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <div style={{ fontWeight: 600 }}>{filename || attachmentId || "image"}</div>
+                    {sizeKb !== null ? <div style={{ fontSize: 12, color: "rgba(17,24,39,.65)" }}>{sizeKb} KB</div> : null}
+                    <Button type="link" onClick={() => window.open(url, "_blank")} style={{ padding: 0, height: "auto" }}>
+                        {t("common.download")}
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
     function renderMessageContent(m: MessageItem) {
         if (m.content_type === "text") {
             return <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.content?.text || ""}</div>;
@@ -1422,6 +1507,11 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
         if (m.content_type === "file") {
             const name = m.content?.filename || m.content?.attachment_id || "file";
             const sizeKb = typeof m.content?.size_bytes === "number" ? Math.max(1, Math.round((m.content.size_bytes / 1024) * 10) / 10) : null;
+            const isImg = isPreviewableImage(m.content?.mime, m.content?.filename);
+
+            if (isImg) {
+                return <InlineImageAttachment attachmentId={m.content?.attachment_id} filename={name} sizeKb={sizeKb} />;
+            }
             return (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <div style={{ fontWeight: 600 }}>{name}</div>
@@ -1602,20 +1692,8 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
     }
 
     async function onDownload(attachmentId?: string) {
-        if (!attachmentId) return;
-        if (!bootstrap?.visitor_token) return;
-        try {
-            const res = await apiFetch<PresignDownloadResponse>(
-                `/api/v1/attachments/${encodeURIComponent(attachmentId)}/presign-download`,
-                {
-                    method: "GET",
-                    headers: { Authorization: `Bearer ${bootstrap.visitor_token}` },
-                },
-            );
-            if (res?.download_url) window.open(res.download_url, "_blank");
-        } catch {
-            // ignore
-        }
+        const url = await getAttachmentUrl(attachmentId);
+        if (url) window.open(url, "_blank");
     }
 
     useEffect(() => {
@@ -1792,15 +1870,15 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                     <div
                         style={{
                             flex: "0 0 auto",
+                            position: "relative",
                             display: "flex",
                             alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: "10px 10px",
-                            background: uiPanelBg,
-                            borderBottom: `1px solid ${uiBorder}`,
+                            justifyContent: "center",
+                            padding: "12px 10px",
+                            background: uiChatBg,
                         }}
                     >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                        <div style={{ position: "absolute", left: 10, display: "flex", alignItems: "center" }}>
                             <Button
                                 type="text"
                                 size="small"
@@ -1819,34 +1897,51 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                                     }
                                 }}
                             />
+                        </div>
+
+                        <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
                             <div
-                                aria-hidden
                                 style={{
-                                    width: 28,
-                                    height: 28,
-                                    borderRadius: 10,
-                                    background: uiPrimary,
+                                    maxWidth: "92%",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    padding: "6px 12px",
+                                    borderRadius: 999,
+                                    background: uiPanelBg,
+                                    border: `1px solid ${uiBorder}`,
                                     boxShadow: "0 10px 20px rgba(0,0,0,.08)",
                                 }}
-                            />
-                            <div style={{ minWidth: 0, display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
-                                <div style={{ fontWeight: 800, color: "#0f172a", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                    {headerTitle}
+                            >
+                                <div
+                                    aria-hidden
+                                    style={{
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: 10,
+                                        background: uiPrimary,
+                                        flex: "0 0 auto",
+                                    }}
+                                />
+                                <div style={{ minWidth: 0, display: "flex", flexDirection: "column", lineHeight: 1.1, textAlign: "center" }}>
+                                    <div style={{ fontWeight: 800, color: uiTextMain, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                        {headerTitle}
+                                    </div>
+                                    {!hostOpen && unread ? (
+                                        <div style={{ fontSize: 12, color: uiTextMuted, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                                            <span style={{ color: "#ef4444", fontWeight: 700 }}>{t("visitorEmbed.unread", { count: unread })}</span>
+                                            {peerTyping ? <span style={{ color: "#7c3aed", fontWeight: 600 }}>{t("visitorEmbed.typing")}</span> : null}
+                                        </div>
+                                    ) : peerTyping ? (
+                                        <div style={{ fontSize: 12, color: uiTextMuted, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                                            <span style={{ color: "#7c3aed", fontWeight: 600 }}>{t("visitorEmbed.typing")}</span>
+                                        </div>
+                                    ) : null}
                                 </div>
-                                {!hostOpen && unread ? (
-                                    <div style={{ fontSize: 12, color: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", gap: 6 }}>
-                                        <span style={{ color: "#ef4444", fontWeight: 700 }}>{t("visitorEmbed.unread", { count: unread })}</span>
-                                        {peerTyping ? <span style={{ color: "#7c3aed", fontWeight: 600 }}>{t("visitorEmbed.typing")}</span> : null}
-                                    </div>
-                                ) : peerTyping ? (
-                                    <div style={{ fontSize: 12, color: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", gap: 6 }}>
-                                        <span style={{ color: "#7c3aed", fontWeight: 600 }}>{t("visitorEmbed.typing")}</span>
-                                    </div>
-                                ) : null}
                             </div>
                         </div>
 
-                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <div style={{ position: "absolute", right: 10, display: "flex", alignItems: "center", gap: 4 }}>
                             {window !== window.parent ? (
                                 <Tooltip title={t("visitorEmbed.minimize")}>
                                     <Button

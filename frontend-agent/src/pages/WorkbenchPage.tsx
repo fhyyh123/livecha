@@ -615,6 +615,7 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
                                     uploadProps={uploadProps}
                                     onSendText={onSendText}
                                     onDownload={onDownload}
+                                    getAttachmentUrl={downloadAttachment}
                                     onOpenQuickReplies={() => setQrOpen(true)}
                                     onReopen={onReopenConversation}
                                     canLoadOlder={Boolean(selectedId) && messages.length >= historyLimit && historyLimit < 2000}

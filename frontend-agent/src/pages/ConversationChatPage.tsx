@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -15,6 +15,7 @@ import {
 import type { UploadProps } from "antd";
 
 import { useChatStore } from "../store/chatStore";
+import { isPreviewableImage } from "../utils/attachments";
 
 function formatBytes(n?: number) {
     const v = Number(n || 0);
@@ -73,6 +74,63 @@ export function ConversationChatPage() {
         if (!url) return;
         window.open(url, "_blank");
     };
+
+    const attachmentUrlCacheRef = useRef<Record<string, string>>({});
+    const attachmentUrlPendingRef = useRef<Record<string, Promise<string | null>>>({});
+
+    function InlineImageAttachment(props: { attachmentId?: string; filename?: string; mime?: string }) {
+        const { attachmentId, filename, mime } = props;
+        const [url, setUrl] = useState<string | null>(null);
+        const isImg = isPreviewableImage(mime, filename);
+
+        useEffect(() => {
+            let alive = true;
+            const id = String(attachmentId || "");
+            if (!isImg || !id) return;
+
+            const cached = attachmentUrlCacheRef.current[id];
+            if (cached) {
+                setUrl(cached);
+                return;
+            }
+
+            const pending = attachmentUrlPendingRef.current[id];
+            const p =
+                pending ||
+                (attachmentUrlPendingRef.current[id] = downloadAttachment(id)
+                    .then((u) => {
+                        const next = u || null;
+                        if (next) attachmentUrlCacheRef.current[id] = next;
+                        return next;
+                    })
+                    .catch(() => null)
+                    .finally(() => {
+                        delete attachmentUrlPendingRef.current[id];
+                    }));
+
+            void p.then((u) => {
+                if (!alive) return;
+                setUrl(u);
+            });
+
+            return () => {
+                alive = false;
+            };
+        }, [attachmentId, filename, mime, isImg]);
+
+        if (!isImg) return null;
+        if (!url) return null;
+
+        return (
+            <img
+                src={url}
+                alt={filename || "image"}
+                loading="lazy"
+                style={{ display: "block", maxWidth: 260, maxHeight: 320, height: "auto", borderRadius: 10, cursor: "pointer" }}
+                onClick={() => window.open(url, "_blank")}
+            />
+        );
+    }
 
     const uploadProps: UploadProps = {
         beforeUpload: async (file) => {
@@ -137,6 +195,13 @@ export function ConversationChatPage() {
                                     <Typography.Text>{m.content?.text || ""}</Typography.Text>
                                 ) : (
                                     <Space size={8} wrap>
+                                        {isPreviewableImage(m.content?.mime, m.content?.filename) ? (
+                                            <InlineImageAttachment
+                                                attachmentId={m.content?.attachment_id}
+                                                filename={m.content?.filename}
+                                                mime={m.content?.mime}
+                                            />
+                                        ) : null}
                                         <Typography.Text>
                                             {m.content?.filename || m.content?.attachment_id || "file"}
                                         </Typography.Text>
