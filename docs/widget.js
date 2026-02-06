@@ -475,6 +475,13 @@
           return;
         }
 
+        // Prefetch is best-effort. If we can't determine a stable origin (e.g. srcdoc),
+        // skip to avoid triggering avoidable 400s from strict request validation.
+        if (!origin) {
+          resolve(null);
+          return;
+        }
+
         // Cache-bust to avoid any intermediate caching (even though it's POST).
         var url =
           base +
@@ -669,6 +676,18 @@
         return window.location.origin;
       }
     } catch (e) {
+      // ignore
+    }
+
+    // Admin preview environments sometimes run inside about:srcdoc iframes where
+    // window.location.origin becomes "null". Best-effort derive from referrer.
+    try {
+      var ref = String(document && document.referrer ? document.referrer : "");
+      if (ref) {
+        var u = safeParseUrl(ref);
+        if (u && u.origin && u.origin !== "null") return u.origin;
+      }
+    } catch (e2) {
       // ignore
     }
     return "";

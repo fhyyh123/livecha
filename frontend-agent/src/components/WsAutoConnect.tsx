@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useIsAuthenticated } from "@refinedev/core";
 
-import { http } from "../providers/http";
+import { AUTH_CHANGED_EVENT, getCurrentUserId, http } from "../providers/http";
 import { useChatStore } from "../store/chatStore";
 
 const SESSION_STORAGE_KEY = "chatlive.agent.session_id" as const;
@@ -17,6 +17,47 @@ export function WsAutoConnect() {
     const bootstrapInboxSubscriptions = useChatStore((s) => s.bootstrapInboxSubscriptions);
 
     const didBootstrapInboxRef = useRef(false);
+    const prevUserIdRef = useRef<string>(getCurrentUserId());
+    const [authSeq, setAuthSeq] = useState(0);
+
+    useEffect(() => {
+        const onAuthChanged = () => {
+            // Force WS reconnect so server binds new token claims.
+            disconnectWs();
+            didBootstrapInboxRef.current = false;
+
+            // If the logged-in user changed (e.g. user registers a new tenant
+            // while an old token/session is still present), clear the agent
+            // presence session so we don't keep using a stale session_id.
+            const nextUserId = getCurrentUserId();
+            if (nextUserId !== prevUserIdRef.current) {
+                prevUserIdRef.current = nextUserId;
+                try {
+                    localStorage.removeItem(SESSION_STORAGE_KEY);
+                    localStorage.removeItem(HEARTBEAT_INTERVAL_KEY);
+                    localStorage.removeItem(HEARTBEAT_TTL_KEY);
+                } catch {
+                    // ignore
+                }
+            }
+
+            setAuthSeq((x) => x + 1);
+        };
+
+        try {
+            globalThis.window?.addEventListener(AUTH_CHANGED_EVENT, onAuthChanged);
+        } catch {
+            // ignore
+        }
+
+        return () => {
+            try {
+                globalThis.window?.removeEventListener(AUTH_CHANGED_EVENT, onAuthChanged);
+            } catch {
+                // ignore
+            }
+        };
+    }, [disconnectWs]);
 
     useEffect(() => {
         if (isLoading) return;
@@ -76,7 +117,7 @@ export function WsAutoConnect() {
         return () => {
             cancelled = true;
         };
-    }, [authenticated, isLoading, connectWs, disconnectWs, bootstrapInboxSubscriptions]);
+    }, [authenticated, isLoading, authSeq, connectWs, disconnectWs, bootstrapInboxSubscriptions]);
 
     return null;
 }
