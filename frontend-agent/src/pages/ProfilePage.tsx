@@ -28,6 +28,7 @@ type ProfileMeResponse = {
     display_name?: string | null;
     job_title?: string | null;
     max_concurrent: number;
+    avatar_url?: string | null;
 };
 
 type SkillGroupItem = {
@@ -58,6 +59,41 @@ function clampInt(value: unknown, min: number, max: number, fallback: number) {
     return Math.max(min, Math.min(max, Math.trunc(n)));
 }
 
+function bytesToMb(bytes: unknown): number {
+    const n = Number(bytes);
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    return Math.round((n / 1024 / 1024) * 10) / 10;
+}
+
+function avatarUploadErrorDescription(e: unknown, file: File | null, t: (key: string, opts?: any) => string): string {
+    const code = String((e as any)?.code || (e as any)?.message || "");
+    if (code === "invalid_avatar_type") return t("profile.invalidAvatarType");
+    if (code === "file_too_large") return t("profile.avatarTooLarge");
+    if (code === "storage_disabled" || code === "storage_not_configured") return t("profile.avatarUploadUnavailable");
+    if (code === "presign_failed") return t("profile.avatarPresignFailed");
+
+    if (code.startsWith("upload_failed_")) {
+        const statusRaw = code.slice("upload_failed_".length);
+        const status = Number(statusRaw);
+        if (Number.isFinite(status) && status > 0) {
+            return t("profile.avatarUploadHttpFailed", { status });
+        }
+        return t("profile.avatarUploadFailed");
+    }
+
+    const msg = code.toLowerCase();
+    if (msg.includes("failed to fetch") || msg.includes("network") || msg.includes("timeout")) {
+        return t("profile.avatarUploadFailed");
+    }
+
+    // If file has no content-type, hint the user (common in some browsers/environments)
+    if (file && !String(file.type || "").trim()) {
+        return t("profile.avatarUploadFailed");
+    }
+
+    return errorMessage(e, t("common.saveFailed"));
+}
+
 export function ProfilePage() {
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -67,6 +103,7 @@ export function ProfilePage() {
 
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [avatarUploading, setAvatarUploading] = useState(false);
 
     const [viewer, setViewer] = useState<ProfileMeResponse | null>(null);
     const [me, setMe] = useState<ProfileMeResponse | null>(null);
@@ -88,6 +125,59 @@ export function ProfilePage() {
         const base = me?.display_name || me?.username || "";
         return initials(base);
     }, [me?.display_name, me?.username]);
+
+    async function uploadAvatar(file: File) {
+        if (!file) return;
+        setAvatarUploading(true);
+        try {
+            const ct = String(file.type || "").toLowerCase();
+            const okType = ct === "image/png" || ct === "image/jpeg" || ct === "image/jpg" || ct === "image/webp" || ct === "image/gif";
+            if (!okType) {
+                throw new Error("invalid_avatar_type");
+            }
+
+            const presign = await http.post<{
+                upload_url: string;
+                max_upload_bytes?: number;
+            }>("/api/v1/profile/me/avatar/presign-upload", {
+                filename: file.name,
+                content_type: file.type || "application/octet-stream",
+                size_bytes: file.size,
+            });
+
+            const uploadUrl = presign.data?.upload_url;
+            if (!uploadUrl) throw new Error("presign_failed");
+
+            const maxMb = bytesToMb(presign.data?.max_upload_bytes);
+            if (maxMb > 0 && file.size > Number(presign.data?.max_upload_bytes)) {
+                throw new Error("file_too_large");
+            }
+
+            const put = await fetch(uploadUrl, {
+                method: "PUT",
+                headers: { "Content-Type": file.type || "application/octet-stream" },
+                body: file,
+            });
+            if (!put.ok) {
+                throw new Error(`upload_failed_${put.status}`);
+            }
+
+            notification.success({
+                message: t("profile.avatarUpdated"),
+                placement: "bottomRight",
+                duration: 1.5,
+            });
+            await loadAll();
+        } catch (e) {
+            notification.error({
+                message: t("common.saveFailed"),
+                description: avatarUploadErrorDescription(e, file, t),
+                placement: "bottomRight",
+            });
+        } finally {
+            setAvatarUploading(false);
+        }
+    }
 
     async function loadAll() {
         setLoading(true);
@@ -276,6 +366,7 @@ export function ProfilePage() {
                         <div style={{ position: "relative", display: "inline-block" }}>
                             <Avatar
                                 size={96}
+                                src={me?.avatar_url || undefined}
                                 style={{ background: "#7c3aed", fontSize: 40, userSelect: "none" }}
                             >
                                 {avatarName}
@@ -296,14 +387,17 @@ export function ProfilePage() {
                                 icon={<PlusOutlined />}
                                 size="small"
                                 style={{ position: "absolute", right: -4, bottom: -4 }}
-                                onClick={() =>
-                                    notification.info({
-                                        message: t("team.comingSoon"),
-                                        description: t("profile.changeAvatar"),
-                                        placement: "bottomRight",
-                                        duration: 2,
-                                    })
-                                }
+                                loading={avatarUploading}
+                                onClick={() => {
+                                    const input = document.createElement("input");
+                                    input.type = "file";
+                                    input.accept = "image/png,image/jpeg,image/webp,image/gif";
+                                    input.onchange = () => {
+                                        const f = input.files && input.files[0];
+                                        if (f) void uploadAvatar(f);
+                                    };
+                                    input.click();
+                                }}
                             />
                         </div>
 

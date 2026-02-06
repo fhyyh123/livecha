@@ -12,7 +12,15 @@ public class AgentProfileRepository {
     public record AgentProfileRow(String userId, String status, int maxConcurrent) {
     }
 
-    public record AgentProfileDetailsRow(String userId, String displayName, String jobTitle) {
+        public record AgentProfileDetailsRow(
+            String userId,
+            String displayName,
+            String jobTitle,
+            String avatarBucket,
+            String avatarObjectKey,
+            String avatarContentType,
+            java.time.Instant avatarUpdatedAt
+        ) {
     }
 
     public record AgentCandidateRow(String userId, int maxConcurrent) {
@@ -88,13 +96,54 @@ public class AgentProfileRepository {
     }
 
     public Optional<AgentProfileDetailsRow> findDetailsByUserId(String userId) {
-        var sql = "select user_id, display_name, job_title from agent_profile where user_id = ? limit 1";
+        var sql = """
+                select user_id, display_name, job_title,
+                       avatar_bucket, avatar_object_key, avatar_content_type, avatar_updated_at
+                from agent_profile
+                where user_id = ?
+                limit 1
+                """;
         var list = jdbcTemplate.query(sql, (rs, rowNum) -> new AgentProfileDetailsRow(
                 rs.getString("user_id"),
                 rs.getString("display_name"),
-                rs.getString("job_title")
+                rs.getString("job_title"),
+                rs.getString("avatar_bucket"),
+                rs.getString("avatar_object_key"),
+                rs.getString("avatar_content_type"),
+                rs.getTimestamp("avatar_updated_at") == null ? null : rs.getTimestamp("avatar_updated_at").toInstant()
         ), userId);
         return list.stream().findFirst();
+    }
+
+    public void upsertAvatar(String userId, String bucket, String objectKey, String contentType) {
+        var b = bucket == null ? null : bucket.trim();
+        if (b != null && b.isBlank()) b = null;
+        var k = objectKey == null ? null : objectKey.trim();
+        if (k != null && k.isBlank()) k = null;
+        var ct = contentType == null ? null : contentType.trim();
+        if (ct != null && ct.isBlank()) ct = null;
+
+        var pg = """
+                insert into agent_profile(user_id, status, max_concurrent, avatar_bucket, avatar_object_key, avatar_content_type, avatar_updated_at, created_at)
+                values (?, 'offline', 3, ?, ?, ?, now(), now())
+                on conflict (user_id)
+                do update set avatar_bucket = excluded.avatar_bucket,
+                              avatar_object_key = excluded.avatar_object_key,
+                              avatar_content_type = excluded.avatar_content_type,
+                              avatar_updated_at = excluded.avatar_updated_at
+                """;
+
+        var h2 = """
+                merge into agent_profile (user_id, status, max_concurrent, display_name, job_title, avatar_bucket, avatar_object_key, avatar_content_type, avatar_updated_at, created_at)
+                key(user_id)
+                values (?, 'offline', 3, null, null, ?, ?, ?, current_timestamp, current_timestamp)
+                """;
+
+        try {
+            jdbcTemplate.update(pg, userId, b, k, ct);
+        } catch (Exception ignored) {
+            jdbcTemplate.update(h2, userId, b, k, ct);
+        }
     }
 
     public void upsertDetails(String userId, String displayName, String jobTitle) {

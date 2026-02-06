@@ -3,6 +3,8 @@ package com.chatlive.support.profile.api;
 import com.chatlive.support.auth.service.jwt.JwtService;
 import com.chatlive.support.chat.repo.AgentProfileRepository;
 import com.chatlive.support.common.api.ApiResponse;
+import com.chatlive.support.profile.service.AgentAvatarService;
+import com.chatlive.support.profile.service.AvatarUrlService;
 import com.chatlive.support.user.repo.UserAccountRepository;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -18,7 +20,24 @@ public class ProfileController {
             String email,
             String display_name,
             String job_title,
-            int max_concurrent
+            int max_concurrent,
+            String avatar_url
+    ) {
+    }
+
+    public record PresignAvatarUploadRequest(
+            String filename,
+            String content_type,
+            Long size_bytes
+    ) {
+    }
+
+    public record PresignAvatarUploadResponse(
+            String bucket,
+            String object_key,
+            String upload_url,
+            long expires_in_seconds,
+            long max_upload_bytes
     ) {
     }
 
@@ -31,15 +50,21 @@ public class ProfileController {
     private final JwtService jwtService;
     private final UserAccountRepository userAccountRepository;
     private final AgentProfileRepository agentProfileRepository;
+        private final AgentAvatarService agentAvatarService;
+        private final AvatarUrlService avatarUrlService;
 
     public ProfileController(
             JwtService jwtService,
             UserAccountRepository userAccountRepository,
-            AgentProfileRepository agentProfileRepository
+                        AgentProfileRepository agentProfileRepository,
+                        AgentAvatarService agentAvatarService,
+                        AvatarUrlService avatarUrlService
     ) {
         this.jwtService = jwtService;
         this.userAccountRepository = userAccountRepository;
         this.agentProfileRepository = agentProfileRepository;
+                this.agentAvatarService = agentAvatarService;
+                this.avatarUrlService = avatarUrlService;
     }
 
     @GetMapping("/me")
@@ -60,6 +85,7 @@ public class ProfileController {
                 .orElse(new AgentProfileRepository.AgentProfileRow(claims.userId(), "offline", 3));
 
         var details = agentProfileRepository.findDetailsByUserId(claims.userId()).orElse(null);
+        var avatarView = avatarUrlService.getAgentAvatarView(claims.userId());
 
         return ApiResponse.ok(new ProfileMeResponse(
                 claims.userId(),
@@ -68,7 +94,8 @@ public class ProfileController {
                 me.email(),
                 details == null ? null : details.displayName(),
                 details == null ? null : details.jobTitle(),
-                profile.maxConcurrent()
+                profile.maxConcurrent(),
+                avatarView == null ? null : avatarView.avatar_url()
         ));
     }
 
@@ -97,6 +124,7 @@ public class ProfileController {
                 .orElse(new AgentProfileRepository.AgentProfileRow(userId, "offline", 3));
 
         var details = agentProfileRepository.findDetailsByUserId(userId).orElse(null);
+        var avatarView = avatarUrlService.getAgentAvatarView(userId);
 
         return ApiResponse.ok(new ProfileMeResponse(
                 userId,
@@ -105,7 +133,36 @@ public class ProfileController {
                 user.email(),
                 details == null ? null : details.displayName(),
                 details == null ? null : details.jobTitle(),
-                profile.maxConcurrent()
+                profile.maxConcurrent(),
+                avatarView == null ? null : avatarView.avatar_url()
+        ));
+    }
+
+    @PostMapping("/me/avatar/presign-upload")
+    public ApiResponse<PresignAvatarUploadResponse> presignMyAvatarUpload(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestBody PresignAvatarUploadRequest req
+    ) {
+        var token = JwtService.extractBearerToken(authorization)
+                .orElseThrow(() -> new IllegalArgumentException("missing_token"));
+        var claims = jwtService.parse(token);
+        if ("customer".equals(claims.role())) {
+            throw new IllegalArgumentException("forbidden");
+        }
+
+        var r = agentAvatarService.presignUpload(
+                claims,
+                req == null ? null : req.filename(),
+                req == null ? null : req.content_type(),
+                req == null || req.size_bytes() == null ? 0 : req.size_bytes()
+        );
+
+        return ApiResponse.ok(new PresignAvatarUploadResponse(
+                r.bucket(),
+                r.object_key(),
+                r.upload_url(),
+                r.expires_in_seconds(),
+                r.max_upload_bytes()
         ));
     }
 

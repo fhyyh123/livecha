@@ -4,6 +4,7 @@ import com.chatlive.support.auth.service.jwt.JwtClaims;
 import com.chatlive.support.chat.api.MessagePage;
 import com.chatlive.support.chat.repo.ConversationRepository;
 import com.chatlive.support.chat.service.MessageService;
+import com.chatlive.support.profile.service.AvatarUrlService;
 import com.chatlive.support.publicchat.api.PublicConversationDetailResponse;
 import org.springframework.stereotype.Service;
 
@@ -12,10 +13,16 @@ public class PublicConversationQueryService {
 
     private final ConversationRepository conversationRepository;
     private final MessageService messageService;
+    private final AvatarUrlService avatarUrlService;
 
-    public PublicConversationQueryService(ConversationRepository conversationRepository, MessageService messageService) {
+    public PublicConversationQueryService(
+            ConversationRepository conversationRepository,
+            MessageService messageService,
+            AvatarUrlService avatarUrlService
+    ) {
         this.conversationRepository = conversationRepository;
         this.messageService = messageService;
+        this.avatarUrlService = avatarUrlService;
     }
 
     public PublicConversationDetailResponse getDetail(JwtClaims claims, String conversationId) {
@@ -31,12 +38,17 @@ public class PublicConversationQueryService {
         var detail = conversationRepository.findDetail(claims.tenantId(), conversationId)
                 .orElseThrow(() -> new IllegalArgumentException("conversation_not_found"));
 
+        var assignedAgentUserId = detail.assignedAgentUserId();
+        var avatarView = avatarUrlService.getAgentAvatarView(assignedAgentUserId);
+
         return new PublicConversationDetailResponse(
                 detail.id(),
                 detail.status(),
                 detail.channel(),
                 detail.subject(),
-                detail.assignedAgentUserId(),
+            assignedAgentUserId,
+            avatarView == null ? null : avatarView.display_name(),
+            avatarView == null ? null : avatarView.avatar_url(),
                 detail.createdAt().getEpochSecond(),
                 detail.lastMsgAt().getEpochSecond()
         );

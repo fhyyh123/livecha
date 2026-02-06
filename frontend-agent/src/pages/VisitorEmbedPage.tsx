@@ -116,6 +116,8 @@ type PublicConversationDetail = {
     channel: string;
     subject?: string | null;
     assigned_agent_user_id?: string | null;
+    assigned_agent_display_name?: string | null;
+    assigned_agent_avatar_url?: string | null;
     created_at: number;
     last_msg_at: number;
 };
@@ -473,6 +475,14 @@ function formatTimeShort(epochSeconds: number): string {
     } catch {
         return "";
     }
+}
+
+function initials(name: string): string {
+    const s = String(name || "").trim();
+    if (!s) return "A";
+    const first = s.split(/[\s_-]+/).filter(Boolean)[0] || s;
+    const ch = Array.from(first)[0] || "";
+    return ch ? ch.toUpperCase() : "A";
 }
 
 export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } = {}) {
@@ -2213,6 +2223,8 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                                         const sender = String(m.sender_type || "");
                                         const isCustomer = sender === "customer";
                                         const isAgent = sender === "agent";
+                                        const agentAvatarUrl = String(detail?.assigned_agent_avatar_url || "");
+                                        const agentInitial = initials(String(detail?.assigned_agent_display_name || ""));
 
                                         if (system) {
                                             return (
@@ -2284,7 +2296,23 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                                             <div key={m.id} style={{ display: "flex", flexDirection: "column" }}>
                                                 <div style={rowStyle}>
                                                     <div style={avatarStyle} aria-hidden>
-                                                        S
+                                                        {isAgent ? (
+                                                            agentAvatarUrl ? (
+                                                                <img
+                                                                    src={agentAvatarUrl}
+                                                                    alt=""
+                                                                    style={{
+                                                                        width: "100%",
+                                                                        height: "100%",
+                                                                        borderRadius: 12,
+                                                                        objectFit: "cover",
+                                                                        display: "block",
+                                                                    }}
+                                                                />
+                                                            ) : (
+                                                                agentInitial
+                                                            )
+                                                        ) : null}
                                                     </div>
                                                     <div style={bubbleStyle}>{renderMessageContent(m)}</div>
                                                 </div>

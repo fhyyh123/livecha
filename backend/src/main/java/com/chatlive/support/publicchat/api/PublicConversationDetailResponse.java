@@ -6,6 +6,8 @@ public record PublicConversationDetailResponse(
         String channel,
         String subject,
         String assigned_agent_user_id,
+        String assigned_agent_display_name,
+        String assigned_agent_avatar_url,
         long created_at,
         long last_msg_at
 ) {

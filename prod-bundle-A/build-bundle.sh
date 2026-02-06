@@ -18,7 +18,7 @@ IMAGE="chatlive-backend:${TAG}"
 OUT_TAR="$SCRIPT_DIR/chatlive-backend_${TAG}.tar"
 
 echo "[1/3] Building backend jar..."
-(cd backend && mvn -q -DskipTests package)
+(cd backend && mvn -q -DskipTests clean package)
 
 echo "[2/3] Building docker image: ${IMAGE}"
 docker build -t "$IMAGE" backend
