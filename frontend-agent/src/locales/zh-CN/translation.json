@@ -763,20 +763,6 @@
       "fakeMessage": "你好！",
       "defaultWelcome": "在线客服"
     },
-    "cookieStrategy": {
-      "title": "visitor_id Cookie 策略（可选）",
-      "hint": "用于跨子域持久化 visitor_id。若要跨子域，请填写 cookie_domain（例如 .example.com）。"
-    },
-    "cookieDomain": {
-      "label": "cookie_domain（可选）",
-      "tooltip": "例如 .example.com；留空则不设置 Domain。",
-      "placeholder": ".example.com"
-    },
-    "cookieSameSite": {
-      "label": "cookie_samesite（可选）",
-      "tooltip": "默认 Lax。跨站第三方嵌入通常需要 None + https。",
-      "placeholder": "Lax / Strict / None"
-    },
     "tweaksOptions": {
       "showLogo": "显示徽标",
       "uploadLogo": "上传徽标",

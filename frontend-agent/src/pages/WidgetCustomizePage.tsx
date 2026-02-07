@@ -1,6 +1,7 @@
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Card, Col, Collapse, Divider, Form, Input, InputNumber, Radio, Row, Select, Space, Spin, Switch, Typography } from "antd";
+import { Alert, Button, Card, Col, Collapse, Divider, Form, Input, InputNumber, Radio, Row, Select, Space, Spin, Switch, Tooltip, Typography } from "antd";
 import { useTranslation } from "react-i18next";
+import { ExclamationCircleOutlined } from "@ant-design/icons";
 
 import { http } from "../providers/http";
 import { errorMessage } from "../utils/errorMessage";
@@ -1043,81 +1044,95 @@ export function WidgetCustomizePage() {
                                             label: t("widgetCustomize.sections.tweaks"),
                                             children: (
                                                 <>
-                                                    <Typography.Text strong>{t("widgetCustomize.cookieStrategy.title")}</Typography.Text>
-                                                    <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>
-                                                        {t("widgetCustomize.cookieStrategy.hint")}
-                                                    </Typography.Paragraph>
+                                                    {(() => {
+                                                        const row: CSSProperties = {
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "space-between",
+                                                            gap: 12,
+                                                            padding: "8px 0",
+                                                        };
+                                                        const left: CSSProperties = { display: "flex", alignItems: "center", gap: 8, minWidth: 0 };
+                                                        const right: CSSProperties = { display: "flex", alignItems: "center", gap: 10, flex: "0 0 auto" };
+                                                        const hintIconStyle: CSSProperties = { color: "rgba(0,0,0,.45)", cursor: "help", fontSize: 14 };
 
-                                                    <Form.Item
-                                                        label={t("widgetCustomize.cookieDomain.label")}
-                                                        name="cookie_domain"
-                                                        tooltip={t("widgetCustomize.cookieDomain.tooltip")}
-                                                    >
-                                                        <Input placeholder={t("widgetCustomize.cookieDomain.placeholder")} />
-                                                    </Form.Item>
+                                                        return (
+                                                            <>
+                                                                <div style={row}>
+                                                                    <div style={left}>
+                                                                        <Typography.Text>{t("widgetCustomize.fields.debug")}</Typography.Text>
+                                                                    </div>
+                                                                    <div style={right}>
+                                                                        <Form.Item name="debug" valuePropName="checked" noStyle>
+                                                                            <Switch />
+                                                                        </Form.Item>
+                                                                    </div>
+                                                                </div>
 
-                                                    <Form.Item
-                                                        label={t("widgetCustomize.cookieSameSite.label")}
-                                                        name="cookie_samesite"
-                                                        tooltip={t("widgetCustomize.cookieSameSite.tooltip")}
-                                                    >
-                                                        <Select
-                                                            allowClear
-                                                            placeholder={t("widgetCustomize.cookieSameSite.placeholder")}
-                                                            options={[
-                                                                { value: "Lax", label: "Lax" },
-                                                                { value: "Strict", label: "Strict" },
-                                                                { value: "None", label: "None" },
-                                                            ]}
-                                                        />
-                                                    </Form.Item>
+                                                                <div style={row}>
+                                                                    <div style={left}>
+                                                                        <Typography.Text>{t("widgetCustomize.tweaksOptions.showLogo")}</Typography.Text>
+                                                                    </div>
+                                                                    <div style={right}>
+                                                                        <input
+                                                                            ref={logoFileInputRef}
+                                                                            type="file"
+                                                                            accept="image/*"
+                                                                            style={{ display: "none" }}
+                                                                            onChange={(e) => {
+                                                                                const f = e.target.files?.[0];
+                                                                                if (!f) return;
+                                                                                void uploadLogo(f);
+                                                                                // allow re-uploading same file
+                                                                                e.currentTarget.value = "";
+                                                                            }}
+                                                                        />
 
-                                                    <Divider style={{ margin: "12px 0" }} />
+                                                                        <Button
+                                                                            type="link"
+                                                                            onClick={() => logoFileInputRef.current?.click()}
+                                                                            loading={logoUploading}
+                                                                            disabled={!isAdmin}
+                                                                            style={{ padding: 0, height: "auto" }}
+                                                                        >
+                                                                            {t("widgetCustomize.tweaksOptions.uploadLogo")}
+                                                                        </Button>
 
-                                                    <Form.Item label={t("widgetCustomize.fields.debug")} name="debug" valuePropName="checked">
-                                                        <Switch />
-                                                    </Form.Item>
-                                                    <Form.Item label={t("widgetCustomize.tweaksOptions.showLogo")} name="show_logo" valuePropName="checked">
-                                                        <Switch />
-                                                    </Form.Item>
+                                                                        <Tooltip title={t("widgetCustomize.tweaksOptions.uploadLogoHint")}>
+                                                                            <span aria-label="Help">
+                                                                                <ExclamationCircleOutlined style={hintIconStyle} />
+                                                                            </span>
+                                                                        </Tooltip>
 
-                                                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: -6, marginBottom: 12 }}>
-                                                        <input
-                                                            ref={logoFileInputRef}
-                                                            type="file"
-                                                            accept="image/*"
-                                                            style={{ display: "none" }}
-                                                            onChange={(e) => {
-                                                                const f = e.target.files?.[0];
-                                                                if (!f) return;
-                                                                void uploadLogo(f);
-                                                                // allow re-uploading same file
-                                                                e.currentTarget.value = "";
-                                                            }}
-                                                        />
+                                                                        {watchLogoUrl ? (
+                                                                            <img
+                                                                                alt={t("widgetCustomize.tweaksOptions.showLogo")}
+                                                                                src={String(watchLogoUrl || "")}
+                                                                                style={{ height: 28, width: 28, borderRadius: 8, objectFit: "cover", border: "1px solid rgba(15,23,42,.12)" }}
+                                                                            />
+                                                                        ) : null}
 
-                                                        <Button onClick={() => logoFileInputRef.current?.click()} loading={logoUploading} disabled={!isAdmin}>
-                                                            {t("widgetCustomize.tweaksOptions.uploadLogo")}
-                                                        </Button>
+                                                                        <Form.Item name="show_logo" valuePropName="checked" noStyle>
+                                                                            <Switch />
+                                                                        </Form.Item>
+                                                                    </div>
+                                                                </div>
 
-                                                        {watchLogoUrl ? (
-                                                            <img
-                                                                alt={t("widgetCustomize.tweaksOptions.showLogo")}
-                                                                src={String(watchLogoUrl || "")}
-                                                                style={{ height: 28, width: 28, borderRadius: 8, objectFit: "cover", border: "1px solid rgba(15,23,42,.12)" }}
-                                                            />
-                                                        ) : (
-                                                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                                                                {t("widgetCustomize.tweaksOptions.uploadLogoHint")}
-                                                            </Typography.Text>
-                                                        )}
-                                                    </div>
+                                                                {logoUploadError ? <Alert type="warning" showIcon message={logoUploadError} style={{ marginBottom: 12 }} /> : null}
 
-                                                    {logoUploadError ? <Alert type="warning" showIcon message={logoUploadError} style={{ marginBottom: 12 }} /> : null}
-
-                                                    <Form.Item label={t("widgetCustomize.tweaksOptions.showAgentPhoto")} name="show_agent_photo" valuePropName="checked">
-                                                        <Switch />
-                                                    </Form.Item>
+                                                                <div style={row}>
+                                                                    <div style={left}>
+                                                                        <Typography.Text>{t("widgetCustomize.tweaksOptions.showAgentPhoto")}</Typography.Text>
+                                                                    </div>
+                                                                    <div style={right}>
+                                                                        <Form.Item name="show_agent_photo" valuePropName="checked" noStyle>
+                                                                            <Switch />
+                                                                        </Form.Item>
+                                                                    </div>
+                                                                </div>
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </>
                                             ),
                                         },

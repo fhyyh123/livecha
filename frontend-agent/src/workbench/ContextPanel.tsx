@@ -11,7 +11,7 @@ export function ContextPanel({ children, width = 320 }: ContextPanelProps) {
         <Layout.Sider
             width={width}
             theme="light"
-            style={{ borderLeft: "1px solid #f0f0f0", overflow: "hidden", height: "100%" }}
+            style={{ borderLeft: "1px solid #f0f0f0", overflowX: "hidden", overflowY: "auto", height: "100%" }}
         >
             {children ?? <div style={{ padding: 12 }}>ContextPanel</div>}
         </Layout.Sider>

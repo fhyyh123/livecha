@@ -767,20 +767,6 @@
       "fakeMessage": "Hi!",
       "defaultWelcome": "Chat"
     },
-    "cookieStrategy": {
-      "title": "visitor_id cookie strategy (optional)",
-      "hint": "Used to persist visitor_id across subdomains. For subdomains, set cookie_domain (e.g. .example.com)."
-    },
-    "cookieDomain": {
-      "label": "cookie_domain (optional)",
-      "tooltip": "e.g. .example.com; leave empty to not set Domain.",
-      "placeholder": ".example.com"
-    },
-    "cookieSameSite": {
-      "label": "cookie_samesite (optional)",
-      "tooltip": "Default is Lax. Cross-site third-party embeds usually require None + https.",
-      "placeholder": "Lax / Strict / None"
-    },
     "tweaksOptions": {
       "showLogo": "Show logo",
       "uploadLogo": "Upload logo",
