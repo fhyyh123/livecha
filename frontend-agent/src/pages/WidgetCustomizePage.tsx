@@ -1185,7 +1185,7 @@ export function WidgetCustomizePage() {
                                 </Button>
                             }
                         >
-                            <div style={{ height: 620 }}>{previewIframe}</div>
+                            <div style={{ height: 720 }}>{previewIframe}</div>
                         </Card>
                     </Col>
                 </Row>

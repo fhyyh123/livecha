@@ -148,6 +148,12 @@
     // Optional postMessage origin allowlist. If set, widget accepts messages from these origins.
     // Otherwise it defaults to the embedUrl origin.
     allowedOrigins: null,
+
+    // Preview-only overrides (used by admin previews).
+    // Forwarded to the visitor iframe via HOST_INIT so it can override server widget_config.
+    widgetLanguage: null,
+    widgetPhrasesJson: null,
+    welcomeText: null,
   };
 
   var PM_CHANNEL = "chatlive.widget";
@@ -1310,6 +1316,9 @@
         colorOverridesJson: state.config.colorOverridesJson || null,
         launcherStyle: state.config.launcherStyle || "bubble",
         autoHeight: !!state.config.autoHeight,
+        widgetLanguage: state.config.widgetLanguage || null,
+        widgetPhrasesJson: state.config.widgetPhrasesJson || null,
+        welcomeText: state.config.welcomeText || null,
         page: getPageInfo(),
       });
       postHostVisibility();
@@ -1599,6 +1608,9 @@
         colorOverridesJson: state.config.colorOverridesJson || null,
         launcherStyle: state.config.launcherStyle || "bubble",
         autoHeight: !!state.config.autoHeight,
+        widgetLanguage: state.config.widgetLanguage || null,
+        widgetPhrasesJson: state.config.widgetPhrasesJson || null,
+        welcomeText: state.config.welcomeText || null,
         page: getPageInfo(),
       });
       return;

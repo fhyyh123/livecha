@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Card, Col, Divider, Form, Grid, Input, Layout, Row, Select, Space, Spin, Typography } from "antd";
 import { useTranslation } from "react-i18next";
 
-import i18n from "../i18n";
 import { http } from "../providers/http";
 import { errorMessage } from "../utils/errorMessage";
 
@@ -27,6 +26,17 @@ type WidgetConfigDto = {
     pre_chat_email_label?: string | null;
     pre_chat_name_required?: boolean;
     pre_chat_email_required?: boolean;
+};
+
+type WidgetSnippetResponse = {
+    site_id: string;
+    site_key: string;
+    embed_url: string;
+    widget_script_url: string;
+    widget_script_versioned_url: string;
+    cookie_domain?: string | null;
+    cookie_samesite?: string | null;
+    snippet_html: string;
 };
 
 type PhraseFormValues = {
@@ -115,81 +125,45 @@ function normalizeWidgetLanguage(v: unknown): "en" | "zh-CN" {
     return "en";
 }
 
-function Preview({ lang, welcomeText, phrases }: { lang: "en" | "zh-CN"; welcomeText: string; phrases: Record<string, string> }) {
-    const fixedT = useMemo(() => i18n.getFixedT(lang), [lang]);
+function escapeAttr(s: string): string {
+    return String(s)
+        .replaceAll("&", "&amp;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+}
 
-    const headerTitle = phrases.header_title || fixedT("visitorEmbed.headerTitle");
-    const composerPlaceholder = phrases.message_placeholder || fixedT("visitorEmbed.composer.placeholder");
+function appendQueryParams(rawUrl: string, params: Record<string, string>): string {
+    const input = String(rawUrl || "").trim();
+    if (!input) return input;
+    try {
+        const base = typeof window !== "undefined" ? window.location.href : "http://localhost/";
+        const u = new URL(input, base);
+        for (const [k, v] of Object.entries(params || {})) {
+            if (!k) continue;
+            u.searchParams.set(k, String(v));
+        }
+        return u.toString();
+    } catch {
+        const qs = Object.entries(params || {})
+            .filter(([k, v]) => k && v !== undefined)
+            .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+            .join("&");
+        if (!qs) return input;
+        return input + (input.includes("?") ? "&" : "?") + qs;
+    }
+}
 
-    const welcome = welcomeText.trim() || fixedT("widgetLanguage.preview.welcomeFallback");
-    const customerBubble = fixedT("widgetLanguage.preview.customerBubble");
-    const agentBubble = fixedT("widgetLanguage.preview.agentBubble");
-
-    return (
-        <div style={{ display: "flex", justifyContent: "center", padding: 12 }}>
-            <div
-                style={{
-                    width: 340,
-                    borderRadius: 18,
-                    border: "1px solid rgba(15,23,42,.10)",
-                    overflow: "hidden",
-                    background: "#fff",
-                    boxShadow: "0 20px 45px rgba(0,0,0,.08)",
-                }}
-            >
-                <div style={{ padding: 12, borderBottom: "1px solid rgba(15,23,42,.06)", display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 10, background: "#2563eb" }} />
-                    <div style={{ fontWeight: 800, color: "#0f172a", fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {headerTitle}
-                    </div>
-                </div>
-
-                <div style={{ padding: 12, background: "#f8fafc", minHeight: 240 }}>
-                    <div style={{ display: "flex", justifyContent: "center", margin: "10px 0 14px" }}>
-                        <div
-                            style={{
-                                maxWidth: "92%",
-                                background: "rgba(15,23,42,.06)",
-                                color: "rgba(15,23,42,.7)",
-                                padding: "8px 12px",
-                                borderRadius: 999,
-                                fontSize: 12,
-                                textAlign: "center",
-                            }}
-                        >
-                            {welcome}
-                        </div>
-                    </div>
-
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-                        <div style={{ background: "#2563eb", color: "#fff", padding: "8px 10px", borderRadius: 14, maxWidth: "78%", fontSize: 13 }}>
-                            {customerBubble}
-                        </div>
-                    </div>
-
-                    <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                        <div style={{ background: "#fff", border: "1px solid rgba(15,23,42,.08)", color: "#0f172a", padding: "8px 10px", borderRadius: 14, maxWidth: "78%", fontSize: 13 }}>
-                            {agentBubble}
-                        </div>
-                    </div>
-                </div>
-
-                <div style={{ padding: 10, borderTop: "1px solid rgba(15,23,42,.06)", background: "#fff" }}>
-                    <div
-                        style={{
-                            border: "1px solid rgba(15,23,42,.12)",
-                            borderRadius: 999,
-                            padding: "10px 12px",
-                            color: "rgba(15,23,42,.55)",
-                            fontSize: 13,
-                        }}
-                    >
-                        {composerPlaceholder}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
+function buildPreviewScriptTagHtml(params: { scriptUrl: string; siteKey: string; embedUrl: string }): string {
+    const { scriptUrl, siteKey, embedUrl } = params;
+    const lines: string[] = [];
+    lines.push("<script");
+    lines.push("  defer");
+    lines.push(`  src=\"${escapeAttr(scriptUrl)}\"`);
+    lines.push(`  data-chatlive-site-key=\"${escapeAttr(siteKey)}\"`);
+    lines.push(`  data-chatlive-embed-url=\"${escapeAttr(embedUrl)}\"`);
+    lines.push("></script>");
+    return lines.join("\n");
 }
 
 export function WidgetLanguagePage() {
@@ -210,9 +184,18 @@ export function WidgetLanguagePage() {
     const [cfgError, setCfgError] = useState<string>("");
     const [saving, setSaving] = useState(false);
 
+    const [snippetLoading, setSnippetLoading] = useState(false);
+    const [snippetError, setSnippetError] = useState<string>("");
+    const [snippet, setSnippet] = useState<WidgetSnippetResponse | null>(null);
+
+    const [previewReload] = useState(0);
+    const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
+
     const [currentCfg, setCurrentCfg] = useState<WidgetConfigDto | null>(null);
 
     const [form] = Form.useForm<PhraseFormValues>();
+
+    const selectedSite = useMemo(() => sites.find((x) => x.id === siteId) || sites[0] || null, [siteId, sites]);
 
     const selectedSiteLabel = useMemo(() => {
         const s = sites.find((x) => x.id === siteId) || sites[0];
@@ -272,6 +255,36 @@ export function WidgetLanguagePage() {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAdmin, meLoading]);
+
+    useEffect(() => {
+        if (meLoading) return;
+        if (!isAdmin) return;
+        if (!siteId) return;
+
+        let mounted = true;
+        setSnippetLoading(true);
+        setSnippetError("");
+
+        http
+            .get<WidgetSnippetResponse>(`/api/v1/admin/sites/${encodeURIComponent(siteId)}/widget/snippet`)
+            .then((res) => {
+                if (!mounted) return;
+                setSnippet(res.data);
+            })
+            .catch((e: unknown) => {
+                if (!mounted) return;
+                setSnippetError(errorMessage(e, "load_widget_snippet_failed"));
+                setSnippet(null);
+            })
+            .finally(() => {
+                if (!mounted) return;
+                setSnippetLoading(false);
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, [isAdmin, meLoading, siteId]);
 
     useEffect(() => {
         if (meLoading) return;
@@ -344,21 +357,151 @@ export function WidgetLanguagePage() {
         };
     }, [form, isAdmin, meLoading, siteId]);
 
-    const watchLang = Form.useWatch("widget_language", form);
-    const watchWelcome = Form.useWatch("welcome_text", form);
-    const watchDefaultName = Form.useWatch("default_customer_name", form);
-    const watchPlaceholder = Form.useWatch("message_placeholder", form);
-    const watchHeaderTitle = Form.useWatch("header_title", form);
+    const watchAll = Form.useWatch([], form) as Partial<PhraseFormValues> | undefined;
 
-    const previewLang = normalizeWidgetLanguage(watchLang);
-    const previewWelcome = String(watchWelcome || "");
-    const previewPhrases = useMemo(
-        () => ({
-            default_customer_name: String(watchDefaultName || "").trim(),
-            message_placeholder: String(watchPlaceholder || "").trim(),
-            header_title: String(watchHeaderTitle || "").trim(),
-        }),
-        [watchDefaultName, watchHeaderTitle, watchPlaceholder],
+    const previewConfig = useMemo(() => {
+        const v = (watchAll || {}) as Partial<PhraseFormValues>;
+        const mergedPhrasesJson = mergePhrases(currentCfg?.widget_phrases_json, {
+            default_customer_name: v.default_customer_name,
+            message_placeholder: v.message_placeholder,
+            header_title: v.header_title,
+
+            minimize: v.minimize,
+            retry: v.retry,
+            start_conversation: v.start_conversation,
+
+            name_optional: v.name_optional,
+            email_optional: v.email_optional,
+            leave_contact_title: v.leave_contact_title,
+            leave_contact_ok: v.leave_contact_ok,
+            leave_contact_cancel: v.leave_contact_cancel,
+            leave_contact_hint: v.leave_contact_hint,
+            identity_error: v.identity_error,
+
+            prechat_default_info: v.prechat_default_info,
+            prechat_name_label: v.prechat_name_label,
+            prechat_email_label: v.prechat_email_label,
+            prechat_required_error: v.prechat_required_error,
+            prechat_at_least_one_error: v.prechat_at_least_one_error,
+
+            composer_send: v.composer_send,
+            composer_enter_content_hint: v.composer_enter_content_hint,
+
+            attach_add_file: v.attach_add_file,
+            attach_upload_file: v.attach_upload_file,
+            attach_send_screenshot: v.attach_send_screenshot,
+            attach_emoji: v.attach_emoji,
+            attach_add: v.attach_add,
+
+            no_messages: v.no_messages,
+            typing: v.typing,
+            unread: v.unread,
+        });
+
+        const welcomeText = String(v.welcome_text || "").trim();
+
+        return {
+            widgetLanguage: normalizeWidgetLanguage(v.widget_language),
+            widgetPhrasesJson: mergedPhrasesJson,
+            welcomeText: welcomeText ? welcomeText : null,
+        };
+    }, [currentCfg?.widget_phrases_json, watchAll]);
+
+    useEffect(() => {
+        const win = previewIframeRef.current?.contentWindow;
+        if (!win) return;
+        win.postMessage({ type: "chatlive.preview.config", config: previewConfig }, "*");
+    }, [previewConfig, previewReload, selectedSite?.public_key, snippet?.widget_script_url]);
+
+    const previewSrcDoc = useMemo(() => {
+        if (!selectedSite?.public_key) return null;
+        if (!snippet?.widget_script_url) return null;
+        if (!snippet?.embed_url) return null;
+
+        const previewEmbedUrl = appendQueryParams(snippet.embed_url, { chatlive_preview: "1" });
+        const scriptTag = buildPreviewScriptTagHtml({
+            scriptUrl: snippet.widget_script_url,
+            siteKey: selectedSite.public_key,
+            embedUrl: previewEmbedUrl,
+        });
+
+        const css = `
+            html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+            .page { height: 100%; background: #f5f5f5; position: relative; overflow: hidden; }
+            .topbar { position: absolute; left: 16px; top: 16px; right: 16px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.85);
+                      display: flex; align-items: center; padding: 0 12px; color: #666; font-size: 12px; }
+            .content { position: absolute; left: 16px; right: 16px; top: 68px; bottom: 16px; border-radius: 14px;
+                       background: rgba(255,255,255,0.6); }
+        `;
+
+        const bridge = `
+            (function(){
+                var BASE = { siteKey: ${JSON.stringify(selectedSite.public_key)}, embedUrl: ${JSON.stringify(previewEmbedUrl)} };
+
+                function merge(a, b){
+                    var out = {};
+                    try {
+                        if (a && typeof a === 'object') { for (var k in a) out[k] = a[k]; }
+                        if (b && typeof b === 'object') { for (var k2 in b) out[k2] = b[k2]; }
+                    } catch (e) {}
+                    return out;
+                }
+
+                function apply(cfg){
+                    try {
+                        var next = merge(BASE, cfg || {});
+                        if (window.ChatLiveWidget && typeof window.ChatLiveWidget.init === 'function') {
+                            window.ChatLiveWidget.init(next);
+                        }
+
+                        var mode = (next && next.themeMode ? String(next.themeMode) : '').trim().toLowerCase();
+                        var isDark = mode === 'dark';
+                        var page = document.querySelector('.page');
+                        if (page) page.style.background = isDark ? '#111827' : '#f5f5f5';
+                        var topbar = document.querySelector('.topbar');
+                        if (topbar) {
+                            topbar.style.background = isDark ? 'rgba(17,24,39,0.85)' : 'rgba(255,255,255,0.85)';
+                            topbar.style.color = isDark ? 'rgba(255,255,255,0.72)' : '#666';
+                        }
+                        var content = document.querySelector('.content');
+                        if (content) content.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.6)';
+                    } catch (e) {}
+                }
+
+                try { apply({}); } catch (e) {}
+
+                window.addEventListener('message', function(ev){
+                    try {
+                        var d = ev && ev.data;
+                        if (!d || typeof d !== 'object') return;
+                        if (d.type === 'chatlive.preview.config') apply(d.config || {});
+                    } catch (e) {}
+                });
+            })();
+        `;
+
+        return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>${css}</style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="topbar">${escapeAttr(t("widgetCustomize.preview.fakePage"))}</div>
+      <div class="content"></div>
+    </div>
+    ${scriptTag}
+    <script>${bridge}</script>
+  </body>
+</html>`;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedSite?.public_key, snippet?.embed_url, snippet?.widget_script_url, previewReload, t]);
+
+    const previewIframeStyle: CSSProperties = useMemo(
+        () => ({ width: "100%", height: "100%", border: 0, borderRadius: 12, overflow: "hidden" }),
+        [],
     );
 
     async function save(values: PhraseFormValues) {
@@ -466,11 +609,26 @@ export function WidgetLanguagePage() {
             {!meLoading && !isAdmin ? <Alert type="warning" message={t("widgetLanguage.adminOnlyHint")} showIcon /> : null}
             {sitesError ? <Alert type="error" message={sitesError} showIcon /> : null}
             {cfgError ? <Alert type="error" message={cfgError} showIcon /> : null}
+            {snippetError ? <Alert type="error" message={snippetError} showIcon /> : null}
         </>
     );
 
-    const preview = (
-        <Preview lang={previewLang} welcomeText={previewWelcome} phrases={previewPhrases} />
+    const preview = previewSrcDoc ? (
+        <iframe
+            key={`${selectedSite?.public_key || ""}:${previewReload}`}
+            title="widget-preview"
+            srcDoc={previewSrcDoc}
+            style={previewIframeStyle}
+            sandbox="allow-scripts allow-same-origin allow-forms"
+            ref={previewIframeRef}
+            onLoad={() => {
+                const win = previewIframeRef.current?.contentWindow;
+                if (!win) return;
+                win.postMessage({ type: "chatlive.preview.config", config: previewConfig }, "*");
+            }}
+        />
+    ) : (
+        <div style={{ color: "rgba(0,0,0,.45)" }}>{t("preChatForm.previewEmpty")}</div>
     );
 
     const editor = (
@@ -488,6 +646,7 @@ export function WidgetLanguagePage() {
                         <Typography.Text code>{selectedSiteLabel || "-"}</Typography.Text>
                         {sitesLoading ? <Spin size="small" /> : null}
                         {cfgLoading ? <Spin size="small" /> : null}
+                        {snippetLoading ? <Spin size="small" /> : null}
                     </Space>
 
                     <Form.Item label={t("widgetLanguage.language.label")} name="widget_language" style={{ maxWidth: 360 }}>
@@ -711,7 +870,9 @@ export function WidgetLanguagePage() {
                         {editor}
                     </Col>
                     <Col xs={24} lg={8} xl={8}>
-                        <Card title={t("widgetLanguage.preview.title")}>{preview}</Card>
+                        <Card title={t("widgetLanguage.preview.title")} styles={{ body: { height: 720 } }}>
+                            <div style={{ height: "100%", borderRadius: 12, overflow: "hidden" }}>{preview}</div>
+                        </Card>
                     </Col>
                 </Row>
             </div>
@@ -744,10 +905,13 @@ export function WidgetLanguagePage() {
                     theme="light"
                     style={{ borderLeft: "1px solid #f0f0f0", overflow: "hidden", height: "100%" }}
                 >
-                    <div style={{ height: "100%", overflow: "auto", padding: 12 }}>
-                        <Card title={t("widgetLanguage.preview.title")} style={{ height: "100%" }}>
-                            {preview}
-                        </Card>
+                    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+                        <div style={{ padding: 12, borderBottom: "1px solid #f0f0f0" }}>
+                            <Typography.Text strong>{t("widgetLanguage.preview.title")}</Typography.Text>
+                        </div>
+                        <div style={{ flex: 1, minHeight: 0, overflow: "hidden", padding: 12 }}>
+                            <div style={{ height: "100%", borderRadius: 12, overflow: "hidden" }}>{preview}</div>
+                        </div>
                     </div>
                 </Layout.Sider>
             </Layout>

@@ -520,6 +520,9 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
     const pendingPageViewsRef = useRef<HostPageViewPayload[]>([]);
     const hostInitThemeColorRef = useRef<string | null>(null);
 
+    const hostOverridesRef = useRef<{ widgetLanguage?: "en" | "zh-CN"; widgetPhrasesJson?: string | null; welcomeText?: string | null }>({});
+    const [hostWelcomeOverride, setHostWelcomeOverride] = useState<string | null>(null);
+
     // In some cross-origin iframe contexts, iframe document visibility/focus can be unreliable.
     // Host page (widget.js) can optionally send HOST_VISIBILITY so we can decide read receipts correctly.
     const [hostVisibility, setHostVisibility] = useState<{ visible: boolean; focused: boolean } | null>(null);
@@ -1123,6 +1126,26 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
 
     // postMessage bridge: listen host commands.
     useEffect(() => {
+        const applyHostOverrides = (ov: { widgetLanguage?: "en" | "zh-CN"; widgetPhrasesJson?: string | null; welcomeText?: string | null }) => {
+            if (!isHostPreview) return;
+            try {
+                const nextLang = normalizeWidgetLanguage(ov.widgetLanguage);
+                const phrases = parseWidgetPhrases(ov.widgetPhrasesJson || null);
+                applyWidgetPhrasesToEmbedI18n(i18n, nextLang, phrases);
+                if (i18n.language !== nextLang) {
+                    void i18n.changeLanguage(nextLang);
+                }
+            } catch {
+                // ignore
+            }
+            try {
+                const wt = typeof ov.welcomeText === "string" ? ov.welcomeText.trim() : "";
+                setHostWelcomeOverride(wt ? wt : null);
+            } catch {
+                // ignore
+            }
+        };
+
         function onMessage(ev: MessageEvent) {
             if (window === window.parent) return;
             if (allowedParentOrigin && ev.origin !== allowedParentOrigin) return;
@@ -1148,6 +1171,15 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
 
                 const pv = normalizePageViewPayload(payloadRec?.page);
                 if (pv) enqueuePageView(pv);
+
+                if (isHostPreview) {
+                    const widgetLanguage = normalizeWidgetLanguage(payloadRec?.widgetLanguage ?? payloadRec?.widget_language);
+                    const widgetPhrasesJson = typeof payloadRec?.widgetPhrasesJson === "string" ? payloadRec.widgetPhrasesJson : null;
+                    const welcomeText = typeof payloadRec?.welcomeText === "string" ? payloadRec.welcomeText : null;
+                    const ov = { widgetLanguage, widgetPhrasesJson, welcomeText };
+                    hostOverridesRef.current = ov;
+                    applyHostOverrides(ov);
+                }
                 return;
             }
 
@@ -1274,6 +1306,23 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
             // Apply per-site widget language without leaking into the agent/admin app.
             if (i18n.language !== nextLang) {
                 void i18n.changeLanguage(nextLang);
+            }
+
+            // In preview mode, host may override language/phrases/welcome without saving.
+            if (isHostPreview && hostOverridesRef.current) {
+                try {
+                    const ov = hostOverridesRef.current;
+                    const hostLang = normalizeWidgetLanguage(ov.widgetLanguage);
+                    const hostPhrases = parseWidgetPhrases(ov.widgetPhrasesJson || null);
+                    applyWidgetPhrasesToEmbedI18n(i18n, hostLang, hostPhrases);
+                    if (i18n.language !== hostLang) {
+                        void i18n.changeLanguage(hostLang);
+                    }
+                    const wt = typeof ov.welcomeText === "string" ? ov.welcomeText.trim() : "";
+                    setHostWelcomeOverride(wt ? wt : null);
+                } catch {
+                    // ignore
+                }
             }
 
             // If the visitor previously chatted, restore the conversation id from storage so we can
@@ -2114,7 +2163,7 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                             />
                         ) : null}
 
-                        {bootstrap?.widget_config?.welcome_text ? (
+                        {(hostWelcomeOverride || bootstrap?.widget_config?.welcome_text) ? (
                             <div style={{ display: "flex", justifyContent: "center", margin: "10px 0 14px" }}>
                                 <div
                                     style={{
@@ -2127,7 +2176,7 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                                         textAlign: "center",
                                     }}
                                 >
-                                    {bootstrap.widget_config.welcome_text}
+                                    {hostWelcomeOverride || bootstrap?.widget_config?.welcome_text}
                                 </div>
                             </div>
                         ) : null}
