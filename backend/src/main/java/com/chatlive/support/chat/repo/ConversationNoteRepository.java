@@ -3,6 +3,7 @@ package com.chatlive.support.chat.repo;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.util.Objects;
 import java.util.Optional;
 
 @Repository
@@ -22,7 +23,8 @@ public class ConversationNoteRepository {
                 limit 1
                 """;
         var list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getString("note"), tenantId, conversationId, userId);
-        return list.stream().findFirst();
+        // note is nullable; avoid Optional.of(null) inside findFirst().
+        return list.stream().filter(Objects::nonNull).findFirst();
     }
 
     public void upsertNote(String tenantId, String conversationId, String userId, String note) {

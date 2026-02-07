@@ -132,7 +132,7 @@ public class ConversationRepository {
                 limit 1
                 """;
         var list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getString("id"), tenantId, siteId, visitorId);
-        return list.stream().findFirst();
+        return list.stream().filter(java.util.Objects::nonNull).findFirst();
     }
 
         /**
@@ -152,7 +152,7 @@ public class ConversationRepository {
                                 limit 1
                                 """;
                 var list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getString("id"), tenantId, siteId, visitorId);
-                return list.stream().findFirst();
+                return list.stream().filter(java.util.Objects::nonNull).findFirst();
         }
 
         public int tryAssignToAgent(String tenantId, String conversationId, String agentUserId) {

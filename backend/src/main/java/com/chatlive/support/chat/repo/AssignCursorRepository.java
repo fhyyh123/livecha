@@ -3,6 +3,7 @@ package com.chatlive.support.chat.repo;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.util.Objects;
 import java.util.Optional;
 
 @Repository
@@ -64,6 +65,7 @@ public class AssignCursorRepository {
     public Optional<String> getLastAgent(String tenantId, String groupKey) {
         var sql = "select last_agent_user_id from agent_assign_cursor where tenant_id = ? and group_key = ?";
         var list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getString("last_agent_user_id"), tenantId, groupKey);
-        return list.stream().findFirst();
+        // last_agent_user_id is nullable; avoid Optional.of(null) inside findFirst().
+        return list.stream().filter(Objects::nonNull).findFirst();
     }
 }
