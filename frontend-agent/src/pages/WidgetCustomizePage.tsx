@@ -1,5 +1,5 @@
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Card, Col, Collapse, Divider, Form, Input, InputNumber, Radio, Row, Select, Space, Spin, Switch, Tooltip, Typography } from "antd";
+import { Alert, Button, Card, Col, Collapse, Divider, Form, Grid, Input, InputNumber, Layout, Radio, Row, Select, Space, Spin, Switch, Tooltip, Typography } from "antd";
 import { useTranslation } from "react-i18next";
 import { ExclamationCircleOutlined } from "@ant-design/icons";
 
@@ -323,6 +323,8 @@ function buildPreviewScriptTagHtml(params: {
 
 export function WidgetCustomizePage() {
     const { t } = useTranslation();
+    const screens = Grid.useBreakpoint();
+    const isNarrow = !screens.lg;
 
     const [meRole, setMeRole] = useState<string>("");
     const [meLoading, setMeLoading] = useState<boolean>(true);
@@ -719,36 +721,16 @@ export function WidgetCustomizePage() {
                 [],
         );
 
-    return (
-        <div style={{ maxWidth: 1180, margin: "0 auto", padding: 16 }}>
-            <Typography.Title level={3} style={{ marginTop: 0 }}>
-                {t("widgetCustomize.title")}
-            </Typography.Title>
+    const editor = (
+        <Card>
+            <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                <Space wrap style={{ width: "100%", justifyContent: "flex-end" }}>
+                    {sitesLoading ? <Spin size="small" /> : null}
+                    {cfgLoading ? <Spin size="small" /> : null}
+                    {snippetLoading ? <Spin size="small" /> : null}
+                </Space>
 
-            {!meLoading && !isAdmin ? (
-                <Alert type="warning" message={t("widgetCustomize.adminOnlyHint")} showIcon style={{ marginBottom: 12 }} />
-            ) : null}
-
-            {sitesError ? <Alert type="error" message={sitesError} showIcon style={{ marginBottom: 12 }} /> : null}
-            {cfgError ? <Alert type="error" message={cfgError} showIcon style={{ marginBottom: 12 }} /> : null}
-            {snippetError ? <Alert type="error" message={snippetError} showIcon style={{ marginBottom: 12 }} /> : null}
-
-            <Row gutter={16} align="top">
-                <Col xs={24} lg={12}>
-                    <Card>
-                        <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                            <Space wrap style={{ width: "100%", justifyContent: "flex-end" }}>
-                                {sitesLoading ? <Spin size="small" /> : null}
-                                {cfgLoading ? <Spin size="small" /> : null}
-                                {snippetLoading ? <Spin size="small" /> : null}
-                            </Space>
-
-                            <Form
-                                form={form}
-                                layout="vertical"
-                                onFinish={save}
-                                disabled={cfgLoading || !isAdmin}
-                            >
+                <Form form={form} layout="vertical" onFinish={save} disabled={cfgLoading || !isAdmin}>
                                 <Form.Item name="welcome_text" hidden>
                                     <Input />
                                 </Form.Item>
@@ -1149,42 +1131,109 @@ export function WidgetCustomizePage() {
                                         {t("common.reset")}
                                     </Button>
                                 </Space>
-                            </Form>
-                        </Space>
-                    </Card>
-                </Col>
+                </Form>
+            </Space>
+        </Card>
+    );
 
-                <Col xs={24} lg={12}>
-                    <Card
-                        title={t("widgetCustomize.preview.title")}
-                        extra={
-                            <Button onClick={() => setPreviewReload((x) => x + 1)} disabled={!previewSrcDoc}>
-                                {t("widgetCustomize.preview.reload")}
-                            </Button>
-                        }
-                    >
-                        <div style={{ height: 620 }}>
-                            {previewSrcDoc ? (
-                                <iframe
-                                    key={`${selectedSite?.public_key || ""}:${previewReload}`}
-                                    title="widget-preview"
-                                    srcDoc={previewSrcDoc}
-                                    style={previewIframeStyle}
-                                    sandbox="allow-scripts allow-same-origin allow-forms"
-                                    ref={previewIframeRef}
-                                    onLoad={() => {
-                                        const win = previewIframeRef.current?.contentWindow;
-                                        if (!win) return;
-                                        win.postMessage({ type: "chatlive.preview.config", config: previewConfig }, "*");
-                                    }}
-                                />
-                            ) : (
-                                <div style={{ color: "rgba(0,0,0,.45)" }}>{t("preChatForm.previewEmpty")}</div>
-                            )}
+    const previewIframe = previewSrcDoc ? (
+        <iframe
+            key={`${selectedSite?.public_key || ""}:${previewReload}`}
+            title="widget-preview"
+            srcDoc={previewSrcDoc}
+            style={previewIframeStyle}
+            sandbox="allow-scripts allow-same-origin allow-forms"
+            ref={previewIframeRef}
+            onLoad={() => {
+                const win = previewIframeRef.current?.contentWindow;
+                if (!win) return;
+                win.postMessage({ type: "chatlive.preview.config", config: previewConfig }, "*");
+            }}
+        />
+    ) : (
+        <div style={{ color: "rgba(0,0,0,.45)" }}>{t("preChatForm.previewEmpty")}</div>
+    );
+
+    const header = (
+        <>
+            <Typography.Title level={3} style={{ marginTop: 0, marginBottom: 0 }}>
+                {t("widgetCustomize.title")}
+            </Typography.Title>
+
+            {!meLoading && !isAdmin ? <Alert type="warning" message={t("widgetCustomize.adminOnlyHint")} showIcon /> : null}
+            {sitesError ? <Alert type="error" message={sitesError} showIcon /> : null}
+            {cfgError ? <Alert type="error" message={cfgError} showIcon /> : null}
+            {snippetError ? <Alert type="error" message={snippetError} showIcon /> : null}
+        </>
+    );
+
+    if (isNarrow) {
+        return (
+            <div style={{ maxWidth: 1180, margin: "0 auto", padding: 16 }}>
+                {header}
+
+                <Row gutter={16} align="top" style={{ marginTop: 12 }}>
+                    <Col xs={24} lg={12}>
+                        {editor}
+                    </Col>
+                    <Col xs={24} lg={12}>
+                        <Card
+                            title={t("widgetCustomize.preview.title")}
+                            extra={
+                                <Button onClick={() => setPreviewReload((x) => x + 1)} disabled={!previewSrcDoc}>
+                                    {t("widgetCustomize.preview.reload")}
+                                </Button>
+                            }
+                        >
+                            <div style={{ height: 620 }}>{previewIframe}</div>
+                        </Card>
+                    </Col>
+                </Row>
+            </div>
+        );
+    }
+
+    return (
+        <div
+            style={{
+                padding: 16,
+                height: "calc(100vh - 56px)",
+                minHeight: "calc(100vh - 56px)",
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+            }}
+        >
+            {header}
+
+            <Layout style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+                <Layout.Content style={{ minHeight: 0, overflow: "hidden" }}>
+                    <div style={{ height: "100%", overflow: "auto", paddingRight: 12 }}>
+                        {editor}
+                    </div>
+                </Layout.Content>
+
+                <Layout.Sider
+                    width={560}
+                    theme="light"
+                    style={{ borderLeft: "1px solid #f0f0f0", overflow: "hidden", height: "100%" }}
+                >
+                    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+                        <div style={{ padding: 12, borderBottom: "1px solid #f0f0f0" }}>
+                            <Space style={{ width: "100%", justifyContent: "space-between" }} align="center">
+                                <Typography.Text strong>{t("widgetCustomize.preview.title")}</Typography.Text>
+                                <Button onClick={() => setPreviewReload((x) => x + 1)} disabled={!previewSrcDoc}>
+                                    {t("widgetCustomize.preview.reload")}
+                                </Button>
+                            </Space>
                         </div>
-                    </Card>
-                </Col>
-            </Row>
+                        <div style={{ flex: 1, minHeight: 0, overflow: "hidden", padding: 12 }}>
+                            <div style={{ height: "100%", borderRadius: 12, overflow: "hidden" }}>{previewIframe}</div>
+                        </div>
+                    </div>
+                </Layout.Sider>
+            </Layout>
         </div>
     );
 }

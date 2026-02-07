@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Checkbox, Col, Divider, Form, Input, Row, Select, Space, Spin, Switch, Tooltip, Typography } from "antd";
+import { Alert, Button, Card, Checkbox, Divider, Form, Grid, Input, Layout, Select, Space, Spin, Switch, Tooltip, Typography } from "antd";
 import { HolderOutlined } from "@ant-design/icons";
 import { DndContext, PointerSensor, type DragEndEvent, useSensor, useSensors } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
@@ -369,6 +369,8 @@ function SortableFieldCard(props: {
 
 export function PreChatFormPage() {
     const { t } = useTranslation();
+    const screens = Grid.useBreakpoint();
+    const isNarrow = !screens.lg;
 
     const [meRole, setMeRole] = useState<string>("");
     const [meLoading, setMeLoading] = useState<boolean>(true);
@@ -576,179 +578,219 @@ export function PreChatFormPage() {
         }
     }
 
+    const header = (
+        <>
+            {!meLoading && !isAdmin ? <Alert type="warning" message={t("preChatForm.adminOnlyHint")} showIcon /> : null}
+            {sitesError ? <Alert type="error" message={sitesError} showIcon /> : null}
+            {cfgError ? <Alert type="error" message={cfgError} showIcon /> : null}
+        </>
+    );
+
+    const previewIframe = selectedSite?.public_key ? (
+        <iframe
+            title="visitor-preview"
+            src={`/visitor/embed?site_key=${encodeURIComponent(selectedSite.public_key)}`}
+            style={{ width: "100%", height: "100%", border: 0, borderRadius: 12, overflow: "hidden" }}
+        />
+    ) : (
+        <div style={{ color: "rgba(0,0,0,.45)" }}>{t("preChatForm.previewEmpty")}</div>
+    );
+
+    const editor = (
+        <Form
+            form={form}
+            layout="vertical"
+            initialValues={{ pre_chat_enabled: false }}
+            onFinish={save}
+            disabled={cfgLoading || !isAdmin}
+        >
+            <Card title={t("preChatForm.title")}>
+                <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                    <Space wrap>
+                        <Typography.Text strong>{t("preChatForm.selectSite")}</Typography.Text>
+                        <Typography.Text code>{selectedSiteLabel || "-"}</Typography.Text>
+                        {sitesLoading ? <Spin size="small" /> : null}
+                        {cfgLoading ? <Spin size="small" /> : null}
+                    </Space>
+
+                    <Typography.Paragraph type="secondary" style={{ marginTop: 0, marginBottom: 8 }}>
+                        {t("preChatForm.hint")}
+                    </Typography.Paragraph>
+
+                    <Form.Item label={t("preChatForm.enabled.label")} name="pre_chat_enabled" valuePropName="checked">
+                        <Switch />
+                    </Form.Item>
+
+                    <Space>
+                        <Button type="primary" htmlType="submit" loading={saving} disabled={!isAdmin}>
+                            {t("common.save")}
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                form.resetFields();
+                                setFields(fromLegacy(currentCfg));
+                            }}
+                            disabled={saving || !isAdmin}
+                        >
+                            {t("common.reset")}
+                        </Button>
+                    </Space>
+
+                    <Divider style={{ margin: "12px 0" }} />
+
+                    <Typography.Title level={5} style={{ margin: 0 }}>
+                        {t("preChatForm.fields.title")}
+                    </Typography.Title>
+                    <Typography.Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 12 }}>
+                        {t("preChatForm.fields.hint")}
+                    </Typography.Paragraph>
+
+                    {keyIssues.hasRequiredErrors || keyIssues.hasDuplicateErrors ? (
+                        <Alert
+                            type="warning"
+                            showIcon
+                            message={t("preChatForm.fields.validationTitle")}
+                            description={
+                                keyIssues.hasDuplicateErrors
+                                    ? t("preChatForm.fields.validationDuplicate")
+                                    : t("preChatForm.fields.validationRequired")
+                            }
+                        />
+                    ) : null}
+
+                    <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                        <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={onDragEnd}>
+                            <SortableContext items={fields.map((f) => f.uid)} strategy={verticalListSortingStrategy}>
+                                <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                                    {fields.map((f, idx) => (
+                                        <SortableFieldCard
+                                            key={f.uid}
+                                            t={t}
+                                            field={f}
+                                            index={idx}
+                                            fieldTypeOptions={fieldTypeOptions}
+                                            isAdmin={isAdmin}
+                                            issuesByUid={keyIssues.issuesByUid}
+                                            onChange={(uid, patch) => {
+                                                setFields((prev) =>
+                                                    prev.map((x) => {
+                                                        if (x.uid !== uid) return x;
+                                                        const next = { ...x, ...patch } as PreChatField;
+                                                        const keyTrimmed = String(next.id || "").trim();
+                                                        const reservedType = reservedTypeForKey(keyTrimmed);
+                                                        if (reservedType) {
+                                                            next.id = keyTrimmed;
+                                                            next.type = reservedType;
+                                                        }
+                                                        return next;
+                                                    }),
+                                                );
+                                            }}
+                                            onDelete={(uid) => {
+                                                setFields((prev) => prev.filter((x) => x.uid !== uid));
+                                            }}
+                                        />
+                                    ))}
+                                </Space>
+                            </SortableContext>
+                        </DndContext>
+
+                        <Space wrap>
+                            <Button
+                                onClick={() =>
+                                    setFields((prev) => [
+                                        ...prev,
+                                        { uid: makeId("uid"), id: makeId("field"), type: "text", label: null, required: false },
+                                    ])
+                                }
+                            >
+                                {t("preChatForm.fields.add")}
+                            </Button>
+                            <Button
+                                onClick={() =>
+                                    setFields((prev) => [...prev, { uid: makeId("uid"), id: makeId("info"), type: "info", text: null }])
+                                }
+                            >
+                                {t("preChatForm.fields.addInfo")}
+                            </Button>
+                            <Button
+                                onClick={() =>
+                                    setFields((prev) =>
+                                        prev.some((x) => String(x.id || "").trim() === "name")
+                                            ? prev
+                                            : [...prev, { uid: makeId("uid"), id: "name", type: "name" }],
+                                    )
+                                }
+                            >
+                                {t("preChatForm.fields.addName")}
+                            </Button>
+                            <Button
+                                onClick={() =>
+                                    setFields((prev) =>
+                                        prev.some((x) => String(x.id || "").trim() === "email")
+                                            ? prev
+                                            : [...prev, { uid: makeId("uid"), id: "email", type: "email" }],
+                                    )
+                                }
+                            >
+                                {t("preChatForm.fields.addEmail")}
+                            </Button>
+                        </Space>
+                    </Space>
+                </Space>
+            </Card>
+        </Form>
+    );
+
+    if (isNarrow) {
+        return (
+            <div style={{ maxWidth: 1400, margin: "0 auto", padding: 16 }}>
+                {header}
+                <div style={{ marginTop: 12 }}>{editor}</div>
+                <div style={{ marginTop: 16 }}>
+                    <Card title={t("preChatForm.previewTitle")} styles={{ body: { height: 720 } }}>
+                        {previewIframe}
+                    </Card>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div style={{ maxWidth: 1400, margin: "0 auto", padding: 16 }}>
-            {!meLoading && !isAdmin ? (
-                <Alert type="warning" message={t("preChatForm.adminOnlyHint")} showIcon style={{ marginBottom: 12 }} />
-            ) : null}
-
-            {sitesError ? <Alert type="error" message={sitesError} showIcon style={{ marginBottom: 12 }} /> : null}
-            {cfgError ? <Alert type="error" message={cfgError} showIcon style={{ marginBottom: 12 }} /> : null}
-
-            <Form
-                form={form}
-                layout="vertical"
-                initialValues={{ pre_chat_enabled: false }}
-                onFinish={save}
-                disabled={cfgLoading || !isAdmin}
+        <div style={{ padding: 16, height: "calc(100vh - 56px)", minHeight: "calc(100vh - 56px)", overflow: "hidden" }}>
+            <div
+                style={{
+                    maxWidth: 1400,
+                    margin: "0 auto",
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                }}
             >
-                <Row gutter={16} align="stretch">
-                    {/* Left: site + enable + actions */}
-                    <Col xs={24} lg={7} xl={6}>
-                        <Card title={t("preChatForm.title")} style={{ height: "100%" }}>
-                            <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                                <Space wrap>
-                                    <Typography.Text strong>{t("preChatForm.selectSite")}</Typography.Text>
-                                    <Typography.Text code>{selectedSiteLabel || "-"}</Typography.Text>
-                                    {sitesLoading ? <Spin size="small" /> : null}
-                                    {cfgLoading ? <Spin size="small" /> : null}
-                                </Space>
+                {header}
 
-                                <Typography.Paragraph type="secondary" style={{ marginTop: 0, marginBottom: 8 }}>
-                                    {t("preChatForm.hint")}
-                                </Typography.Paragraph>
+                <Layout style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+                    <Layout.Content style={{ minHeight: 0, overflow: "hidden" }}>
+                        <div style={{ height: "100%", overflow: "auto", paddingRight: 12 }}>{editor}</div>
+                    </Layout.Content>
 
-                                <Form.Item label={t("preChatForm.enabled.label")} name="pre_chat_enabled" valuePropName="checked">
-                                    <Switch />
-                                </Form.Item>
-
-                                <Divider style={{ margin: "12px 0" }} />
-
-                                <Space>
-                                    <Button type="primary" htmlType="submit" loading={saving} disabled={!isAdmin}>
-                                        {t("common.save")}
-                                    </Button>
-                                    <Button
-                                        onClick={() => {
-                                            form.resetFields();
-                                            setFields(fromLegacy(currentCfg));
-                                        }}
-                                        disabled={saving || !isAdmin}
-                                    >
-                                        {t("common.reset")}
-                                    </Button>
-                                </Space>
-                            </Space>
-                        </Card>
-                    </Col>
-
-                    {/* Middle: builder */}
-                    <Col xs={24} lg={10} xl={12}>
-                        <Card title={t("preChatForm.fields.title")} style={{ height: "100%" }}>
-                            <Typography.Paragraph type="secondary" style={{ marginTop: 0, marginBottom: 12 }}>
-                                {t("preChatForm.fields.hint")}
-                            </Typography.Paragraph>
-
-                            {keyIssues.hasRequiredErrors || keyIssues.hasDuplicateErrors ? (
-                                <Alert
-                                    type="warning"
-                                    showIcon
-                                    message={t("preChatForm.fields.validationTitle")}
-                                    description={
-                                        keyIssues.hasDuplicateErrors
-                                            ? t("preChatForm.fields.validationDuplicate")
-                                            : t("preChatForm.fields.validationRequired")
-                                    }
-                                    style={{ marginBottom: 12 }}
-                                />
-                            ) : null}
-
-                            <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                                <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={onDragEnd}>
-                                    <SortableContext items={fields.map((f) => f.uid)} strategy={verticalListSortingStrategy}>
-                                        <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                                            {fields.map((f, idx) => (
-                                                <SortableFieldCard
-                                                    key={f.uid}
-                                                    t={t}
-                                                    field={f}
-                                                    index={idx}
-                                                    fieldTypeOptions={fieldTypeOptions}
-                                                    isAdmin={isAdmin}
-                                                    issuesByUid={keyIssues.issuesByUid}
-                                                    onChange={(uid, patch) => {
-                                                        setFields((prev) =>
-                                                            prev.map((x) => {
-                                                                if (x.uid !== uid) return x;
-                                                                const next = { ...x, ...patch } as PreChatField;
-                                                                const keyTrimmed = String(next.id || "").trim();
-                                                                const reservedType = reservedTypeForKey(keyTrimmed);
-                                                                if (reservedType) {
-                                                                    next.id = keyTrimmed;
-                                                                    next.type = reservedType;
-                                                                }
-                                                                return next;
-                                                            }),
-                                                        );
-                                                    }}
-                                                    onDelete={(uid) => {
-                                                        setFields((prev) => prev.filter((x) => x.uid !== uid));
-                                                    }}
-                                                />
-                                            ))}
-                                        </Space>
-                                    </SortableContext>
-                                </DndContext>
-
-                                <Space wrap>
-                                    <Button
-                                        onClick={() =>
-                                            setFields((prev) => [
-                                                ...prev,
-                                                { uid: makeId("uid"), id: makeId("field"), type: "text", label: null, required: false },
-                                            ])
-                                        }
-                                    >
-                                        {t("preChatForm.fields.add")}
-                                    </Button>
-                                    <Button
-                                        onClick={() => setFields((prev) => [...prev, { uid: makeId("uid"), id: makeId("info"), type: "info", text: null }])}
-                                    >
-                                        {t("preChatForm.fields.addInfo")}
-                                    </Button>
-                                    <Button
-                                        onClick={() =>
-                                            setFields((prev) =>
-                                                prev.some((x) => String(x.id || "").trim() === "name")
-                                                    ? prev
-                                                    : [...prev, { uid: makeId("uid"), id: "name", type: "name" }],
-                                            )
-                                        }
-                                    >
-                                        {t("preChatForm.fields.addName")}
-                                    </Button>
-                                    <Button
-                                        onClick={() =>
-                                            setFields((prev) =>
-                                                prev.some((x) => String(x.id || "").trim() === "email")
-                                                    ? prev
-                                                    : [...prev, { uid: makeId("uid"), id: "email", type: "email" }],
-                                            )
-                                        }
-                                    >
-                                        {t("preChatForm.fields.addEmail")}
-                                    </Button>
-                                </Space>
-                            </Space>
-                        </Card>
-                    </Col>
-
-                    {/* Right: preview */}
-                    <Col xs={24} lg={7} xl={6}>
-                        <Card title={t("preChatForm.previewTitle")} styles={{ body: { height: 720 } }} style={{ height: "100%" }}>
-                            {selectedSite?.public_key ? (
-                                <iframe
-                                    title="visitor-preview"
-                                    src={`/visitor/embed?site_key=${encodeURIComponent(selectedSite.public_key)}`}
-                                    style={{ width: "100%", height: "100%", border: 0, borderRadius: 12, overflow: "hidden" }}
-                                />
-                            ) : (
-                                <div style={{ color: "rgba(0,0,0,.45)" }}>{t("preChatForm.previewEmpty")}</div>
-                            )}
-                        </Card>
-                    </Col>
-                </Row>
-            </Form>
+                    <Layout.Sider
+                        width={560}
+                        theme="light"
+                        style={{ borderLeft: "1px solid #f0f0f0", overflow: "hidden", height: "100%" }}
+                    >
+                        <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+                            <div style={{ padding: 12, borderBottom: "1px solid #f0f0f0" }}>
+                                <Typography.Text strong>{t("preChatForm.previewTitle")}</Typography.Text>
+                            </div>
+                            <div style={{ flex: 1, minHeight: 0, overflow: "hidden", padding: 12 }}>
+                                <div style={{ height: "100%", borderRadius: 12, overflow: "hidden" }}>{previewIframe}</div>
+                            </div>
+                        </div>
+                    </Layout.Sider>
+                </Layout>
+            </div>
         </div>
     );
 }

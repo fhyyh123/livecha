@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Col, Divider, Form, Input, Row, Select, Space, Spin, Typography } from "antd";
+import { Alert, Button, Card, Col, Divider, Form, Grid, Input, Layout, Row, Select, Space, Spin, Typography } from "antd";
 import { useTranslation } from "react-i18next";
 
 import i18n from "../i18n";
@@ -194,6 +194,8 @@ function Preview({ lang, welcomeText, phrases }: { lang: "en" | "zh-CN"; welcome
 
 export function WidgetLanguagePage() {
     const { t } = useTranslation();
+    const screens = Grid.useBreakpoint();
+    const isNarrow = !screens.lg;
 
     const [meRole, setMeRole] = useState<string>("");
     const [meLoading, setMeLoading] = useState<boolean>(true);
@@ -459,254 +461,296 @@ export function WidgetLanguagePage() {
         }
     }
 
-    return (
-        <div style={{ maxWidth: 1400, margin: "0 auto", padding: 16 }}>
-            {!meLoading && !isAdmin ? (
-                <Alert type="warning" message={t("widgetLanguage.adminOnlyHint")} showIcon style={{ marginBottom: 12 }} />
-            ) : null}
+    const header = (
+        <>
+            {!meLoading && !isAdmin ? <Alert type="warning" message={t("widgetLanguage.adminOnlyHint")} showIcon /> : null}
+            {sitesError ? <Alert type="error" message={sitesError} showIcon /> : null}
+            {cfgError ? <Alert type="error" message={cfgError} showIcon /> : null}
+        </>
+    );
 
-            {sitesError ? <Alert type="error" message={sitesError} showIcon style={{ marginBottom: 12 }} /> : null}
-            {cfgError ? <Alert type="error" message={cfgError} showIcon style={{ marginBottom: 12 }} /> : null}
+    const preview = (
+        <Preview lang={previewLang} welcomeText={previewWelcome} phrases={previewPhrases} />
+    );
 
-            <Form
-                form={form}
-                layout="vertical"
-                initialValues={{ widget_language: "en" }}
-                onFinish={save}
-                disabled={cfgLoading || !isAdmin}
-            >
-                <Row gutter={16} align="stretch">
-                    <Col xs={24} lg={16} xl={16}>
-                        <Card title={t("widgetLanguage.title")} style={{ height: "100%" }}>
-                            <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                                <Space wrap>
-                                    <Typography.Text strong>{t("widgetLanguage.selectSite")}</Typography.Text>
-                                    <Typography.Text code>{selectedSiteLabel || "-"}</Typography.Text>
-                                    {sitesLoading ? <Spin size="small" /> : null}
-                                    {cfgLoading ? <Spin size="small" /> : null}
-                                </Space>
+    const editor = (
+        <Form
+            form={form}
+            layout="vertical"
+            initialValues={{ widget_language: "en" }}
+            onFinish={save}
+            disabled={cfgLoading || !isAdmin}
+        >
+            <Card title={t("widgetLanguage.title")}>
+                <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                    <Space wrap>
+                        <Typography.Text strong>{t("widgetLanguage.selectSite")}</Typography.Text>
+                        <Typography.Text code>{selectedSiteLabel || "-"}</Typography.Text>
+                        {sitesLoading ? <Spin size="small" /> : null}
+                        {cfgLoading ? <Spin size="small" /> : null}
+                    </Space>
 
-                                <Form.Item
-                                    label={t("widgetLanguage.language.label")}
-                                    name="widget_language"
-                                    style={{ maxWidth: 360 }}
-                                >
-                                    <Select
-                                        options={[
-                                            { value: "en", label: t("common.english") },
-                                            { value: "zh-CN", label: t("common.chinese") },
-                                        ]}
-                                    />
+                    <Form.Item label={t("widgetLanguage.language.label")} name="widget_language" style={{ maxWidth: 360 }}>
+                        <Select
+                            options={[
+                                { value: "en", label: t("common.english") },
+                                { value: "zh-CN", label: t("common.chinese") },
+                            ]}
+                        />
+                    </Form.Item>
+
+                    <Divider style={{ margin: "8px 0" }} />
+
+                    <Typography.Title level={5} style={{ margin: 0 }}>
+                        {t("widgetLanguage.phrases.title")}
+                    </Typography.Title>
+                    <Typography.Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 8 }}>
+                        {t("widgetLanguage.phrases.hint")}
+                    </Typography.Paragraph>
+
+                    <Card size="small" title={t("widgetLanguage.phrases.sectionWelcome")} style={{ maxWidth: 720 }}>
+                        <Form.Item label={t("widgetLanguage.phrases.welcomeText.label")} name="welcome_text">
+                            <Input placeholder={t("widgetLanguage.phrases.welcomeText.placeholder")} />
+                        </Form.Item>
+                        <Row gutter={12}>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.defaultCustomerName.label")} name="default_customer_name">
+                                    <Input placeholder={t("widgetLanguage.phrases.defaultCustomerName.placeholder")} />
                                 </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.headerTitle.label")} name="header_title">
+                                    <Input placeholder={t("widgetLanguage.phrases.headerTitle.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                        <Form.Item label={t("widgetLanguage.phrases.messagePlaceholder.label")} name="message_placeholder">
+                            <Input placeholder={t("widgetLanguage.phrases.messagePlaceholder.placeholder")} />
+                        </Form.Item>
+                    </Card>
 
-                                <Divider style={{ margin: "8px 0" }} />
+                    <Divider style={{ margin: "12px 0" }} />
 
-                                <Typography.Title level={5} style={{ margin: 0 }}>
-                                    {t("widgetLanguage.phrases.title")}
-                                </Typography.Title>
-                                <Typography.Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 8 }}>
-                                    {t("widgetLanguage.phrases.hint")}
-                                </Typography.Paragraph>
+                    <Card size="small" title={t("widgetLanguage.phrases.sectionActions")} style={{ maxWidth: 720 }}>
+                        <Row gutter={12}>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.minimize.label")} name="minimize">
+                                    <Input placeholder={t("widgetLanguage.phrases.minimize.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.retry.label")} name="retry">
+                                    <Input placeholder={t("widgetLanguage.phrases.retry.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                        <Form.Item label={t("widgetLanguage.phrases.startConversation.label")} name="start_conversation">
+                            <Input placeholder={t("widgetLanguage.phrases.startConversation.placeholder")} />
+                        </Form.Item>
 
-                                <Card size="small" title={t("widgetLanguage.phrases.sectionWelcome")} style={{ maxWidth: 720 }}>
-                                    <Form.Item label={t("widgetLanguage.phrases.welcomeText.label")} name="welcome_text">
-                                        <Input placeholder={t("widgetLanguage.phrases.welcomeText.placeholder")} />
-                                    </Form.Item>
-                                    <Row gutter={12}>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.defaultCustomerName.label")} name="default_customer_name">
-                                                <Input placeholder={t("widgetLanguage.phrases.defaultCustomerName.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.headerTitle.label")} name="header_title">
-                                                <Input placeholder={t("widgetLanguage.phrases.headerTitle.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
-                                    <Form.Item label={t("widgetLanguage.phrases.messagePlaceholder.label")} name="message_placeholder">
-                                        <Input placeholder={t("widgetLanguage.phrases.messagePlaceholder.placeholder")} />
-                                    </Form.Item>
-                                </Card>
+                        <Row gutter={12}>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.nameOptional.label")} name="name_optional">
+                                    <Input placeholder={t("widgetLanguage.phrases.nameOptional.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.emailOptional.label")} name="email_optional">
+                                    <Input placeholder={t("widgetLanguage.phrases.emailOptional.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                        </Row>
 
-                                <Divider style={{ margin: "12px 0" }} />
+                        <Form.Item label={t("widgetLanguage.phrases.leaveContactTitle.label")} name="leave_contact_title">
+                            <Input placeholder={t("widgetLanguage.phrases.leaveContactTitle.placeholder")} />
+                        </Form.Item>
+                        <Row gutter={12}>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.leaveContactOk.label")} name="leave_contact_ok">
+                                    <Input placeholder={t("widgetLanguage.phrases.leaveContactOk.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.leaveContactCancel.label")} name="leave_contact_cancel">
+                                    <Input placeholder={t("widgetLanguage.phrases.leaveContactCancel.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                        <Form.Item label={t("widgetLanguage.phrases.leaveContactHint.label")} name="leave_contact_hint">
+                            <Input placeholder={t("widgetLanguage.phrases.leaveContactHint.placeholder")} />
+                        </Form.Item>
+                        <Form.Item label={t("widgetLanguage.phrases.identityError.label")} name="identity_error">
+                            <Input placeholder={t("widgetLanguage.phrases.identityError.placeholder")} />
+                        </Form.Item>
+                    </Card>
 
-                                <Card size="small" title={t("widgetLanguage.phrases.sectionActions")} style={{ maxWidth: 720 }}>
-                                    <Row gutter={12}>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.minimize.label")} name="minimize">
-                                                <Input placeholder={t("widgetLanguage.phrases.minimize.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.retry.label")} name="retry">
-                                                <Input placeholder={t("widgetLanguage.phrases.retry.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
-                                    <Form.Item label={t("widgetLanguage.phrases.startConversation.label")} name="start_conversation">
-                                        <Input placeholder={t("widgetLanguage.phrases.startConversation.placeholder")} />
-                                    </Form.Item>
+                    <Divider style={{ margin: "12px 0" }} />
 
-                                    <Row gutter={12}>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.nameOptional.label")} name="name_optional">
-                                                <Input placeholder={t("widgetLanguage.phrases.nameOptional.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.emailOptional.label")} name="email_optional">
-                                                <Input placeholder={t("widgetLanguage.phrases.emailOptional.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
+                    <Card size="small" title={t("widgetLanguage.phrases.sectionPreChat")} style={{ maxWidth: 720 }}>
+                        <Form.Item label={t("widgetLanguage.phrases.preChatDefaultInfo.label")} name="prechat_default_info">
+                            <Input placeholder={t("widgetLanguage.phrases.preChatDefaultInfo.placeholder")} />
+                        </Form.Item>
+                        <Row gutter={12}>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.preChatNameLabel.label")} name="prechat_name_label">
+                                    <Input placeholder={t("widgetLanguage.phrases.preChatNameLabel.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.preChatEmailLabel.label")} name="prechat_email_label">
+                                    <Input placeholder={t("widgetLanguage.phrases.preChatEmailLabel.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                        <Row gutter={12}>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.preChatRequiredError.label")} name="prechat_required_error">
+                                    <Input placeholder={t("widgetLanguage.phrases.preChatRequiredError.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.preChatAtLeastOneError.label")} name="prechat_at_least_one_error">
+                                    <Input placeholder={t("widgetLanguage.phrases.preChatAtLeastOneError.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    </Card>
 
-                                    <Form.Item label={t("widgetLanguage.phrases.leaveContactTitle.label")} name="leave_contact_title">
-                                        <Input placeholder={t("widgetLanguage.phrases.leaveContactTitle.placeholder")} />
-                                    </Form.Item>
-                                    <Row gutter={12}>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.leaveContactOk.label")} name="leave_contact_ok">
-                                                <Input placeholder={t("widgetLanguage.phrases.leaveContactOk.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.leaveContactCancel.label")} name="leave_contact_cancel">
-                                                <Input placeholder={t("widgetLanguage.phrases.leaveContactCancel.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
-                                    <Form.Item label={t("widgetLanguage.phrases.leaveContactHint.label")} name="leave_contact_hint">
-                                        <Input placeholder={t("widgetLanguage.phrases.leaveContactHint.placeholder")} />
-                                    </Form.Item>
-                                    <Form.Item label={t("widgetLanguage.phrases.identityError.label")} name="identity_error">
-                                        <Input placeholder={t("widgetLanguage.phrases.identityError.placeholder")} />
-                                    </Form.Item>
-                                </Card>
+                    <Divider style={{ margin: "12px 0" }} />
 
-                                <Divider style={{ margin: "12px 0" }} />
+                    <Card size="small" title={t("widgetLanguage.phrases.sectionComposer")} style={{ maxWidth: 720 }}>
+                        <Row gutter={12}>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.composerSend.label")} name="composer_send">
+                                    <Input placeholder={t("widgetLanguage.phrases.composerSend.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.composerEnterContentHint.label")} name="composer_enter_content_hint">
+                                    <Input placeholder={t("widgetLanguage.phrases.composerEnterContentHint.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    </Card>
 
-                                <Card size="small" title={t("widgetLanguage.phrases.sectionPreChat")} style={{ maxWidth: 720 }}>
-                                    <Form.Item label={t("widgetLanguage.phrases.preChatDefaultInfo.label")} name="prechat_default_info">
-                                        <Input placeholder={t("widgetLanguage.phrases.preChatDefaultInfo.placeholder")} />
-                                    </Form.Item>
-                                    <Row gutter={12}>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.preChatNameLabel.label")} name="prechat_name_label">
-                                                <Input placeholder={t("widgetLanguage.phrases.preChatNameLabel.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.preChatEmailLabel.label")} name="prechat_email_label">
-                                                <Input placeholder={t("widgetLanguage.phrases.preChatEmailLabel.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
-                                    <Row gutter={12}>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.preChatRequiredError.label")} name="prechat_required_error">
-                                                <Input placeholder={t("widgetLanguage.phrases.preChatRequiredError.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.preChatAtLeastOneError.label")} name="prechat_at_least_one_error">
-                                                <Input placeholder={t("widgetLanguage.phrases.preChatAtLeastOneError.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
-                                </Card>
+                    <Divider style={{ margin: "12px 0" }} />
 
-                                <Divider style={{ margin: "12px 0" }} />
+                    <Card size="small" title={t("widgetLanguage.phrases.sectionAttachments")} style={{ maxWidth: 720 }}>
+                        <Row gutter={12}>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.attachAddFile.label")} name="attach_add_file">
+                                    <Input placeholder={t("widgetLanguage.phrases.attachAddFile.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.attachAdd.label")} name="attach_add">
+                                    <Input placeholder={t("widgetLanguage.phrases.attachAdd.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                        <Row gutter={12}>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.attachUploadFile.label")} name="attach_upload_file">
+                                    <Input placeholder={t("widgetLanguage.phrases.attachUploadFile.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.attachSendScreenshot.label")} name="attach_send_screenshot">
+                                    <Input placeholder={t("widgetLanguage.phrases.attachSendScreenshot.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                        <Row gutter={12}>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.attachEmoji.label")} name="attach_emoji">
+                                    <Input placeholder={t("widgetLanguage.phrases.attachEmoji.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    </Card>
 
-                                <Card size="small" title={t("widgetLanguage.phrases.sectionComposer")} style={{ maxWidth: 720 }}>
-                                    <Row gutter={12}>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.composerSend.label")} name="composer_send">
-                                                <Input placeholder={t("widgetLanguage.phrases.composerSend.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.composerEnterContentHint.label")} name="composer_enter_content_hint">
-                                                <Input placeholder={t("widgetLanguage.phrases.composerEnterContentHint.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
-                                </Card>
+                    <Divider style={{ margin: "12px 0" }} />
 
-                                <Divider style={{ margin: "12px 0" }} />
+                    <Card size="small" title={t("widgetLanguage.phrases.sectionConversation")} style={{ maxWidth: 720 }}>
+                        <Row gutter={12}>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.noMessages.label")} name="no_messages">
+                                    <Input placeholder={t("widgetLanguage.phrases.noMessages.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item label={t("widgetLanguage.phrases.typing.label")} name="typing">
+                                    <Input placeholder={t("widgetLanguage.phrases.typing.placeholder")} />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                        <Form.Item label={t("widgetLanguage.phrases.unread.label")} name="unread">
+                            <Input placeholder={t("widgetLanguage.phrases.unread.placeholder")} />
+                        </Form.Item>
+                    </Card>
 
-                                <Card size="small" title={t("widgetLanguage.phrases.sectionAttachments")} style={{ maxWidth: 720 }}>
-                                    <Row gutter={12}>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.attachAddFile.label")} name="attach_add_file">
-                                                <Input placeholder={t("widgetLanguage.phrases.attachAddFile.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.attachAdd.label")} name="attach_add">
-                                                <Input placeholder={t("widgetLanguage.phrases.attachAdd.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
-                                    <Row gutter={12}>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.attachUploadFile.label")} name="attach_upload_file">
-                                                <Input placeholder={t("widgetLanguage.phrases.attachUploadFile.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.attachSendScreenshot.label")} name="attach_send_screenshot">
-                                                <Input placeholder={t("widgetLanguage.phrases.attachSendScreenshot.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
-                                    <Row gutter={12}>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.attachEmoji.label")} name="attach_emoji">
-                                                <Input placeholder={t("widgetLanguage.phrases.attachEmoji.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
-                                </Card>
+                    <Divider style={{ margin: "12px 0" }} />
 
-                                <Divider style={{ margin: "12px 0" }} />
+                    <Space>
+                        <Button type="primary" htmlType="submit" loading={saving} disabled={!isAdmin}>
+                            {t("common.save")}
+                        </Button>
+                    </Space>
+                </Space>
+            </Card>
+        </Form>
+    );
 
-                                <Card size="small" title={t("widgetLanguage.phrases.sectionConversation")} style={{ maxWidth: 720 }}>
-                                    <Row gutter={12}>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.noMessages.label")} name="no_messages">
-                                                <Input placeholder={t("widgetLanguage.phrases.noMessages.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} md={12}>
-                                            <Form.Item label={t("widgetLanguage.phrases.typing.label")} name="typing">
-                                                <Input placeholder={t("widgetLanguage.phrases.typing.placeholder")} />
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
-                                    <Form.Item label={t("widgetLanguage.phrases.unread.label")} name="unread">
-                                        <Input placeholder={t("widgetLanguage.phrases.unread.placeholder")} />
-                                    </Form.Item>
-                                </Card>
+    if (isNarrow) {
+        return (
+            <div style={{ maxWidth: 1400, margin: "0 auto", padding: 16 }}>
+                {header}
 
-                                <Divider style={{ margin: "12px 0" }} />
-
-                                <Space>
-                                    <Button type="primary" htmlType="submit" loading={saving} disabled={!isAdmin}>
-                                        {t("common.save")}
-                                    </Button>
-                                </Space>
-                            </Space>
-                        </Card>
+                <Row gutter={16} align="stretch" style={{ marginTop: 12 }}>
+                    <Col xs={24} lg={16} xl={16}>
+                        {editor}
                     </Col>
-
                     <Col xs={24} lg={8} xl={8}>
-                        <Card title={t("widgetLanguage.preview.title")} style={{ height: "100%" }}>
-                            <Preview lang={previewLang} welcomeText={previewWelcome} phrases={previewPhrases} />
-                        </Card>
+                        <Card title={t("widgetLanguage.preview.title")}>{preview}</Card>
                     </Col>
                 </Row>
-            </Form>
+            </div>
+        );
+    }
+
+    return (
+        <div
+            style={{
+                padding: 16,
+                height: "calc(100vh - 56px)",
+                minHeight: "calc(100vh - 56px)",
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+                maxWidth: 1400,
+                margin: "0 auto",
+            }}
+        >
+            {header}
+
+            <Layout style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+                <Layout.Content style={{ minHeight: 0, overflow: "hidden" }}>
+                    <div style={{ height: "100%", overflow: "auto", paddingRight: 12 }}>{editor}</div>
+                </Layout.Content>
+
+                <Layout.Sider
+                    width={560}
+                    theme="light"
+                    style={{ borderLeft: "1px solid #f0f0f0", overflow: "hidden", height: "100%" }}
+                >
+                    <div style={{ height: "100%", overflow: "auto", padding: 12 }}>
+                        <Card title={t("widgetLanguage.preview.title")} style={{ height: "100%" }}>
+                            {preview}
+                        </Card>
+                    </div>
+                </Layout.Sider>
+            </Layout>
         </div>
     );
 }
