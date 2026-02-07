@@ -5,6 +5,9 @@ import com.chatlive.support.auth.service.jwt.JwtClaims;
 import com.chatlive.support.common.api.ApiResponse;
 import com.chatlive.support.widget.repo.SiteRepository;
 import com.chatlive.support.widget.repo.WidgetConfigRepository;
+import com.chatlive.support.widget.service.WidgetLogoService;
+import com.chatlive.support.widget.service.WidgetLogoUrlService;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -38,15 +41,21 @@ public class AdminWidgetConfigController {
     private final JwtService jwtService;
     private final SiteRepository siteRepository;
     private final WidgetConfigRepository widgetConfigRepository;
+    private final WidgetLogoService widgetLogoService;
+    private final WidgetLogoUrlService widgetLogoUrlService;
 
     public AdminWidgetConfigController(
             JwtService jwtService,
             SiteRepository siteRepository,
-            WidgetConfigRepository widgetConfigRepository
+            WidgetConfigRepository widgetConfigRepository,
+            WidgetLogoService widgetLogoService,
+            WidgetLogoUrlService widgetLogoUrlService
     ) {
         this.jwtService = jwtService;
         this.siteRepository = siteRepository;
         this.widgetConfigRepository = widgetConfigRepository;
+        this.widgetLogoService = widgetLogoService;
+        this.widgetLogoUrlService = widgetLogoUrlService;
     }
 
     @GetMapping("/{id}/widget-config")
@@ -91,9 +100,13 @@ public class AdminWidgetConfigController {
                 DEFAULT_MOBILE_FULLSCREEN,
                 DEFAULT_OFFSET_X,
                 DEFAULT_OFFSET_Y,
-                DEFAULT_DEBUG
+                DEFAULT_DEBUG,
+                false,
+                null,
+                false
             ));
         }
+        var showLogo = Boolean.TRUE.equals(row.showLogo());
         return ApiResponse.ok(new WidgetConfigDto(
                 row.preChatEnabled(),
                 row.preChatFieldsJson(),
@@ -125,8 +138,32 @@ public class AdminWidgetConfigController {
             normalizeMobileFullscreen(row.mobileFullscreen()),
             normalizeOffsetX(row.offsetX()),
             normalizeOffsetY(row.offsetY()),
-            normalizeDebug(row.debug())
+            normalizeDebug(row.debug()),
+            showLogo,
+            showLogo ? widgetLogoUrlService.presignGetUrl(row.logoBucket(), row.logoObjectKey()) : null,
+            Boolean.TRUE.equals(row.showAgentPhoto())
         ));
+    }
+
+    public record PresignWidgetLogoUploadRequest(String filename, String content_type, Long size_bytes) {
+    }
+
+    @PostMapping("/{id}/widget-logo/presign-upload")
+    public ApiResponse<WidgetLogoService.PresignWidgetLogoUploadResult> presignWidgetLogoUpload(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @PathVariable("id") String siteId,
+            @RequestBody PresignWidgetLogoUploadRequest req
+    ) {
+        var claims = requireAdminClaims(authorization);
+        var site = siteRepository.findById(claims.tenantId(), siteId)
+                .orElseThrow(() -> new IllegalArgumentException("site_not_found"));
+
+        var filename = req == null ? null : req.filename();
+        var contentType = req == null ? null : req.content_type();
+        var sizeBytes = req == null || req.size_bytes() == null ? 0 : req.size_bytes();
+
+        var res = widgetLogoService.presignUpload(claims, site.id(), filename, contentType, sizeBytes);
+        return ApiResponse.ok(res);
     }
 
     @PutMapping("/{id}/widget-config")
@@ -173,6 +210,8 @@ public class AdminWidgetConfigController {
         var offsetX = normalizeOffsetX(req == null ? null : req.offset_x());
         var offsetY = normalizeOffsetY(req == null ? null : req.offset_y());
         var debug = normalizeDebug(req == null ? null : req.debug());
+        var showLogo = req != null && req.show_logo();
+        var showAgentPhoto = req != null && req.show_agent_photo();
 
         widgetConfigRepository.upsert(
                 site.id(),
@@ -206,7 +245,9 @@ public class AdminWidgetConfigController {
             mobileFullscreen,
             offsetX,
             offsetY,
-            debug
+            debug,
+            showLogo,
+            showAgentPhoto
         );
 
         var row = widgetConfigRepository.findBySiteId(site.id()).orElse(null);
@@ -242,9 +283,13 @@ public class AdminWidgetConfigController {
                 DEFAULT_MOBILE_FULLSCREEN,
                 DEFAULT_OFFSET_X,
                 DEFAULT_OFFSET_Y,
-                DEFAULT_DEBUG
+                DEFAULT_DEBUG,
+                false,
+                null,
+                false
             ));
         }
+        var outShowLogo = Boolean.TRUE.equals(row.showLogo());
         return ApiResponse.ok(new WidgetConfigDto(
                 row.preChatEnabled(),
                 row.preChatFieldsJson(),
@@ -276,7 +321,10 @@ public class AdminWidgetConfigController {
             normalizeMobileFullscreen(row.mobileFullscreen()),
             normalizeOffsetX(row.offsetX()),
             normalizeOffsetY(row.offsetY()),
-            normalizeDebug(row.debug())
+            normalizeDebug(row.debug()),
+            outShowLogo,
+            outShowLogo ? widgetLogoUrlService.presignGetUrl(row.logoBucket(), row.logoObjectKey()) : null,
+            Boolean.TRUE.equals(row.showAgentPhoto())
         ));
     }
 

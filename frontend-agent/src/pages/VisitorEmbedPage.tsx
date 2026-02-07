@@ -95,6 +95,10 @@ type WidgetConfig = {
     pre_chat_email_label?: string | null;
     pre_chat_name_required?: boolean;
     pre_chat_email_required?: boolean;
+
+    show_logo?: boolean;
+    logo_url?: string | null;
+    show_agent_photo?: boolean;
 };
 
 type BootstrapRes = {
@@ -190,6 +194,7 @@ const MSG = {
     WIDGET_HEIGHT: "WIDGET_HEIGHT",
     WIDGET_UNREAD: "WIDGET_UNREAD",
     WIDGET_THEME: "WIDGET_THEME",
+    WIDGET_AGENT: "WIDGET_AGENT",
     WIDGET_REQUEST_OPEN: "WIDGET_REQUEST_OPEN",
     WIDGET_REQUEST_CLOSE: "WIDGET_REQUEST_CLOSE",
 } as const;
@@ -551,6 +556,8 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
 
     const wsRef = useRef<WsClient | null>(null);
 
+    const refreshedDetailForAgentRef = useRef(false);
+
     const attachmentUrlCacheRef = useRef<Record<string, string>>({});
     const attachmentUrlPendingRef = useRef<Record<string, Promise<string | null>>>({});
 
@@ -619,6 +626,50 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
     const [hostColorSettingsMode, setHostColorSettingsMode] = useState<string | null>(null);
     const [hostColorOverridesJson, setHostColorOverridesJson] = useState<string | null>(null);
     const [unread, setUnread] = useState(0);
+
+    useEffect(() => {
+        // Reset per conversation.
+        refreshedDetailForAgentRef.current = false;
+    }, [conversation?.conversation_id]);
+
+    useEffect(() => {
+        const token = bootstrap?.visitor_token || "";
+        const convId = conversation?.conversation_id || "";
+        if (!token || !convId) return;
+        if (refreshedDetailForAgentRef.current) return;
+
+        const last = messages.length ? messages[messages.length - 1] : null;
+        if (!last || String(last.sender_type || "") !== "agent") return;
+
+        // If assignment info is already present, don't refetch.
+        if (detail?.assigned_agent_user_id || detail?.assigned_agent_avatar_url) {
+            refreshedDetailForAgentRef.current = true;
+            return;
+        }
+
+        refreshedDetailForAgentRef.current = true;
+        (async () => {
+            try {
+                const d = await apiFetch<PublicConversationDetail>(`/api/v1/public/conversations/${encodeURIComponent(convId)}`, {
+                    method: "GET",
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                setDetail(d);
+            } catch {
+                // best-effort
+            }
+        })();
+    }, [bootstrap?.visitor_token, conversation?.conversation_id, detail?.assigned_agent_avatar_url, detail?.assigned_agent_user_id, messages]);
+
+    useEffect(() => {
+        // When enabled, allow host launcher to show assigned agent avatar.
+        if (window === window.parent) return;
+
+        const enabled = Boolean(bootstrap?.widget_config?.show_agent_photo);
+        const avatarUrl = String(detail?.assigned_agent_avatar_url || "").trim();
+
+        postToHost(MSG.WIDGET_AGENT, { enabled, avatar_url: enabled ? avatarUrl || null : null });
+    }, [bootstrap?.widget_config?.show_agent_photo, detail?.assigned_agent_avatar_url]);
 
     const preChatEnabled = Boolean(bootstrap?.widget_config?.pre_chat_enabled);
     const legacyPreChatMessage = (bootstrap?.widget_config?.pre_chat_message || "").trim();
@@ -1925,14 +1976,18 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                             >
                                 <div
                                     aria-hidden
-                                    style={{
-                                        width: 28,
-                                        height: 28,
-                                        borderRadius: 10,
-                                        background: uiPrimary,
-                                        flex: "0 0 auto",
-                                    }}
-                                />
+                                    style={{ width: 28, height: 28, flex: "0 0 auto" }}
+                                >
+                                    {bootstrap?.widget_config?.show_logo && bootstrap?.widget_config?.logo_url ? (
+                                        <img
+                                            alt=""
+                                            src={String(bootstrap.widget_config.logo_url || "")}
+                                            style={{ width: 28, height: 28, borderRadius: 10, objectFit: "cover", display: "block" }}
+                                        />
+                                    ) : (
+                                        <div style={{ width: 28, height: 28, borderRadius: 10, background: uiPrimary }} />
+                                    )}
+                                </div>
                                 <div style={{ minWidth: 0, display: "flex", flexDirection: "column", lineHeight: 1.1, textAlign: "center" }}>
                                     <div style={{ fontWeight: 800, color: uiTextMain, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                                         {headerTitle}

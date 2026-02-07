@@ -5,6 +5,7 @@ import VirtualList from "rc-virtual-list";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { Conversation } from "../store/chatStore";
+import { http } from "../providers/http";
 import {
     fetchInactivityTimeouts,
     getCachedInactivityTimeouts,
@@ -40,6 +41,15 @@ export type ConversationListPaneViewProps = {
 
     showTransfer?: boolean;
     onOpenTransfer?: (conversationId: string) => void;
+
+    // Archives UX: show the assigned agent name (LiveChat-like)
+    showAgentName?: boolean;
+};
+
+type AvatarLookupItem = {
+    user_id: string;
+    display_name?: string | null;
+    avatar_url?: string | null;
 };
 
 const AVATAR_COLORS = [
@@ -136,6 +146,7 @@ export function ConversationListPaneView({
     onCloseConversation,
     showTransfer = true,
     onOpenTransfer,
+    showAgentName = false,
 }: ConversationListPaneViewProps) {
     const [nowMs, setNowMs] = useState(() => Date.now());
     useEffect(() => {
@@ -175,6 +186,10 @@ export function ConversationListPaneView({
     const [myChatsOpen, setMyChatsOpen] = useState(true);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
 
+    const agentNameCacheRef = useRef<Record<string, string>>({});
+    const agentNamePendingRef = useRef<Record<string, Promise<void> | undefined>>({});
+    const [, bumpAgentTick] = useState(0);
+
     const sorted = useMemo(() => {
         const list = [...filtered];
         list.sort((a, b) => {
@@ -187,6 +202,52 @@ export function ConversationListPaneView({
         });
         return list;
     }, [filtered, sortOrder]);
+
+    useEffect(() => {
+        if (!showAgentName) return;
+
+        const ids = Array.from(
+            new Set(
+                sorted
+                    .map((c) => String(c.assigned_agent_user_id || "").trim())
+                    .filter(Boolean),
+            ),
+        );
+
+        // Avoid huge payloads; list items share the same few agents typically.
+        const need = ids.filter((id) => !(id in agentNameCacheRef.current)).slice(0, 200);
+        if (!need.length) return;
+
+        const batchKey = need.join(",");
+        if (agentNamePendingRef.current[batchKey]) return;
+
+        agentNamePendingRef.current[batchKey] = (async () => {
+            try {
+                const res = await http.post<AvatarLookupItem[]>("/api/v1/profile/avatars/lookup", { user_ids: need });
+                const list = Array.isArray(res.data) ? res.data : [];
+
+                let changed = false;
+                for (const it of list) {
+                    const userId = String(it?.user_id || "").trim();
+                    if (!userId) continue;
+                    const name = String(it?.display_name || "").trim();
+                    agentNameCacheRef.current[userId] = name;
+                    if (name) changed = true;
+                }
+                for (const id of need) {
+                    if (!(id in agentNameCacheRef.current)) {
+                        agentNameCacheRef.current[id] = "";
+                    }
+                }
+
+                if (changed) bumpAgentTick((x) => x + 1);
+            } catch {
+                // best-effort
+            } finally {
+                delete agentNamePendingRef.current[batchKey];
+            }
+        })();
+    }, [showAgentName, sorted]);
 
     const listWrapRef = useRef<HTMLDivElement | null>(null);
     const [listHeight, setListHeight] = useState(0);
@@ -322,6 +383,10 @@ export function ConversationListPaneView({
                                         ? t("workbench.system.idle", { minutes: idleForMinutes })
                                         : (lastMsgText || (c.subject || "-")));
 
+                                const agentName = showAgentName
+                                    ? String(agentNameCacheRef.current[String(c.assigned_agent_user_id || "").trim()] || "").trim()
+                                    : "";
+
                                 const avatarBg = avatarBgForConversation(c, title);
                                 const avatarText = avatarTextFromTitle(title, t);
 
@@ -451,19 +516,27 @@ export function ConversationListPaneView({
                                                     </Space>
                                                 </Space>
 
-                                                <Typography.Text type="secondary" ellipsis style={{ fontSize: 12 }}>
-                                                    {lastFromAgent && (Boolean(lastMsgText) || isIdle || isArchivedInactivity) ? (
-                                                        <RollbackOutlined
-                                                            aria-hidden
-                                                            style={{
-                                                                fontSize: 12,
-                                                                marginRight: 6,
-                                                                color: "rgba(0,0,0,0.45)",
-                                                            }}
-                                                        />
+                                                <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                                                    {showAgentName && agentName ? (
+                                                        <Typography.Text type="secondary" ellipsis style={{ fontSize: 12, lineHeight: 1.2 }}>
+                                                            {t("workbench.agent")}: {agentName}
+                                                        </Typography.Text>
                                                     ) : null}
-                                                    {subtitleText || "-"}
-                                                </Typography.Text>
+
+                                                    <Typography.Text type="secondary" ellipsis style={{ fontSize: 12, lineHeight: 1.2 }}>
+                                                        {lastFromAgent && (Boolean(lastMsgText) || isIdle || isArchivedInactivity) ? (
+                                                            <RollbackOutlined
+                                                                aria-hidden
+                                                                style={{
+                                                                    fontSize: 12,
+                                                                    marginRight: 6,
+                                                                    color: "rgba(0,0,0,0.45)",
+                                                                }}
+                                                            />
+                                                        ) : null}
+                                                        {subtitleText || "-"}
+                                                    </Typography.Text>
+                                                </div>
                                             </Space>
                                         </div>
                                 </List.Item>

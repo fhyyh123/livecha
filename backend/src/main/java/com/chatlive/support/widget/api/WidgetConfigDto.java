@@ -31,6 +31,9 @@ public record WidgetConfigDto(
         Boolean mobile_fullscreen,
         Integer offset_x,
         Integer offset_y,
-        Boolean debug
+        Boolean debug,
+        boolean show_logo,
+        String logo_url,
+        boolean show_agent_photo
 ) {
 }

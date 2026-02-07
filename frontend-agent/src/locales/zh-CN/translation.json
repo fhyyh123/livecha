@@ -776,6 +776,12 @@
       "label": "cookie_samesite（可选）",
       "tooltip": "默认 Lax。跨站第三方嵌入通常需要 None + https。",
       "placeholder": "Lax / Strict / None"
+    },
+    "tweaksOptions": {
+      "showLogo": "显示徽标",
+      "uploadLogo": "上传徽标",
+      "uploadLogoHint": "上传一张图片，用于在访客端标题栏展示。",
+      "showAgentPhoto": "显示经纪人照片"
     }
   },
   "trustedDomains": {

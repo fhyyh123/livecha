@@ -43,6 +43,7 @@ public class PublicWidgetService {
     private final VisitorRepository visitorRepository;
     private final VisitorGeoUpdater visitorGeoUpdater;
     private final JwtService jwtService;
+    private final WidgetLogoUrlService widgetLogoUrlService;
     private final Duration visitorTtl;
 
     public PublicWidgetService(
@@ -52,6 +53,7 @@ public class PublicWidgetService {
             VisitorRepository visitorRepository,
             VisitorGeoUpdater visitorGeoUpdater,
             JwtService jwtService,
+            WidgetLogoUrlService widgetLogoUrlService,
             @Value("${app.jwt.visitor-ttl-seconds:7200}") long visitorTtlSeconds
     ) {
         this.siteRepository = siteRepository;
@@ -60,6 +62,7 @@ public class PublicWidgetService {
         this.visitorRepository = visitorRepository;
         this.visitorGeoUpdater = visitorGeoUpdater;
         this.jwtService = jwtService;
+        this.widgetLogoUrlService = widgetLogoUrlService;
         this.visitorTtl = Duration.ofSeconds(visitorTtlSeconds);
     }
 
@@ -109,7 +112,10 @@ public class PublicWidgetService {
                 r.mobileFullscreen() != null ? r.mobileFullscreen() : DEFAULT_MOBILE_FULLSCREEN,
                 r.offsetX() != null ? r.offsetX() : DEFAULT_OFFSET_X,
                 r.offsetY() != null ? r.offsetY() : DEFAULT_OFFSET_Y,
-                r.debug() != null ? r.debug() : DEFAULT_DEBUG
+                r.debug() != null ? r.debug() : DEFAULT_DEBUG,
+                Boolean.TRUE.equals(r.showLogo()),
+                Boolean.TRUE.equals(r.showLogo()) ? widgetLogoUrlService.presignGetUrl(r.logoBucket(), r.logoObjectKey()) : null,
+                Boolean.TRUE.equals(r.showAgentPhoto())
             ))
             .orElseGet(() -> new WidgetConfigDto(
                     false,
@@ -142,7 +148,10 @@ public class PublicWidgetService {
                     DEFAULT_MOBILE_FULLSCREEN,
                     DEFAULT_OFFSET_X,
                     DEFAULT_OFFSET_Y,
-                    DEFAULT_DEBUG
+                    DEFAULT_DEBUG,
+                    false,
+                    null,
+                    false
             ));
 
         String visitorId;

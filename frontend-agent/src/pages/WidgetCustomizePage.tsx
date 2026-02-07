@@ -46,6 +46,9 @@ type WidgetConfigDto = {
     offset_x?: number | null;
     offset_y?: number | null;
     debug?: boolean | null;
+    show_logo?: boolean;
+    logo_url?: string | null;
+    show_agent_photo?: boolean;
 };
 
 type WidgetSnippetResponse = {
@@ -57,6 +60,14 @@ type WidgetSnippetResponse = {
     cookie_domain?: string | null;
     cookie_samesite?: string | null;
     snippet_html: string;
+};
+
+type PresignWidgetLogoUploadResponse = {
+    bucket: string;
+    object_key: string;
+    upload_url: string;
+    expires_in_seconds?: number;
+    max_upload_bytes?: number;
 };
 
 const DEFAULTS = {
@@ -330,7 +341,13 @@ export function WidgetCustomizePage() {
     const [previewReload, setPreviewReload] = useState(0);
     const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
 
+    const logoFileInputRef = useRef<HTMLInputElement | null>(null);
+    const [logoUploading, setLogoUploading] = useState(false);
+    const [logoUploadError, setLogoUploadError] = useState<string>("");
+
     const [form] = Form.useForm<WidgetConfigDto>();
+
+    const watchLogoUrl = Form.useWatch("logo_url", form);
 
     const selectedSite = useMemo(() => sites.find((x) => x.id === siteId) || sites[0] || null, [siteId, sites]);
 
@@ -470,6 +487,52 @@ export function WidgetCustomizePage() {
             setCfgError(errorMessage(e, "save_widget_config_failed"));
         } finally {
             setSaving(false);
+        }
+    }
+
+    async function reloadConfig() {
+        if (!siteId) return;
+        const res = await http.get<WidgetConfigDto>(`/api/v1/admin/sites/${encodeURIComponent(siteId)}/widget-config`);
+        form.setFieldsValue(res.data);
+    }
+
+    async function uploadLogo(file: File) {
+        if (!siteId) return;
+        if (!file) return;
+
+        setLogoUploading(true);
+        setLogoUploadError("");
+
+        try {
+            const presign = await http.post<PresignWidgetLogoUploadResponse>(
+                `/api/v1/admin/sites/${encodeURIComponent(siteId)}/widget-logo/presign-upload`,
+                {
+                    filename: file.name,
+                    content_type: file.type || "application/octet-stream",
+                    size_bytes: file.size,
+                },
+            );
+
+            const uploadUrl = String(presign.data?.upload_url || "");
+            if (!uploadUrl) throw new Error("upload_url_missing");
+
+            const putRes = await fetch(uploadUrl, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": file.type || "application/octet-stream",
+                },
+                body: file,
+            });
+
+            if (!putRes.ok) {
+                throw new Error(`upload_failed_${putRes.status}`);
+            }
+
+            await reloadConfig();
+        } catch (e: unknown) {
+            setLogoUploadError(errorMessage(e, "upload_logo_failed"));
+        } finally {
+            setLogoUploading(false);
         }
     }
 
@@ -1002,6 +1065,47 @@ export function WidgetCustomizePage() {
                                                     <Divider style={{ margin: "12px 0" }} />
 
                                                     <Form.Item label={t("widgetCustomize.fields.debug")} name="debug" valuePropName="checked">
+                                                        <Switch />
+                                                    </Form.Item>
+                                                    <Form.Item label={t("widgetCustomize.tweaksOptions.showLogo")} name="show_logo" valuePropName="checked">
+                                                        <Switch />
+                                                    </Form.Item>
+
+                                                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: -6, marginBottom: 12 }}>
+                                                        <input
+                                                            ref={logoFileInputRef}
+                                                            type="file"
+                                                            accept="image/*"
+                                                            style={{ display: "none" }}
+                                                            onChange={(e) => {
+                                                                const f = e.target.files?.[0];
+                                                                if (!f) return;
+                                                                void uploadLogo(f);
+                                                                // allow re-uploading same file
+                                                                e.currentTarget.value = "";
+                                                            }}
+                                                        />
+
+                                                        <Button onClick={() => logoFileInputRef.current?.click()} loading={logoUploading} disabled={!isAdmin}>
+                                                            {t("widgetCustomize.tweaksOptions.uploadLogo")}
+                                                        </Button>
+
+                                                        {watchLogoUrl ? (
+                                                            <img
+                                                                alt={t("widgetCustomize.tweaksOptions.showLogo")}
+                                                                src={String(watchLogoUrl || "")}
+                                                                style={{ height: 28, width: 28, borderRadius: 8, objectFit: "cover", border: "1px solid rgba(15,23,42,.12)" }}
+                                                            />
+                                                        ) : (
+                                                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                                                {t("widgetCustomize.tweaksOptions.uploadLogoHint")}
+                                                            </Typography.Text>
+                                                        )}
+                                                    </div>
+
+                                                    {logoUploadError ? <Alert type="warning" showIcon message={logoUploadError} style={{ marginBottom: 12 }} /> : null}
+
+                                                    <Form.Item label={t("widgetCustomize.tweaksOptions.showAgentPhoto")} name="show_agent_photo" valuePropName="checked">
                                                         <Switch />
                                                     </Form.Item>
                                                 </>

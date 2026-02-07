@@ -4,6 +4,7 @@ import com.chatlive.support.auth.service.jwt.JwtService;
 import com.chatlive.support.common.api.ApiResponse;
 import com.chatlive.support.widget.repo.SiteRepository;
 import com.chatlive.support.widget.repo.WidgetConfigRepository;
+import com.chatlive.support.widget.service.WidgetLogoUrlService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -40,11 +41,18 @@ public class SiteController {
     private final JwtService jwtService;
     private final SiteRepository siteRepository;
     private final WidgetConfigRepository widgetConfigRepository;
+        private final WidgetLogoUrlService widgetLogoUrlService;
 
-    public SiteController(JwtService jwtService, SiteRepository siteRepository, WidgetConfigRepository widgetConfigRepository) {
+        public SiteController(
+                        JwtService jwtService,
+                        SiteRepository siteRepository,
+                        WidgetConfigRepository widgetConfigRepository,
+                        WidgetLogoUrlService widgetLogoUrlService
+        ) {
         this.jwtService = jwtService;
         this.siteRepository = siteRepository;
         this.widgetConfigRepository = widgetConfigRepository;
+                this.widgetLogoUrlService = widgetLogoUrlService;
     }
 
     @GetMapping
@@ -118,10 +126,14 @@ public class SiteController {
                         DEFAULT_MOBILE_FULLSCREEN,
                         DEFAULT_OFFSET_X,
                         DEFAULT_OFFSET_Y,
-                        DEFAULT_DEBUG
+                        DEFAULT_DEBUG,
+                        false,
+                        null,
+                        false
                 ));
         }
 
+        var showLogo = Boolean.TRUE.equals(row.showLogo());
         return ApiResponse.ok(new WidgetConfigDto(
                 row.preChatEnabled(),
                 row.preChatFieldsJson(),
@@ -153,7 +165,10 @@ public class SiteController {
                 row.mobileFullscreen() != null ? row.mobileFullscreen() : DEFAULT_MOBILE_FULLSCREEN,
                 row.offsetX() != null ? row.offsetX() : DEFAULT_OFFSET_X,
                 row.offsetY() != null ? row.offsetY() : DEFAULT_OFFSET_Y,
-                row.debug() != null ? row.debug() : DEFAULT_DEBUG
+                row.debug() != null ? row.debug() : DEFAULT_DEBUG,
+                showLogo,
+                showLogo ? widgetLogoUrlService.presignGetUrl(row.logoBucket(), row.logoObjectKey()) : null,
+                Boolean.TRUE.equals(row.showAgentPhoto())
         ));
     }
 }

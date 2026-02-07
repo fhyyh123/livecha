@@ -40,7 +40,12 @@ public class WidgetConfigRepository {
             Boolean mobileFullscreen,
             Integer offsetX,
             Integer offsetY,
-            Boolean debug
+            Boolean debug,
+            Boolean showLogo,
+            String logoBucket,
+            String logoObjectKey,
+            String logoContentType,
+            Boolean showAgentPhoto
     ) {
     }
 
@@ -51,7 +56,7 @@ public class WidgetConfigRepository {
     }
 
     public Optional<WidgetConfigRow> findBySiteId(String siteId) {
-        var sql = "select site_id, pre_chat_enabled, pre_chat_fields_json, theme_color, welcome_text, cookie_domain, cookie_samesite, widget_language, widget_phrases_json, pre_chat_message, pre_chat_name_label, pre_chat_email_label, pre_chat_name_required, pre_chat_email_required, launcher_style, theme_mode, color_settings_mode, color_overrides_json, position, z_index, launcher_text, width, height, auto_height, auto_height_mode, min_height, max_height_ratio, mobile_breakpoint, mobile_fullscreen, offset_x, offset_y, debug from widget_config where site_id = ? limit 1";
+        var sql = "select site_id, pre_chat_enabled, pre_chat_fields_json, theme_color, welcome_text, cookie_domain, cookie_samesite, widget_language, widget_phrases_json, pre_chat_message, pre_chat_name_label, pre_chat_email_label, pre_chat_name_required, pre_chat_email_required, launcher_style, theme_mode, color_settings_mode, color_overrides_json, position, z_index, launcher_text, width, height, auto_height, auto_height_mode, min_height, max_height_ratio, mobile_breakpoint, mobile_fullscreen, offset_x, offset_y, debug, show_logo, logo_bucket, logo_object_key, logo_content_type, show_agent_photo from widget_config where site_id = ? limit 1";
         var list = jdbcTemplate.query(sql, (rs, rowNum) -> new WidgetConfigRow(
                 rs.getString("site_id"),
             rs.getBoolean("pre_chat_enabled"),
@@ -84,7 +89,12 @@ public class WidgetConfigRepository {
             rs.getObject("mobile_fullscreen", Boolean.class),
             rs.getObject("offset_x", Integer.class),
             rs.getObject("offset_y", Integer.class),
-            rs.getObject("debug", Boolean.class)
+            rs.getObject("debug", Boolean.class),
+            rs.getObject("show_logo", Boolean.class),
+            rs.getString("logo_bucket"),
+            rs.getString("logo_object_key"),
+            rs.getString("logo_content_type"),
+            rs.getObject("show_agent_photo", Boolean.class)
         ), siteId);
         return list.stream().findFirst();
     }
@@ -121,9 +131,11 @@ public class WidgetConfigRepository {
             Boolean mobileFullscreen,
             Integer offsetX,
             Integer offsetY,
-            Boolean debug
+            Boolean debug,
+            boolean showLogo,
+            Boolean showAgentPhoto
     ) {
-        var updateSql = "update widget_config set pre_chat_enabled = ?, pre_chat_fields_json = ?, theme_color = ?, welcome_text = ?, cookie_domain = ?, cookie_samesite = ?, widget_language = ?, widget_phrases_json = ?, pre_chat_message = ?, pre_chat_name_label = ?, pre_chat_email_label = ?, pre_chat_name_required = ?, pre_chat_email_required = ?, launcher_style = ?, theme_mode = ?, color_settings_mode = ?, color_overrides_json = ?, position = ?, z_index = ?, launcher_text = ?, width = ?, height = ?, auto_height = ?, auto_height_mode = ?, min_height = ?, max_height_ratio = ?, mobile_breakpoint = ?, mobile_fullscreen = ?, offset_x = ?, offset_y = ?, debug = ?, updated_at = current_timestamp where site_id = ?";
+        var updateSql = "update widget_config set pre_chat_enabled = ?, pre_chat_fields_json = ?, theme_color = ?, welcome_text = ?, cookie_domain = ?, cookie_samesite = ?, widget_language = ?, widget_phrases_json = ?, pre_chat_message = ?, pre_chat_name_label = ?, pre_chat_email_label = ?, pre_chat_name_required = ?, pre_chat_email_required = ?, launcher_style = ?, theme_mode = ?, color_settings_mode = ?, color_overrides_json = ?, position = ?, z_index = ?, launcher_text = ?, width = ?, height = ?, auto_height = ?, auto_height_mode = ?, min_height = ?, max_height_ratio = ?, mobile_breakpoint = ?, mobile_fullscreen = ?, offset_x = ?, offset_y = ?, debug = ?, show_logo = ?, show_agent_photo = ?, updated_at = current_timestamp where site_id = ?";
         var updated = jdbcTemplate.update(updateSql,
             preChatEnabled,
             preChatFieldsJson,
@@ -156,10 +168,12 @@ public class WidgetConfigRepository {
             offsetX,
             offsetY,
             debug,
+            showLogo,
+            showAgentPhoto,
             siteId);
         if (updated > 0) return;
 
-        var insertSql = "insert into widget_config(site_id, pre_chat_enabled, pre_chat_fields_json, theme_color, welcome_text, cookie_domain, cookie_samesite, widget_language, widget_phrases_json, pre_chat_message, pre_chat_name_label, pre_chat_email_label, pre_chat_name_required, pre_chat_email_required, launcher_style, theme_mode, color_settings_mode, color_overrides_json, position, z_index, launcher_text, width, height, auto_height, auto_height_mode, min_height, max_height_ratio, mobile_breakpoint, mobile_fullscreen, offset_x, offset_y, debug, created_at, updated_at) values (?,?,?,?,?,?,?,?,?,?,?,?,?, ?, ?,?,?,?, ?,?,?,?,?,?,?,?,?,?,?,?,?,?, current_timestamp, current_timestamp)";
+        var insertSql = "insert into widget_config(site_id, pre_chat_enabled, pre_chat_fields_json, theme_color, welcome_text, cookie_domain, cookie_samesite, widget_language, widget_phrases_json, pre_chat_message, pre_chat_name_label, pre_chat_email_label, pre_chat_name_required, pre_chat_email_required, launcher_style, theme_mode, color_settings_mode, color_overrides_json, position, z_index, launcher_text, width, height, auto_height, auto_height_mode, min_height, max_height_ratio, mobile_breakpoint, mobile_fullscreen, offset_x, offset_y, debug, show_logo, show_agent_photo, created_at, updated_at) values (?,?,?,?,?,?,?,?,?,?,?,?,?, ?, ?,?,?,?, ?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?, ?, current_timestamp, current_timestamp)";
         jdbcTemplate.update(insertSql,
             siteId,
             preChatEnabled,
@@ -192,6 +206,28 @@ public class WidgetConfigRepository {
             mobileFullscreen,
             offsetX,
             offsetY,
-            debug);
+            debug,
+            showLogo,
+            showAgentPhoto);
+    }
+
+    public void upsertLogo(String siteId, boolean showLogo, String bucket, String objectKey, String contentType) {
+        var updateSql = "update widget_config set show_logo = ?, logo_bucket = ?, logo_object_key = ?, logo_content_type = ?, logo_updated_at = current_timestamp, updated_at = current_timestamp where site_id = ?";
+        var updated = jdbcTemplate.update(updateSql,
+                showLogo,
+                bucket,
+                objectKey,
+                contentType,
+                siteId);
+        if (updated > 0) return;
+
+        var insertSql = "insert into widget_config(site_id, show_logo, logo_bucket, logo_object_key, logo_content_type, logo_updated_at, created_at, updated_at) values (?,?,?,?,?, current_timestamp, current_timestamp, current_timestamp)";
+        jdbcTemplate.update(insertSql,
+                siteId,
+                showLogo,
+                bucket,
+                objectKey,
+                contentType);
     }
 }
+

@@ -142,6 +142,9 @@
     offsetY: 20,
     debug: false,
 
+    // When enabled (site widget_config), host launcher can swap to agent avatar once assigned.
+    showAgentPhoto: false,
+
     // Optional postMessage origin allowlist. If set, widget accepts messages from these origins.
     // Otherwise it defaults to the embedUrl origin.
     allowedOrigins: null,
@@ -161,6 +164,7 @@
     WIDGET_HEIGHT: "WIDGET_HEIGHT",
     WIDGET_UNREAD: "WIDGET_UNREAD",
     WIDGET_THEME: "WIDGET_THEME",
+    WIDGET_AGENT: "WIDGET_AGENT",
     WIDGET_REQUEST_OPEN: "WIDGET_REQUEST_OPEN",
     WIDGET_REQUEST_CLOSE: "WIDGET_REQUEST_CLOSE",
   };
@@ -174,11 +178,14 @@
     button: null,
     buttonLabel: null,
     badge: null,
+    buttonIcon: null,
     config: null,
     iframeOrigin: "",
     iframeReady: false,
     panelHeight: null,
     unread: 0,
+    agentAvatarUrl: null,
+    _defaultIconHtml: null,
     pmQueue: [],
     outsideBound: false,
     prefetchDone: false,
@@ -458,6 +465,9 @@
 
       // Diagnostics
       if (typeof ws.debug === "boolean") out.debug = ws.debug;
+
+      // Launcher avatar option
+      if (typeof ws.show_agent_photo === "boolean") out.showAgentPhoto = ws.show_agent_photo;
 
       return out;
     } catch (e) {
@@ -827,9 +837,64 @@
 
       var icon = null;
       try {
-        icon = state.button.querySelector("[data-chatlive-button-icon='1']");
+        icon = state.buttonIcon || state.button.querySelector("[data-chatlive-button-icon='1']");
       } catch (e0) {
         icon = null;
+      }
+
+      var wantsAgentAvatar = !!(!state.open && cfg && cfg.showAgentPhoto && state.agentAvatarUrl);
+      if (icon) {
+        if (wantsAgentAvatar) {
+          // Replace default SVG with agent avatar image.
+          try {
+            var url = String(state.agentAvatarUrl || "");
+            // Basic scheme allowlist to avoid weird URLs.
+            var ok = false;
+            try {
+              ok = url.indexOf("https://") === 0 || url.indexOf("http://") === 0;
+            } catch (e01) {
+              ok = false;
+            }
+            if (!ok || !url) {
+              if (state._defaultIconHtml) {
+                icon.innerHTML = state._defaultIconHtml;
+                icon.style.width = "24px";
+                icon.style.height = "24px";
+                icon.style.lineHeight = "24px";
+              }
+            } else {
+              // Make avatar more prominent than the default 24px icon.
+              icon.style.width = "42px";
+              icon.style.height = "42px";
+              icon.style.lineHeight = "42px";
+              icon.innerHTML = "";
+              var img = document.createElement("img");
+              img.alt = "";
+              img.src = url;
+              img.style.width = "42px";
+              img.style.height = "42px";
+              img.style.borderRadius = "999px";
+              img.style.objectFit = "cover";
+              img.style.display = "block";
+              img.setAttribute("aria-hidden", "true");
+              icon.appendChild(img);
+            }
+          } catch (e02) {
+            // ignore
+          }
+        } else {
+          // Restore default SVG if we previously swapped.
+          try {
+            if (state._defaultIconHtml && icon.innerHTML !== state._defaultIconHtml) {
+              icon.innerHTML = state._defaultIconHtml;
+              icon.style.width = "24px";
+              icon.style.height = "24px";
+              icon.style.lineHeight = "24px";
+            }
+          } catch (e03) {
+            // ignore
+          }
+        }
       }
 
       if (state.open) {
@@ -1264,6 +1329,28 @@
       return;
     }
 
+    if (data.type === MSG.WIDGET_AGENT) {
+      if (!payload || typeof payload !== "object") return;
+      try {
+        if (typeof payload.enabled === "boolean" && state.config) {
+          state.config.showAgentPhoto = payload.enabled;
+        }
+      } catch (e00) {
+        // ignore
+      }
+      var nextUrl = null;
+      try {
+        // payload: { avatar_url: string|null }
+        if (typeof payload.avatar_url === "string") nextUrl = payload.avatar_url;
+        else if (payload.avatar_url === null) nextUrl = null;
+      } catch (e0) {
+        nextUrl = null;
+      }
+      state.agentAvatarUrl = nextUrl && String(nextUrl || "").trim() ? String(nextUrl || "").trim() : null;
+      applyLauncherVisual();
+      return;
+    }
+
     if (data.type === MSG.WIDGET_THEME) {
       if (!payload || typeof payload !== "object") return;
       if (typeof payload.themeColor === "string") {
@@ -1477,6 +1564,7 @@
       "<path d='M21 12c0 4.418-4.03 8-9 8-1.015 0-2-.145-2.93-.414L3 21l1.62-4.12A7.42 7.42 0 0 1 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8Z' stroke='currentColor' stroke-width='2' stroke-linejoin='round'/>" +
       "<path d='M8 12h.01M12 12h.01M16 12h.01' stroke='currentColor' stroke-width='3' stroke-linecap='round'/>" +
       "</svg>";
+    var defaultIconHtml = buttonIcon.innerHTML;
     button.appendChild(buttonIcon);
 
     // Button label (do not use button.textContent later; it would clear the badge node)
@@ -1653,7 +1741,9 @@
     state.root = root;
     state.iframe = iframe;
     state.button = button;
+    state.buttonIcon = buttonIcon;
     state.buttonLabel = buttonLabel;
+    state._defaultIconHtml = defaultIconHtml;
     // Apply initial label/icon state.
     applyLauncherVisual();
     state.badge = badge;

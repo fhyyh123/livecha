@@ -1,0 +1,10 @@
+-- Widget logo (header icon) + optional agent photo launcher behavior (H2)
+
+alter table widget_config add column if not exists show_logo boolean not null default false;
+
+alter table widget_config add column if not exists logo_bucket varchar(255);
+alter table widget_config add column if not exists logo_object_key varchar(1024);
+alter table widget_config add column if not exists logo_content_type varchar(128);
+alter table widget_config add column if not exists logo_updated_at timestamp;
+
+alter table widget_config add column if not exists show_agent_photo boolean not null default false;

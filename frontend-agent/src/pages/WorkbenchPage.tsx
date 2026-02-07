@@ -511,6 +511,7 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
                             onOpenTransfer={openTransfer}
                             showClose={!isArchives}
                             onCloseConversation={closeConversationFromList}
+                            showAgentName={isArchives}
                         />
                     </ConversationListPane>
                 }

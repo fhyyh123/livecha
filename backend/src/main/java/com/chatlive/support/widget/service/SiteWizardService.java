@@ -74,7 +74,9 @@ public class SiteWizardService {
             null, // mobileFullscreen
             null, // offsetX
             null, // offsetY
-            null  // debug
+            null,  // debug
+            false, // showLogo
+            false  // showAgentPhoto
         );
 
         var domain = emptyToNull(allowlistDomain);

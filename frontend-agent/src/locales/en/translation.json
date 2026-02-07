@@ -780,6 +780,12 @@
       "label": "cookie_samesite (optional)",
       "tooltip": "Default is Lax. Cross-site third-party embeds usually require None + https.",
       "placeholder": "Lax / Strict / None"
+    },
+    "tweaksOptions": {
+      "showLogo": "Show logo",
+      "uploadLogo": "Upload logo",
+      "uploadLogoHint": "Upload an image to show in the visitor header.",
+      "showAgentPhoto": "Show agent photo"
     }
   },
   "trustedDomains": {
