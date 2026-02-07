@@ -1520,6 +1520,7 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
     function InlineImageAttachment(props: { attachmentId?: string; filename?: string; sizeKb?: number | null }) {
         const { attachmentId, filename, sizeKb } = props;
         const [url, setUrl] = useState<string | null>(null);
+        const lastPreviewTriggerAtRef = useRef<number>(0);
 
         useEffect(() => {
             let alive = true;
@@ -1550,7 +1551,27 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                     alt={filename || "image"}
                     loading="lazy"
                     style={{ display: "block", maxWidth: "min(260px, 65vw)", maxHeight: 320, height: "auto", borderRadius: 10, cursor: "pointer" }}
-                    onClick={() => {
+                    draggable={false}
+                    onDragStart={(e) => {
+                        try {
+                            e.preventDefault();
+                        } catch {
+                            // ignore
+                        }
+                    }}
+                    onPointerDown={(e) => {
+                        // Some mobile/iframe environments may require a first tap to focus the iframe,
+                        // and only a second tap will emit a `click`. Use pointer-down to open preview
+                        // on the first interaction.
+                        try {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        } catch {
+                            // ignore
+                        }
+
+                        lastPreviewTriggerAtRef.current = Date.now();
+
                         // In iframe: ask host to render a full-screen preview (outside chat window).
                         if (window !== window.parent) {
                             postToHost(MSG.WIDGET_IMAGE_PREVIEW, { url });
@@ -1558,6 +1579,27 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                         }
 
                         // Standalone page fallback: use AntD Image preview.
+                        setImagePreviewUrl(url);
+                    }}
+                    onClick={(e) => {
+                        // Fallback for browsers without Pointer Events.
+                        // Also dedupe the synthetic click that follows pointer events.
+                        const last = Number(lastPreviewTriggerAtRef.current || 0);
+                        if (last && Date.now() - last < 800) return;
+
+                        try {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        } catch {
+                            // ignore
+                        }
+
+                        lastPreviewTriggerAtRef.current = Date.now();
+
+                        if (window !== window.parent) {
+                            postToHost(MSG.WIDGET_IMAGE_PREVIEW, { url });
+                            return;
+                        }
                         setImagePreviewUrl(url);
                     }}
                 />

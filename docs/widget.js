@@ -1447,7 +1447,7 @@
     closeBtn.style.lineHeight = "40px";
     closeBtn.style.cursor = "pointer";
 
-    function onOverlayClick(e) {
+    function onOverlayPointerDown(e) {
       try {
         // Prevent the same click that triggered openImagePreview() from instantly
         // closing the overlay (common on mobile, and can happen on desktop due to timing).
@@ -1461,7 +1461,17 @@
     closeBtn.addEventListener("click", function () {
       closeImagePreview();
     });
-    overlay.addEventListener("click", onOverlayClick);
+    // IMPORTANT: do not rely on `click` here.
+    // In some browsers, a delayed click from the iframe interaction that triggered
+    // openImagePreview() can land on the newly-shown overlay and immediately close it.
+    // Using pointer/touch/mouse *down* avoids that class of "flash then close" bugs.
+    try {
+      overlay.addEventListener("pointerdown", onOverlayPointerDown);
+    } catch (e0) {
+      // ignore
+    }
+    overlay.addEventListener("touchstart", onOverlayPointerDown, { passive: true });
+    overlay.addEventListener("mousedown", onOverlayPointerDown);
     overlay.appendChild(img);
     overlay.appendChild(closeBtn);
 
@@ -1491,7 +1501,9 @@
 
     try {
       // Ignore immediate click events right after opening.
-      state._imagePreviewIgnoreUntil = Date.now() + 450;
+      // Some environments synthesize delayed clicks (>450ms) after iframe interactions;
+      // keep this window conservative to avoid "flash then close".
+      state._imagePreviewIgnoreUntil = Date.now() + 1200;
       state._imagePreviewImg.src = String(url || "");
       state._imagePreviewEl.style.display = "flex";
       if (state._imagePreviewKeyHandler) window.addEventListener("keydown", state._imagePreviewKeyHandler);
