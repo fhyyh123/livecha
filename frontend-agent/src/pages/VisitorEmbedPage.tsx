@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { WsClient, type WsInboundEvent, type WsStatus } from "../ws/wsClient";
 import { applyWidgetPhrasesToEmbedI18n, normalizeWidgetLanguage } from "../i18nEmbed";
 import { isPreviewableImage } from "../utils/attachments";
+import { extractImageFilesFromClipboardData } from "../utils/clipboard";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
     if (!value || typeof value !== "object") return null;
@@ -756,7 +757,25 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
 
     // If pre-chat is enabled, require a conversation (created after form submit) before sending.
     const composerEnabled = Boolean(bootstrap?.visitor_token) && (!preChatEnabled || Boolean(conversation?.conversation_id)) && !uploading;
-    const canSend = composerEnabled && !!draft.trim();
+    const [pastedImages, setPastedImages] = useState<Array<{ file: File; url: string }>>([]);
+
+    useEffect(() => {
+        return () => {
+            try {
+                for (const it of pastedImages) {
+                    try {
+                        if (it?.url) URL.revokeObjectURL(it.url);
+                    } catch {
+                        // ignore
+                    }
+                }
+            } catch {
+                // ignore
+            }
+        };
+    }, [pastedImages]);
+
+    const canSend = composerEnabled && (!!draft.trim() || pastedImages.length > 0);
 
     const emojiList = useMemo(
         () => ["😀", "😁", "😂", "🙂", "😉", "😍", "🥳", "👍", "🙏", "🎉", "❤️", "😅", "🤔", "😭"],
@@ -1816,15 +1835,15 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
         }
     }
 
-    async function sendFile(file: File) {
-        if (!file) return;
-        if (!bootstrap?.visitor_token) return;
+    async function sendFile(file: File): Promise<boolean> {
+        if (!file) return false;
+        if (!bootstrap?.visitor_token) return false;
         // Pre-chat mode requires form submit first.
-        if (preChatEnabled && !conversation?.conversation_id) return;
+        if (preChatEnabled && !conversation?.conversation_id) return false;
 
         // LiveChat-like behavior: create/recover only at first send.
         const convId = conversation?.conversation_id || (await createOrRecover())?.conversation_id || null;
-        if (!convId) return;
+        if (!convId) return false;
         setUploading(true);
         setError("");
 
@@ -1835,7 +1854,7 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
             // Prefer WS (so agent gets real-time MSG broadcast)
             if (wsRef.current?.getStatus() === "connected") {
                 wsRef.current.sendFile(convId, presigned.attachment_id);
-                return;
+                return true;
             }
 
             // HTTP fallback: create the file message
@@ -1846,10 +1865,62 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
             });
 
             await loadDetailAndHistory(convId);
+            return true;
         } catch (e: unknown) {
             setError(getErrorFields(e).message || "send_failed");
+            return false;
         } finally {
             setUploading(false);
+        }
+    }
+
+    function onComposerPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+        if (!composerEnabled) return;
+        const files = extractImageFilesFromClipboardData(e.clipboardData, { filenameBase: "pasted-image" });
+        if (!files.length) return;
+        try {
+            e.preventDefault();
+        } catch {
+            // ignore
+        }
+
+        setPastedImages((prev) => {
+            const next = [...prev];
+            for (const f of files) {
+                try {
+                    next.push({ file: f, url: URL.createObjectURL(f) });
+                } catch {
+                    // ignore
+                }
+            }
+            return next;
+        });
+    }
+
+    async function onSend() {
+        if (!composerEnabled || loading) return;
+        if (!canSend) return;
+
+        // Send attachment first (if any), then text.
+        if (pastedImages.length) {
+            const remaining: Array<{ file: File; url: string }> = [];
+            for (const it of pastedImages) {
+                const ok = await sendFile(it.file);
+                if (ok) {
+                    try {
+                        if (it.url) URL.revokeObjectURL(it.url);
+                    } catch {
+                        // ignore
+                    }
+                } else {
+                    remaining.push(it);
+                }
+            }
+            setPastedImages(remaining);
+        }
+
+        if (draft.trim()) {
+            await sendText();
         }
     }
 
@@ -1982,7 +2053,7 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
         // Enter to send, Shift+Enter for newline.
         if (e.shiftKey) return;
         e.preventDefault();
-        void sendText();
+        void onSend();
     }
 
     const isPreChatScreen = preChatEnabled && !conversation?.conversation_id;
@@ -2644,27 +2715,79 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                                     boxShadow: "0 10px 28px rgba(0,0,0,.06)",
                                 }}
                             >
-                                <Input.TextArea
-                                    ref={textAreaRef}
-                                    value={draft}
-                                    onChange={(e) => setDraft(e.target.value)}
-                                    placeholder={composerPlaceholder}
-                                    autoSize={{ minRows: 1, maxRows: 4 }}
-                                    onKeyDown={onComposerKeyDown}
-                                    disabled={!composerEnabled}
-                                    style={{
-                                        flex: "1 1 auto",
-                                        minWidth: 0,
-                                        border: 0,
-                                        boxShadow: "none",
-                                        background: "transparent",
-                                        resize: "none",
-                                        padding: "8px 4px",
-                                        fontSize: 14,
-                                        lineHeight: 1.35,
-                                        color: uiTextMain,
-                                    }}
-                                />
+                                <div style={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column" }}>
+                                    {pastedImages.length ? (
+                                        <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "6px 6px 2px 2px" }}>
+                                            {pastedImages.map((it, idx) => (
+                                                <div key={`${it.file.name || "pasted"}:${idx}:${it.file.size}`}
+                                                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                                                >
+                                                    <img
+                                                        src={it.url}
+                                                        alt={it.file.name || "image"}
+                                                        style={{ width: 34, height: 34, borderRadius: 10, objectFit: "cover", flex: "0 0 auto" }}
+                                                        draggable={false}
+                                                        onDragStart={(e) => {
+                                                            try {
+                                                                e.preventDefault();
+                                                            } catch {
+                                                                // ignore
+                                                            }
+                                                        }}
+                                                    />
+                                                    <div
+                                                        title={it.file.name || ""}
+                                                        style={{ flex: "1 1 auto", minWidth: 0, fontSize: 12, color: uiTextMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                                                    >
+                                                        {it.file.name || "pasted-image"}
+                                                    </div>
+                                                    <Button
+                                                        type="text"
+                                                        size="small"
+                                                        aria-label="remove"
+                                                        disabled={!composerEnabled}
+                                                        onClick={() =>
+                                                            setPastedImages((prev) => {
+                                                                const next = [...prev];
+                                                                const removed = next.splice(idx, 1)[0];
+                                                                try {
+                                                                    if (removed?.url) URL.revokeObjectURL(removed.url);
+                                                                } catch {
+                                                                    // ignore
+                                                                }
+                                                                return next;
+                                                            })
+                                                        }
+                                                        style={{ width: 28, height: 28, borderRadius: 999, padding: 0, lineHeight: "28px" }}
+                                                    >
+                                                        ×
+                                                    </Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : null}
+
+                                    <Input.TextArea
+                                        ref={textAreaRef}
+                                        value={draft}
+                                        onChange={(e) => setDraft(e.target.value)}
+                                        placeholder={composerPlaceholder}
+                                        autoSize={{ minRows: 1, maxRows: 4 }}
+                                        onKeyDown={onComposerKeyDown}
+                                        onPaste={onComposerPaste}
+                                        disabled={!composerEnabled}
+                                        style={{
+                                            border: 0,
+                                            boxShadow: "none",
+                                            background: "transparent",
+                                            resize: "none",
+                                            padding: "6px 4px 8px 4px",
+                                            fontSize: 14,
+                                            lineHeight: 1.35,
+                                            color: uiTextMain,
+                                        }}
+                                    />
+                                </div>
 
                                 <Popover
                                     trigger="click"
@@ -2717,7 +2840,7 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                                         type="text"
                                         aria-label={t("visitorEmbed.composer.send")}
                                         icon={<ArrowUpOutlined />}
-                                        onClick={sendText}
+                                        onClick={onSend}
                                         disabled={!canSend || loading}
                                         style={{
                                             width: 44,
