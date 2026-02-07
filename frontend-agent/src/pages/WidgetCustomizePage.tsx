@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import { http } from "../providers/http";
 import { errorMessage } from "../utils/errorMessage";
+import { compressImageForUpload } from "../utils/imageCompress";
+import { WIDGET_LOGO_COMPRESS_OPTS } from "../config/imageUploadCompression";
 
 type SiteItem = {
     id: string;
@@ -504,12 +506,20 @@ export function WidgetCustomizePage() {
         setLogoUploadError("");
 
         try {
+            const ct = String(file.type || "").toLowerCase();
+            const okType = ct === "image/png" || ct === "image/jpeg" || ct === "image/jpg" || ct === "image/webp" || ct === "image/gif";
+            if (!okType) {
+                throw new Error("invalid_logo_type");
+            }
+
+            const compressed = await compressImageForUpload(file, WIDGET_LOGO_COMPRESS_OPTS);
+
             const presign = await http.post<PresignWidgetLogoUploadResponse>(
                 `/api/v1/admin/sites/${encodeURIComponent(siteId)}/widget-logo/presign-upload`,
                 {
-                    filename: file.name,
-                    content_type: file.type || "application/octet-stream",
-                    size_bytes: file.size,
+                    filename: compressed.filename,
+                    content_type: compressed.contentType || "application/octet-stream",
+                    size_bytes: compressed.blob.size,
                 },
             );
 
@@ -519,9 +529,9 @@ export function WidgetCustomizePage() {
             const putRes = await fetch(uploadUrl, {
                 method: "PUT",
                 headers: {
-                    "Content-Type": file.type || "application/octet-stream",
+                    "Content-Type": compressed.contentType || "application/octet-stream",
                 },
-                body: file,
+                body: compressed.blob,
             });
 
             if (!putRes.ok) {

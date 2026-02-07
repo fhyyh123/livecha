@@ -1,5 +1,5 @@
 import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, ConfigProvider, Input, Modal, Popover, Select, Tooltip } from "antd";
+import { Alert, Button, ConfigProvider, Image, Input, Modal, Popover, Select, Tooltip } from "antd";
 import type { TextAreaRef } from "antd/es/input/TextArea";
 import { ArrowUpOutlined, FileAddOutlined, LeftOutlined, MinusOutlined, PlusOutlined, ScanOutlined, SmileOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
@@ -195,6 +195,7 @@ const MSG = {
     WIDGET_UNREAD: "WIDGET_UNREAD",
     WIDGET_THEME: "WIDGET_THEME",
     WIDGET_AGENT: "WIDGET_AGENT",
+    WIDGET_IMAGE_PREVIEW: "WIDGET_IMAGE_PREVIEW",
     WIDGET_REQUEST_OPEN: "WIDGET_REQUEST_OPEN",
     WIDGET_REQUEST_CLOSE: "WIDGET_REQUEST_CLOSE",
 } as const;
@@ -760,6 +761,8 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
     );
 
     const [preChatError, setPreChatError] = useState<string>("");
+
+    const [imagePreviewUrl, setImagePreviewUrl] = useState<string>("");
 
     const textAreaRef = useRef<TextAreaRef | null>(null);
 
@@ -1532,7 +1535,6 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
         if (!url) {
             return (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <div style={{ fontWeight: 600 }}>{filename || attachmentId || "image"}</div>
                     {sizeKb !== null ? <div style={{ fontSize: 12, color: "rgba(17,24,39,.65)" }}>{sizeKb} KB</div> : null}
                     <Button type="link" onClick={() => onDownload(attachmentId)} disabled={!attachmentId} style={{ padding: 0, height: "auto" }}>
                         {t("common.download")}
@@ -1548,12 +1550,20 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                     alt={filename || "image"}
                     loading="lazy"
                     style={{ display: "block", maxWidth: "min(260px, 65vw)", maxHeight: 320, height: "auto", borderRadius: 10, cursor: "pointer" }}
-                    onClick={() => window.open(url, "_blank")}
+                    onClick={() => {
+                        // In iframe: ask host to render a full-screen preview (outside chat window).
+                        if (window !== window.parent) {
+                            postToHost(MSG.WIDGET_IMAGE_PREVIEW, { url });
+                            return;
+                        }
+
+                        // Standalone page fallback: use AntD Image preview.
+                        setImagePreviewUrl(url);
+                    }}
                 />
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <div style={{ fontWeight: 600 }}>{filename || attachmentId || "image"}</div>
                     {sizeKb !== null ? <div style={{ fontSize: 12, color: "rgba(17,24,39,.65)" }}>{sizeKb} KB</div> : null}
-                    <Button type="link" onClick={() => window.open(url, "_blank")} style={{ padding: 0, height: "auto" }}>
+                    <Button type="link" onClick={() => onDownload(attachmentId)} style={{ padding: 0, height: "auto" }}>
                         {t("common.download")}
                     </Button>
                 </div>
@@ -2258,6 +2268,20 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                             </div>
                         </Modal>
 
+                        {imagePreviewUrl ? (
+                            <Image
+                                style={{ display: "none" }}
+                                src={imagePreviewUrl}
+                                preview={{
+                                    visible: true,
+                                    src: imagePreviewUrl,
+                                    onVisibleChange: (v) => {
+                                        if (!v) setImagePreviewUrl("");
+                                    },
+                                }}
+                            />
+                        ) : null}
+
                         {debugUi && conversation?.conversation_id ? (
                             <div style={{ fontSize: 12, color: "rgba(15,23,42,.55)", marginBottom: 8 }}>
                                 {t("visitorEmbed.conversationLabel", { id: conversation.conversation_id })} {conversation.recovered ? t("visitorEmbed.recovered") : t("visitorEmbed.created")}
@@ -2278,6 +2302,8 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                                         const sender = String(m.sender_type || "");
                                         const isCustomer = sender === "customer";
                                         const isAgent = sender === "agent";
+                                        const isImageAttachment =
+                                            m.content_type === "file" && isPreviewableImage(m.content?.mime, m.content?.filename);
                                         const agentAvatarUrl = String(detail?.assigned_agent_avatar_url || "");
                                         const agentInitial = initials(String(detail?.assigned_agent_display_name || ""));
 
@@ -2308,15 +2334,25 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                                             gap: 8,
                                         };
 
-                                        const bubbleStyle: CSSProperties = {
-                                            maxWidth: "78%",
-                                            padding: "10px 12px",
-                                            borderRadius: 18,
-                                            boxShadow: "0 8px 24px rgba(0,0,0,.06)",
-                                            border: isCustomer ? "none" : `1px solid ${uiBorder}`,
-                                            background: isCustomer ? uiCustomerBubble : uiAgentBubble,
-                                            color: isCustomer ? uiCustomerText : uiAgentText,
-                                        };
+                                        const bubbleStyle: CSSProperties = isImageAttachment
+                                            ? {
+                                                  maxWidth: "78%",
+                                                  padding: 0,
+                                                  borderRadius: 0,
+                                                  boxShadow: "none",
+                                                  border: "none",
+                                                  background: "transparent",
+                                                  color: uiTextMain,
+                                              }
+                                            : {
+                                                  maxWidth: "78%",
+                                                  padding: "10px 12px",
+                                                  borderRadius: 18,
+                                                  boxShadow: "0 8px 24px rgba(0,0,0,.06)",
+                                                  border: isCustomer ? "none" : `1px solid ${uiBorder}`,
+                                                  background: isCustomer ? uiCustomerBubble : uiAgentBubble,
+                                                  color: isCustomer ? uiCustomerText : uiAgentText,
+                                              };
 
                                         const avatarStyle: CSSProperties = {
                                             width: 28,

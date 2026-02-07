@@ -1,6 +1,6 @@
 import { CloseOutlined, DownOutlined, FileOutlined } from "@ant-design/icons";
 import type { UploadProps } from "antd";
-import { Button, Spin, Typography } from "antd";
+import { Button, Image, Spin, Typography } from "antd";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { http } from "../providers/http";
@@ -156,10 +156,11 @@ function AttachmentImageBubble(props: {
     sizeBytes?: number;
     getAttachmentUrl?: (attachmentId: string) => Promise<string | null>;
     onDownload: (attachmentId?: string) => void;
+    onPreview?: (url: string, alt: string) => void;
     cacheRef: { current: Record<string, string> };
     pendingRef: { current: Record<string, Promise<string | null>> };
 }) {
-    const { t, attachmentId, filename, sizeBytes, getAttachmentUrl, onDownload, cacheRef, pendingRef } = props;
+    const { t, attachmentId, filename, sizeBytes, getAttachmentUrl, onDownload, onPreview, cacheRef, pendingRef } = props;
     const [url, setUrl] = useState<string | null>(null);
 
     useEffect(() => {
@@ -230,12 +231,12 @@ function AttachmentImageBubble(props: {
                 src={url}
                 alt={filename || "image"}
                 loading="lazy"
-                onClick={() => window.open(url, "_blank")}
+                onClick={() => onPreview?.(url, String(filename || attachmentId || "image"))}
             />
             <div className="cl-attachmentImageMeta">
                 <Typography.Text>{filename || attachmentId || "image"}</Typography.Text>
                 <Typography.Text type="secondary">{formatBytes(sizeBytes)}</Typography.Text>
-                <Button type="link" onClick={() => window.open(url, "_blank")}>
+                <Button type="link" onClick={() => onDownload(attachmentId)}>
                     {t("common.download")}
                 </Button>
             </div>
@@ -269,6 +270,12 @@ export function ChatView({
     const lastTailSigRef = useRef<string>("");
     const forceToBottomRef = useRef(false);
     const [newTailCount, setNewTailCount] = useState(0);
+
+    const [imagePreviewUrl, setImagePreviewUrl] = useState<string>("");
+
+    const openImagePreview = useCallback((url: string) => {
+        setImagePreviewUrl(String(url || ""));
+    }, []);
 
     const attachmentUrlCacheRef = useRef<Record<string, string>>({});
     const attachmentUrlPendingRef = useRef<Record<string, Promise<string | null>>>({});
@@ -739,6 +746,7 @@ export function ChatView({
                                                             sizeBytes={m.content?.size_bytes}
                                                             getAttachmentUrl={getAttachmentUrl}
                                                             onDownload={onDownload}
+                                                            onPreview={(url) => openImagePreview(url)}
                                                             cacheRef={attachmentUrlCacheRef}
                                                             pendingRef={attachmentUrlPendingRef}
                                                         />
@@ -822,6 +830,22 @@ export function ChatView({
                     />
                 )}
             </div>
+
+            {imagePreviewUrl ? (
+                <Image
+                    style={{ display: "none" }}
+                    src={imagePreviewUrl}
+                    preview={{
+                        visible: true,
+                        src: imagePreviewUrl,
+                        onVisibleChange: (v) => {
+                            if (!v) {
+                                setImagePreviewUrl("");
+                            }
+                        },
+                    }}
+                />
+            ) : null}
         </>
     );
 }

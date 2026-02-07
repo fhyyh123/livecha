@@ -19,6 +19,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { http } from "../providers/http";
 import { errorMessage } from "../utils/errorMessage";
+import { compressImageForUpload } from "../utils/imageCompress";
+import { AVATAR_COMPRESS_OPTS } from "../config/imageUploadCompression";
 
 type ProfileMeResponse = {
     user_id: string;
@@ -136,27 +138,29 @@ export function ProfilePage() {
                 throw new Error("invalid_avatar_type");
             }
 
+            const compressed = await compressImageForUpload(file, AVATAR_COMPRESS_OPTS);
+
             const presign = await http.post<{
                 upload_url: string;
                 max_upload_bytes?: number;
             }>("/api/v1/profile/me/avatar/presign-upload", {
-                filename: file.name,
-                content_type: file.type || "application/octet-stream",
-                size_bytes: file.size,
+                filename: compressed.filename,
+                content_type: compressed.contentType || "application/octet-stream",
+                size_bytes: compressed.blob.size,
             });
 
             const uploadUrl = presign.data?.upload_url;
             if (!uploadUrl) throw new Error("presign_failed");
 
             const maxMb = bytesToMb(presign.data?.max_upload_bytes);
-            if (maxMb > 0 && file.size > Number(presign.data?.max_upload_bytes)) {
+            if (maxMb > 0 && compressed.blob.size > Number(presign.data?.max_upload_bytes)) {
                 throw new Error("file_too_large");
             }
 
             const put = await fetch(uploadUrl, {
                 method: "PUT",
-                headers: { "Content-Type": file.type || "application/octet-stream" },
-                body: file,
+                headers: { "Content-Type": compressed.contentType || "application/octet-stream" },
+                body: compressed.blob,
             });
             if (!put.ok) {
                 throw new Error(`upload_failed_${put.status}`);

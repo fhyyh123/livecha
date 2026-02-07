@@ -165,6 +165,7 @@
     WIDGET_UNREAD: "WIDGET_UNREAD",
     WIDGET_THEME: "WIDGET_THEME",
     WIDGET_AGENT: "WIDGET_AGENT",
+    WIDGET_IMAGE_PREVIEW: "WIDGET_IMAGE_PREVIEW",
     WIDGET_REQUEST_OPEN: "WIDGET_REQUEST_OPEN",
     WIDGET_REQUEST_CLOSE: "WIDGET_REQUEST_CLOSE",
   };
@@ -186,6 +187,10 @@
     unread: 0,
     agentAvatarUrl: null,
     _defaultIconHtml: null,
+    _imagePreviewEl: null,
+    _imagePreviewImg: null,
+    _imagePreviewKeyHandler: null,
+    _imagePreviewIgnoreUntil: 0,
     pmQueue: [],
     outsideBound: false,
     prefetchDone: false,
@@ -1218,14 +1223,8 @@
 
     if (state.open) {
       applyVisualViewportOverlay();
-      if (state.handlers && state.handlers.docClick && !state.outsideBound) {
-        try {
-          document.addEventListener("pointerdown", state.handlers.docClick, true);
-          state.outsideBound = true;
-        } catch (e0) {
-          // ignore
-        }
-      }
+      // Intentionally do NOT bind a document-level outside-click handler.
+      // Requirement: clicking outside the chat window should NOT close/collapse it.
       panel.style.visibility = "visible";
       panel.style.opacity = "1";
       panel.style.pointerEvents = "auto";
@@ -1235,14 +1234,16 @@
       postToIframe(MSG.HOST_SET_OPEN, { open: true });
       postHostVisibility();
     } else {
+      // If older versions had outsideBound=true, make best-effort to unbind.
+      // (Keeps behavior consistent even across hot reload / multiple init calls.)
       if (state.handlers && state.handlers.docClick && state.outsideBound) {
         try {
           document.removeEventListener("pointerdown", state.handlers.docClick, true);
         } catch (e00) {
           // ignore
         }
-        state.outsideBound = false;
       }
+      state.outsideBound = false;
       panel.style.opacity = "0";
       panel.style.visibility = "hidden";
       panel.style.pointerEvents = "none";
@@ -1351,6 +1352,19 @@
       return;
     }
 
+    if (data.type === MSG.WIDGET_IMAGE_PREVIEW) {
+      if (!payload || typeof payload !== "object") return;
+      var url = "";
+      try {
+        url = typeof payload.url === "string" ? String(payload.url || "").trim() : "";
+      } catch (e00) {
+        url = "";
+      }
+      if (!url) return;
+      openImagePreview(url);
+      return;
+    }
+
     if (data.type === MSG.WIDGET_THEME) {
       if (!payload || typeof payload !== "object") return;
       if (typeof payload.themeColor === "string") {
@@ -1375,6 +1389,128 @@
     if (data.type === MSG.WIDGET_REQUEST_CLOSE) {
       setOpen(false);
       return;
+    }
+  }
+
+  function isSafeHttpUrl(raw) {
+    try {
+      var u = new URL(String(raw || ""), window.location.href);
+      return u && (u.protocol === "http:" || u.protocol === "https:");
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function ensureImagePreviewElements() {
+    if (state._imagePreviewEl && state._imagePreviewImg) return;
+
+    var overlay = document.createElement("div");
+    overlay.setAttribute("data-chatlive", "image-preview");
+    overlay.style.position = "fixed";
+    overlay.style.left = "0";
+    overlay.style.top = "0";
+    overlay.style.width = "100vw";
+    overlay.style.height = "100vh";
+    overlay.style.display = "none";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+    overlay.style.background = "rgba(0,0,0,.72)";
+    overlay.style.zIndex = String((state.config && state.config.zIndex) || 2147483647);
+    overlay.style.padding = "14px";
+    overlay.style.boxSizing = "border-box";
+
+    var img = document.createElement("img");
+    img.alt = "";
+    img.style.display = "block";
+    img.style.maxWidth = "min(96vw, 1200px)";
+    img.style.maxHeight = "90vh";
+    img.style.width = "auto";
+    img.style.height = "auto";
+    img.style.objectFit = "contain";
+    img.style.borderRadius = "12px";
+    img.style.background = "transparent";
+
+    var closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.setAttribute("aria-label", "Close");
+    closeBtn.textContent = "×";
+    closeBtn.style.position = "fixed";
+    closeBtn.style.right = "18px";
+    closeBtn.style.top = "18px";
+    closeBtn.style.width = "44px";
+    closeBtn.style.height = "44px";
+    closeBtn.style.borderRadius = "999px";
+    closeBtn.style.border = "1px solid rgba(255,255,255,.28)";
+    closeBtn.style.background = "rgba(0,0,0,.35)";
+    closeBtn.style.color = "#fff";
+    closeBtn.style.fontSize = "28px";
+    closeBtn.style.lineHeight = "40px";
+    closeBtn.style.cursor = "pointer";
+
+    function onOverlayClick(e) {
+      try {
+        // Prevent the same click that triggered openImagePreview() from instantly
+        // closing the overlay (common on mobile, and can happen on desktop due to timing).
+        if (Date.now() < (Number(state._imagePreviewIgnoreUntil) || 0)) return;
+      } catch (e0) {
+        // ignore
+      }
+      if (e && e.target === overlay) closeImagePreview();
+    }
+
+    closeBtn.addEventListener("click", function () {
+      closeImagePreview();
+    });
+    overlay.addEventListener("click", onOverlayClick);
+    overlay.appendChild(img);
+    overlay.appendChild(closeBtn);
+
+    state._imagePreviewEl = overlay;
+    state._imagePreviewImg = img;
+
+    state._imagePreviewKeyHandler = function (e) {
+      try {
+        if (!e) return;
+        if (e.key === "Escape") closeImagePreview();
+      } catch (e0) {
+        // ignore
+      }
+    };
+
+    try {
+      document.body.appendChild(overlay);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  function openImagePreview(url) {
+    if (!isSafeHttpUrl(url)) return;
+    ensureImagePreviewElements();
+    if (!state._imagePreviewEl || !state._imagePreviewImg) return;
+
+    try {
+      // Ignore immediate click events right after opening.
+      state._imagePreviewIgnoreUntil = Date.now() + 450;
+      state._imagePreviewImg.src = String(url || "");
+      state._imagePreviewEl.style.display = "flex";
+      if (state._imagePreviewKeyHandler) window.addEventListener("keydown", state._imagePreviewKeyHandler);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  function closeImagePreview() {
+    try {
+      if (state._imagePreviewKeyHandler) window.removeEventListener("keydown", state._imagePreviewKeyHandler);
+    } catch (e0) {
+      // ignore
+    }
+    try {
+      if (state._imagePreviewEl) state._imagePreviewEl.style.display = "none";
+      if (state._imagePreviewImg) state._imagePreviewImg.src = "";
+    } catch (e) {
+      // ignore
     }
   }
 
@@ -1620,33 +1756,8 @@
 
     // Click outside closes
     state.handlers.docClick = function (e) {
-      if (!state.open) return;
-      if (!state.root) return;
-      var path = null;
-      try {
-        path = e && typeof e.composedPath === "function" ? e.composedPath() : null;
-      } catch (e0) {
-        path = null;
-      }
-
-      var t = e && e.target ? e.target : null;
-      var inWidget = false;
-      try {
-        if (path && path.length) {
-          for (var i = 0; i < path.length; i++) {
-            if (path[i] === state.root) {
-              inWidget = true;
-              break;
-            }
-          }
-        } else {
-          inWidget = !!(t && state.root && state.root.contains(t));
-        }
-      } catch (e1) {
-        inWidget = false;
-      }
-      if (inWidget) return;
-      setOpen(false);
+      // Disabled: clicking outside should NOT close/collapse the chat window.
+      return;
     };
 
     // Use pointerdown for better mobile behavior; bind only while open.
@@ -1920,6 +2031,17 @@
     } catch (e01) {
       // ignore
     }
+
+    try {
+      if (state._imagePreviewKeyHandler) window.removeEventListener("keydown", state._imagePreviewKeyHandler);
+    } catch (e01a) {
+      // ignore
+    }
+    try {
+      if (state._imagePreviewEl && state._imagePreviewEl.parentElement) state._imagePreviewEl.parentElement.removeChild(state._imagePreviewEl);
+    } catch (e01b) {
+      // ignore
+    }
     try {
       if (state.root && state.root.parentElement) state.root.parentElement.removeChild(state.root);
     } catch (e) {
@@ -1997,6 +2119,9 @@
     state.pmQueue = [];
     state._debugMarker = null;
     state._debugMarker2 = null;
+    state._imagePreviewEl = null;
+    state._imagePreviewImg = null;
+    state._imagePreviewKeyHandler = null;
     state.handlers.docClick = null;
     state.handlers.onMessage = null;
     state.handlers.onResize = null;
