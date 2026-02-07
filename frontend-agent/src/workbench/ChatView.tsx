@@ -3,6 +3,7 @@ import type { UploadProps } from "antd";
 import { Button, Spin, Typography } from "antd";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import { http } from "../providers/http";
 import type { ConversationDetail, MessageItem } from "../store/chatStore";
 import { isPreviewableImage } from "../utils/attachments";
 import { ChatComposer } from "./ChatComposer";
@@ -10,6 +11,12 @@ import { ChatComposer } from "./ChatComposer";
 import "./chatView.css";
 
 const BOTTOM_EPS_PX = 2;
+
+type AvatarLookupItem = {
+    user_id: string;
+    display_name?: string | null;
+    avatar_url?: string | null;
+};
 
 export type TimelineSystemEvent = {
     id: string;
@@ -249,6 +256,11 @@ export function ChatView({
     const attachmentUrlCacheRef = useRef<Record<string, string>>({});
     const attachmentUrlPendingRef = useRef<Record<string, Promise<string | null>>>({});
 
+    const avatarUrlCacheRef = useRef<Record<string, string>>({});
+    const agentNameCacheRef = useRef<Record<string, string>>({});
+    const avatarUrlPendingRef = useRef<Record<string, Promise<void> | undefined>>({});
+    const [, bumpAvatarTick] = useState(0);
+
     useEffect(() => {
         // Reset window when switching conversations.
         initConvIdRef.current = null;
@@ -274,6 +286,57 @@ export function ChatView({
         const start = Math.max(0, messages.length - Math.max(20, renderCount));
         return messages.slice(start);
     }, [messages, renderCount]);
+
+    useEffect(() => {
+        const ids = Array.from(
+            new Set(
+                visibleMessages
+                    .filter((m) => String(m.sender_type) === "agent")
+                    .map((m) => String(m.sender_id || "").trim())
+                    .filter(Boolean),
+            ),
+        );
+
+        const need = ids.filter((id) => !(id in avatarUrlCacheRef.current));
+        if (!need.length) return;
+
+        const batchKey = need.join(",");
+        if (avatarUrlPendingRef.current[batchKey]) return;
+
+        avatarUrlPendingRef.current[batchKey] = (async () => {
+            try {
+                const res = await http.post<AvatarLookupItem[]>("/api/v1/profile/avatars/lookup", { user_ids: need });
+                const list = Array.isArray(res.data) ? res.data : [];
+
+                let changed = false;
+                for (const it of list) {
+                    const userId = String(it?.user_id || "").trim();
+                    if (!userId) continue;
+                    const url = String(it?.avatar_url || "").trim();
+                    avatarUrlCacheRef.current[userId] = url;
+
+                    const name = String(it?.display_name || "").trim();
+                    agentNameCacheRef.current[userId] = name;
+                    if (url) changed = true;
+                }
+                // Mark unfound as empty to avoid refetch loops.
+                for (const id of need) {
+                    if (!(id in avatarUrlCacheRef.current)) {
+                        avatarUrlCacheRef.current[id] = "";
+                    }
+                    if (!(id in agentNameCacheRef.current)) {
+                        agentNameCacheRef.current[id] = "";
+                    }
+                }
+
+                if (changed) bumpAvatarTick((x) => x + 1);
+            } catch {
+                // Ignore; allow retry on next window change.
+            } finally {
+                delete avatarUrlPendingRef.current[batchKey];
+            }
+        })();
+    }, [visibleMessages]);
 
     type TimelineItem =
         | { kind: "message"; id: string; message: MessageItem }
@@ -590,7 +653,10 @@ export function ChatView({
                             const showAvatar = isGroupStart;
                             prevMsg = m;
 
-                            const headerName = isAgent ? agentLabel : customerLabel;
+                            const agentName = isAgent
+                                ? String(agentNameCacheRef.current[String(m.sender_id || "").trim()] || "").trim()
+                                : "";
+                            const headerName = isAgent ? (agentName || agentLabel) : customerLabel;
                             const headerTime = formatTime(Number(m.created_at || 0));
 
                             const avatarText = firstGlyph(headerName) || (isAgent ? "A" : "C");
@@ -599,13 +665,21 @@ export function ChatView({
                             const avatarFg = `hsl(${avatarHue} 35% 28%)`;
                             const avatarBorder = `hsl(${avatarHue} 45% 82%)`;
 
+                            const agentAvatarUrl = isAgent
+                                ? String(avatarUrlCacheRef.current[String(m.sender_id || "").trim()] || "")
+                                : "";
+
                             const avatarEl = showAvatar ? (
                                 <div
                                     className={`cl-avatar ${isAgent ? "is-agent" : "is-customer"}`}
                                     aria-hidden
                                     style={{ background: avatarBg, color: avatarFg, borderColor: avatarBorder }}
                                 >
-                                    {avatarText}
+                                    {isAgent && agentAvatarUrl ? (
+                                        <img src={agentAvatarUrl} alt="" loading="lazy" />
+                                    ) : (
+                                        avatarText
+                                    )}
                                 </div>
                             ) : (
                                 <div className="cl-avatarSpacer" aria-hidden />

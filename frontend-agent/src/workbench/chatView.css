@@ -283,6 +283,14 @@
     flex: 0 0 28px;
 }
 
+.cl-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    object-fit: cover;
+    display: block;
+}
+
 .cl-msgRow.is-agent .cl-avatar {
     background: #e9f2ff;
     border-color: #c7ddff;

@@ -9,6 +9,11 @@ import com.chatlive.support.user.repo.UserAccountRepository;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+
 @RestController
 @RequestMapping("/api/v1/profile")
 public class ProfileController {
@@ -44,6 +49,18 @@ public class ProfileController {
     public record UpdateProfileRequest(
             String display_name,
             String job_title
+    ) {
+    }
+
+    public record AvatarLookupRequest(
+            List<String> user_ids
+    ) {
+    }
+
+    public record AvatarLookupItem(
+            String user_id,
+            String display_name,
+            String avatar_url
     ) {
     }
 
@@ -181,6 +198,55 @@ public class ProfileController {
         agentProfileRepository.upsertDetails(claims.userId(), req == null ? null : req.display_name(), req == null ? null : req.job_title());
         return ApiResponse.ok(null);
     }
+
+        @PostMapping("/avatars/lookup")
+        public ApiResponse<List<AvatarLookupItem>> lookupAvatars(
+                        @RequestHeader(value = "Authorization", required = false) String authorization,
+                        @RequestBody AvatarLookupRequest req
+        ) {
+                var token = JwtService.extractBearerToken(authorization)
+                                .orElseThrow(() -> new IllegalArgumentException("missing_token"));
+                var claims = jwtService.parse(token);
+                if ("customer".equals(claims.role())) {
+                        throw new IllegalArgumentException("forbidden");
+                }
+
+                var tenantId = claims.tenantId();
+                if (tenantId == null || tenantId.isBlank()) {
+                        throw new IllegalArgumentException("forbidden");
+                }
+
+                var ids = req == null ? null : req.user_ids();
+                if (ids == null || ids.isEmpty()) {
+                        return ApiResponse.ok(List.of());
+                }
+
+                // Deduplicate while preserving input order.
+                var uniqueIds = new LinkedHashSet<String>();
+                for (var id : ids) {
+                        var v = String.valueOf(id).trim();
+                        if (!v.isBlank()) uniqueIds.add(v);
+                }
+
+                var out = new ArrayList<AvatarLookupItem>(uniqueIds.size());
+                for (var userId : uniqueIds) {
+                        var u = userAccountRepository.findPublicById(userId).orElse(null);
+                        if (u == null) continue;
+                        if (!tenantId.equals(u.tenantId())) continue;
+                        if ("customer".equals(u.type())) continue;
+
+                        var view = avatarUrlService.getAgentAvatarView(userId);
+                        if (view == null) continue;
+
+                        out.add(new AvatarLookupItem(
+                                        userId,
+                                        Objects.toString(view.display_name(), null),
+                                        Objects.toString(view.avatar_url(), null)
+                        ));
+                }
+
+                return ApiResponse.ok(out);
+        }
 
         @PostMapping("/users/{userId}")
         public ApiResponse<Void> updateUserProfile(
