@@ -132,6 +132,23 @@ function hashHue(s: string) {
     return h % 360;
 }
 
+function hash32(s: string) {
+    let h = 2166136261;
+    const str = String(s || "");
+    for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+}
+
+function stableTag6(seed: string) {
+    const h = hash32(seed);
+    // Base36 gives [0-9a-z], we upper-case to look like a random code.
+    // Pad/slice to a fixed 6-char tag.
+    return h.toString(36).toUpperCase().padStart(6, "0").slice(0, 6);
+}
+
 function AttachmentImageBubble(props: {
     t: (key: string, options?: Record<string, unknown>) => string;
     attachmentId?: string;
@@ -585,8 +602,14 @@ export function ChatView({
         const name = String(detail?.visitor?.name || "").trim();
         const email = String(detail?.visitor?.email || "").trim();
         const who = name && name !== "-" ? name : (email && email !== "-" ? email : "");
-        return who || t("workbench.customer");
-    }, [detail?.visitor?.email, detail?.visitor?.name, t]);
+        if (who) return who;
+
+        const base = t("workbench.customer");
+        const visitorId = String(detail?.visitor?.id || detail?.visitor_id || "").trim();
+        const seed = visitorId || String(detail?.id || "").trim();
+        if (!seed) return base;
+        return `${base}-${stableTag6(seed)}`;
+    }, [detail?.id, detail?.visitor?.email, detail?.visitor?.id, detail?.visitor?.name, detail?.visitor_id, t]);
 
     const agentLabel = useMemo(() => t("workbench.agent"), [t]);
 

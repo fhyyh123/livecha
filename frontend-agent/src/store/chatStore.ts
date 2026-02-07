@@ -137,6 +137,21 @@ type LocalReadMark = {
     at: number; // ms
 };
 
+function inferUnreadFromLocalRead(c: Conversation, localRead?: LocalReadMark) {
+    if (!localRead) return Number(c.unread_count || 0);
+
+    const serverUnread = Math.max(0, Number(c.unread_count || 0));
+    if (serverUnread > 0) return serverUnread;
+
+    const lastMsgAtSec = Math.max(0, Number(c.last_message_created_at || 0));
+    const readAtSec = Math.floor(Math.max(0, Number(localRead.at || 0)) / 1000);
+    if (!lastMsgAtSec || !readAtSec) return 0;
+
+    const lastFromCustomer = String(c.last_message_sender_type || "") === "customer";
+    if (lastFromCustomer && lastMsgAtSec > readAtSec) return 1;
+    return 0;
+}
+
 type ChatState = {
     conversations: Conversation[];
     conversationsLoading: boolean;
@@ -884,7 +899,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
             const res = await http.get<Conversation[]>("/api/v1/conversations", { params });
             const raw = Array.isArray(res.data) ? res.data : [];
             const localRead = get().localReadByConversationId;
-            const list = raw.map((c) => (localRead?.[c.id] ? { ...c, unread_count: 0 } : c));
+            const list = raw.map((c) => {
+                const mark = localRead?.[c.id];
+                if (!mark) return c;
+                return { ...c, unread_count: inferUnreadFromLocalRead(c, mark) };
+            });
 
             // Inbox UX: keep auto-archived (inactivity) conversations visible (greyed)
             // even if the list API no longer returns them, until page reload / navigation away.

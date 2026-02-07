@@ -1,4 +1,4 @@
-import { Avatar, Button, Divider, Dropdown, Input, List, Select, Space, Switch, Tag, Typography } from "antd";
+import { Avatar, Badge, Button, Divider, Dropdown, Input, List, Select, Space, Switch, Tag, Typography } from "antd";
 import { CloseOutlined, DownOutlined, RightOutlined, RollbackOutlined, StarFilled, StarOutlined } from "@ant-design/icons";
 import { MoreOutlined } from "@ant-design/icons";
 import VirtualList from "rc-virtual-list";
@@ -65,6 +65,22 @@ function hashStringToIndex(input: string, modulo: number) {
     return modulo > 0 ? (n % modulo) : 0;
 }
 
+function hash32(input: string) {
+    // FNV-1a 32-bit
+    const s = String(input || "");
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+}
+
+function stableTag6(seed: string) {
+    const h = hash32(seed);
+    return h.toString(36).toUpperCase().padStart(6, "0").slice(0, 6);
+}
+
 function avatarBgForConversation(c: Conversation, title: string) {
     const seed = String(c.visitor_id || c.visitor_email || c.visitor_name || c.id || title || "");
     return AVATAR_COLORS[hashStringToIndex(seed, AVATAR_COLORS.length)];
@@ -81,7 +97,13 @@ function getPrimaryTitle(c: Conversation, t: (key: string, options?: Record<stri
     const name = String(c.visitor_name || "").trim();
     const email = String(c.visitor_email || "").trim();
     const who = name && name !== "-" ? name : (email && email !== "-" ? email : "");
-    return who || c.subject || t("workbench.customer");
+    if (who) return who;
+    if (c.subject) return c.subject;
+
+    const base = t("workbench.customer");
+    const seed = String(c.visitor_id || c.id || "").trim();
+    if (!seed) return base;
+    return `${base}-${stableTag6(seed)}`;
 }
 
 function formatFreshness(elapsedMs: number) {
@@ -345,16 +367,19 @@ export function ConversationListPaneView({
                                         onClick={() => onOpenConversation(c.id)}
                                     >
                                         <div style={{ display: "flex", gap: 10, width: "100%" }}>
-                                            <Avatar
-                                                size={36}
-                                                style={{
-                                                    background: avatarBg,
-                                                    flex: "0 0 auto",
-                                                    fontWeight: 600,
-                                                }}
-                                            >
-                                                {avatarText}
-                                            </Avatar>
+                                            <div style={{ flex: "0 0 auto" }}>
+                                                <Badge count={unread} size="small" overflowCount={99}>
+                                                    <Avatar
+                                                        size={36}
+                                                        style={{
+                                                            background: avatarBg,
+                                                            fontWeight: 600,
+                                                        }}
+                                                    >
+                                                        {avatarText}
+                                                    </Avatar>
+                                                </Badge>
+                                            </div>
 
                                             <Space direction="vertical" size={2} style={{ flex: 1, minWidth: 0 }}>
                                                 <Space size={8} style={{ width: "100%", justifyContent: "space-between" }}>
@@ -369,7 +394,6 @@ export function ConversationListPaneView({
                                                         </Typography.Text>
                                                         <Tag>{c.channel}</Tag>
                                                         {isStickyArchived ? <Tag color="default">{t("workbench.system.archived")}</Tag> : null}
-                                                        {unread > 0 ? <Tag color="red">{t("workbench.unread", { count: unread })}</Tag> : null}
                                                     </div>
 
                                                     <Space size={2}>
