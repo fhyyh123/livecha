@@ -283,6 +283,13 @@
     flex: 0 0 28px;
 }
 
+/* When an avatar image is present, avoid showing a colored ring from background/border. */
+.cl-avatar.has-image {
+    background: transparent;
+    border: 0;
+    overflow: hidden;
+}
+
 .cl-avatar img {
     width: 100%;
     height: 100%;

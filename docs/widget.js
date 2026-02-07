@@ -866,18 +866,39 @@
                 icon.style.width = "24px";
                 icon.style.height = "24px";
                 icon.style.lineHeight = "24px";
+                try {
+                  // Restore themed background if we previously made it transparent.
+                  applyLauncherTheme();
+                } catch (e000) {
+                  // ignore
+                }
               }
             } else {
-              // Make avatar more prominent than the default 24px icon.
-              icon.style.width = "42px";
-              icon.style.height = "42px";
-              icon.style.lineHeight = "42px";
+              // Bubble launcher: avatar should fully fill the 56x56 circle (no visible background ring).
+              // Bar launcher: keep a smaller avatar next to the label.
+              var s = isBar ? 42 : 56;
+              icon.style.width = String(s) + "px";
+              icon.style.height = String(s) + "px";
+              icon.style.lineHeight = String(s) + "px";
+
+              if (!isBar) {
+                // Make the host button background transparent so the avatar appears larger.
+                // Keep shadow/border-radius on the button itself.
+                try {
+                  state.button.style.background = "transparent";
+                  state.button.style.overflow = "hidden";
+                  state.button.style.padding = "0";
+                } catch (e001) {
+                  // ignore
+                }
+              }
+
               icon.innerHTML = "";
               var img = document.createElement("img");
               img.alt = "";
               img.src = url;
-              img.style.width = "42px";
-              img.style.height = "42px";
+              img.style.width = "100%";
+              img.style.height = "100%";
               img.style.borderRadius = "999px";
               img.style.objectFit = "cover";
               img.style.display = "block";
@@ -896,6 +917,13 @@
               icon.style.height = "24px";
               icon.style.lineHeight = "24px";
             }
+            // Ensure the launcher background returns to the themed color.
+            try {
+              applyLauncherTheme();
+              if (state.button) state.button.style.overflow = "visible";
+            } catch (e030) {
+              // ignore
+            }
           } catch (e03) {
             // ignore
           }
@@ -907,6 +935,12 @@
         state.buttonLabel.textContent = "×";
         state.buttonLabel.style.display = "inline-block";
         if (icon) icon.style.display = "none";
+        try {
+          // When open, the launcher is a close button; use the themed background.
+          applyLauncherTheme();
+        } catch (e0o) {
+          // ignore
+        }
         try {
           state.button.style.gap = "0px";
         } catch (e1) {

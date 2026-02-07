@@ -699,11 +699,16 @@ export function ChatView({
                                 ? String(avatarUrlCacheRef.current[String(m.sender_id || "").trim()] || "")
                                 : "";
 
+                            const hasAvatarImage = Boolean(isAgent && agentAvatarUrl);
+                            const avatarStyle = hasAvatarImage
+                                ? undefined
+                                : { background: avatarBg, color: avatarFg, borderColor: avatarBorder };
+
                             const avatarEl = showAvatar ? (
                                 <div
-                                    className={`cl-avatar ${isAgent ? "is-agent" : "is-customer"}`}
+                                    className={`cl-avatar ${isAgent ? "is-agent" : "is-customer"} ${hasAvatarImage ? "has-image" : ""}`}
                                     aria-hidden
-                                    style={{ background: avatarBg, color: avatarFg, borderColor: avatarBorder }}
+                                    style={avatarStyle}
                                 >
                                     {isAgent && agentAvatarUrl ? (
                                         <img src={agentAvatarUrl} alt="" loading="lazy" />
