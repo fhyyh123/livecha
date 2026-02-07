@@ -292,6 +292,45 @@ public class WsHandler extends TextWebSocketHandler {
         var agentSessionId = root.path("session_id").asText(null);
         sessionRegistry.bind(session, new WsSessionRegistry.SessionContext(claims, client, agentSessionId));
 
+        // Important: assignment eligibility uses agent_profile.status = 'online' (plus active agent_session).
+        // However, the UI/WS may display an agent as "online" when a presence session exists even if
+        // agent_profile.status is still 'offline'. This mismatch causes new visitor conversations to stay queued
+        // (not assigned) until the agent manually toggles status in Team page.
+        //
+        // Fix: when an agent/admin authenticates over WS and has an active presence session, auto-promote
+        // profile offline -> online and (best-effort) drain queue to this agent to mimic the "setStatus(online)" path.
+        try {
+            var role = claims.role();
+            var userId = claims.userId();
+            var tenantId = claims.tenantId();
+            if (("agent".equals(role) || "admin".equals(role))
+                    && userId != null && !userId.isBlank()
+                    && tenantId != null && !tenantId.isBlank()) {
+                var hasPresence = agentPresenceService.hasActiveSession(userId);
+                var profile = agentProfileRepository.findByUserId(userId)
+                        .orElse(new AgentProfileRepository.AgentProfileRow(userId, "offline", 3));
+                var st = profile.status() == null ? "" : profile.status().trim().toLowerCase();
+
+                var promoted = false;
+                if (hasPresence && (st.isBlank() || "offline".equals(st))) {
+                    agentProfileRepository.upsertStatus(userId, "online", null);
+                    promoted = true;
+                }
+
+                // If we just promoted to online, try to assign queued conversations to this agent immediately.
+                if (promoted) {
+                    var assignedActive = assignmentService.getAssignedActiveCount(tenantId, userId);
+                    var maxC = Math.max(1, profile.maxConcurrent());
+                    var remaining = Math.max(0, maxC - assignedActive);
+                    if (remaining > 0) {
+                        assignmentService.tryAssignFromQueueToAgent(tenantId, userId, remaining);
+                    }
+                }
+            }
+        } catch (Exception ignore) {
+            // best-effort
+        }
+
         ObjectNode ok = objectMapper.createObjectNode();
         ok.put("type", "AUTH_OK");
         ok.put("user_id", claims.userId());

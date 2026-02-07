@@ -39,6 +39,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(ApiResponse.error(code));
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalState(IllegalStateException ex) {
+        // IllegalStateException is used in several services to signal a well-known failure code
+        // (e.g. email_send_failed, widget_asset_load_failed). Expose it to clients instead of
+        // collapsing everything into internal_error.
+        var code = ex.getMessage();
+        if (code == null || code.isBlank()) {
+            code = "internal_error";
+        }
+        log.warn("illegal_state code={}", code, ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error(code));
+    }
+
     @ExceptionHandler(ExpiredJwtException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ApiResponse<Void> handleExpiredJwt(ExpiredJwtException ex) {
@@ -102,7 +115,7 @@ public class GlobalExceptionHandler {
     public ApiResponse<Void> handleValidation(MethodArgumentNotValidException ex) {
         var msg = ex.getBindingResult().getAllErrors().isEmpty()
                 ? "validation error"
-                : ex.getBindingResult().getAllErrors().getFirst().getDefaultMessage();
+                : ex.getBindingResult().getAllErrors().get(0).getDefaultMessage();
         return ApiResponse.error(msg);
     }
 

@@ -4,6 +4,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Repository
@@ -68,7 +69,9 @@ public class AgentProfileRepository {
     public java.util.Optional<String> findDisplayNameByUserId(String userId) {
         var sql = "select display_name from agent_profile where user_id = ? limit 1";
         var list = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getString("display_name"), userId);
-        return list.stream().findFirst();
+        // jdbcTemplate RowMapper may return null if display_name is NULL; Stream#findFirst
+        // wraps the element with Optional.of(...) and would throw NPE for null values.
+        return list.stream().filter(Objects::nonNull).findFirst();
     }
 
     public void upsertDisplayName(String userId, String displayName) {

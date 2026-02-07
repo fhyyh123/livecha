@@ -99,6 +99,29 @@ public class AgentController {
                 }
 
                 var sessionId = agentPresenceService.createSession(claims.tenantId(), claims.userId());
+
+                                // Keep status semantics consistent:
+                                // - Assignment eligibility requires agent_profile.status = 'online'.
+                                // - Agent UI may show 'online' when a presence session exists.
+                                // If the agent just logged in (session created) and profile is still offline,
+                                // auto-promote to online so new inbound conversations can be assigned.
+                                try {
+                                        var profile = agentProfileRepository.findByUserId(claims.userId())
+                                                        .orElse(new AgentProfileRepository.AgentProfileRow(claims.userId(), "offline", 3));
+                                        var st = profile.status() == null ? "" : profile.status().trim().toLowerCase();
+                                        if (st.isBlank() || "offline".equals(st)) {
+                                                agentProfileRepository.upsertStatus(claims.userId(), "online", null);
+                                        }
+                                } catch (Exception ignore) {
+                                        // best-effort
+                                }
+
+                                // Broadcast updated status so team UI reflects it quickly.
+                                try {
+                                        broadcastAgentStatus(claims.tenantId(), claims.userId());
+                                } catch (Exception ignore) {
+                                        // best-effort
+                                }
                 return ApiResponse.ok(new AgentSessionResponse(
                         sessionId,
                         agentPresenceService.heartbeatIntervalSeconds(),
