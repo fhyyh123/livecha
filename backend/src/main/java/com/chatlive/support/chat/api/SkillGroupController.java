@@ -39,7 +39,14 @@ public class SkillGroupController {
         }
 
         var rows = skillGroupRepository.listByTenant(claims.tenantId());
-        var items = rows.stream().map(r -> new SkillGroupItem(r.id(), r.name(), r.enabled())).toList();
+        var items = rows.stream().map(r -> new SkillGroupItem(
+                r.id(),
+                r.name(),
+                r.enabled(),
+                r.groupType(),
+                r.isFallback(),
+                r.systemKey()
+        )).toList();
         return ApiResponse.ok(items);
     }
 
@@ -55,7 +62,14 @@ public class SkillGroupController {
                 }
 
                 var rows = skillGroupRepository.listForAgent(claims.tenantId(), claims.userId());
-                var items = rows.stream().map(r -> new SkillGroupItem(r.id(), r.name(), r.enabled())).toList();
+                var items = rows.stream().map(r -> new SkillGroupItem(
+                                r.id(),
+                                r.name(),
+                                r.enabled(),
+                                r.groupType(),
+                                r.isFallback(),
+                                r.systemKey()
+                )).toList();
                 return ApiResponse.ok(items);
         }
 
@@ -74,7 +88,14 @@ public class SkillGroupController {
         var id = skillGroupRepository.create(claims.tenantId(), req.name(), req.enabled());
         var row = skillGroupRepository.findById(claims.tenantId(), id)
                 .orElseThrow(() -> new IllegalArgumentException("create_failed"));
-        return ApiResponse.ok(new SkillGroupItem(row.id(), row.name(), row.enabled()));
+        return ApiResponse.ok(new SkillGroupItem(
+                row.id(),
+                row.name(),
+                row.enabled(),
+                row.groupType(),
+                row.isFallback(),
+                row.systemKey()
+        ));
     }
 
     @GetMapping("/{id}/members")
@@ -111,8 +132,12 @@ public class SkillGroupController {
             throw new IllegalArgumentException("forbidden");
         }
 
-        skillGroupRepository.findById(claims.tenantId(), groupId)
+        var group = skillGroupRepository.findById(claims.tenantId(), groupId)
                 .orElseThrow(() -> new IllegalArgumentException("group_not_found"));
+
+        if (group.isFallback() || (group.groupType() != null && group.groupType().trim().equalsIgnoreCase("system"))) {
+            throw new IllegalArgumentException("system_group_readonly");
+        }
 
         var user = userAccountRepository.findById(req.agent_user_id())
                 .orElseThrow(() -> new IllegalArgumentException("agent_not_found"));
@@ -140,8 +165,12 @@ public class SkillGroupController {
             throw new IllegalArgumentException("forbidden");
         }
 
-        skillGroupRepository.findById(claims.tenantId(), groupId)
+        var group = skillGroupRepository.findById(claims.tenantId(), groupId)
                 .orElseThrow(() -> new IllegalArgumentException("group_not_found"));
+
+        if (group.isFallback() || (group.groupType() != null && group.groupType().trim().equalsIgnoreCase("system"))) {
+            throw new IllegalArgumentException("system_group_readonly");
+        }
 
         skillGroupRepository.removeMember(groupId, agentUserId);
         return ApiResponse.ok(null);

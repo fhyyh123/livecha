@@ -37,7 +37,16 @@ type SkillGroupItem = {
     id: string;
     name: string;
     enabled: boolean;
+    group_type?: string | null;
+    is_fallback?: boolean | null;
+    system_key?: string | null;
 };
+
+function isSystemOrFallbackGroup(g: SkillGroupItem | null | undefined): boolean {
+    if (!g) return false;
+    if (Boolean(g.is_fallback)) return true;
+    return String(g.group_type || "").trim().toLowerCase() === "system";
+}
 
 type AgentStatusResponse = {
     user_id: string;
@@ -305,6 +314,9 @@ export function ProfilePage() {
         if (me.role !== "admin") return;
         if (targetUserId) return;
 
+        const g = allGroups.find((x) => x.id === groupId) || null;
+        if (isSystemOrFallbackGroup(g)) return;
+
         setGroupUpdating(true);
         try {
             await http.post(`/api/v1/skill-groups/${encodeURIComponent(groupId)}/members`, {
@@ -327,6 +339,9 @@ export function ProfilePage() {
         if (!me) return;
         if (me.role !== "admin") return;
         if (targetUserId) return;
+
+        const g = groups.find((x) => x.id === groupId) || null;
+        if (isSystemOrFallbackGroup(g)) return;
 
         setGroupUpdating(true);
         try {
@@ -507,6 +522,7 @@ export function ProfilePage() {
                                                 disabled={groupUpdating || saving}
                                                 value={undefined}
                                                 options={allGroups
+                                                    .filter((g) => !isSystemOrFallbackGroup(g))
                                                     .filter((g) => !groups.some((mg) => mg.id === g.id))
                                                     .map((g) => ({ value: g.id, label: g.name }))}
                                                 onSelect={(val) => void addMeToGroup(String(val))}
@@ -530,9 +546,10 @@ export function ProfilePage() {
                                             <Tag
                                                 key={g.id}
                                                 color={g.enabled ? "blue" : "default"}
-                                                closable={me?.role === "admin"}
+                                                closable={me?.role === "admin" && !isSystemOrFallbackGroup(g)}
                                                 onClose={(e) => {
                                                     e.preventDefault();
+                                                    if (isSystemOrFallbackGroup(g)) return;
                                                     void removeMeFromGroup(g.id);
                                                 }}
                                             >

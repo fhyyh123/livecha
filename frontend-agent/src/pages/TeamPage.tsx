@@ -74,6 +74,9 @@ type SkillGroupItem = {
     id: string;
     name: string;
     enabled: boolean;
+    group_type?: string | null;
+    is_fallback?: boolean | null;
+    system_key?: string | null;
 };
 
 type SkillGroupMemberItem = {
@@ -91,6 +94,12 @@ function initials(name: string) {
     const t = String(name || "").trim();
     if (!t) return "?";
     return t.slice(0, 1).toUpperCase();
+}
+
+function isSystemOrFallbackGroup(g: SkillGroupItem | null | undefined): boolean {
+    if (!g) return false;
+    if (Boolean(g.is_fallback)) return true;
+    return String(g.group_type || "").trim().toLowerCase() === "system";
 }
 
 export function TeamPage() {
@@ -114,6 +123,12 @@ export function TeamPage() {
     const [groups, setGroups] = useState<SkillGroupItem[]>([]);
 
     const [selectedGroupId, setSelectedGroupId] = useState<string>("");
+
+    const selectedGroup = useMemo(
+        () => (selectedGroupId ? groups.find((g) => g.id === selectedGroupId) || null : null),
+        [groups, selectedGroupId],
+    );
+    const selectedGroupReadonly = isSystemOrFallbackGroup(selectedGroup);
 
     const [createGroupOpen, setCreateGroupOpen] = useState(false);
     const [createGroupLoading, setCreateGroupLoading] = useState(false);
@@ -651,6 +666,7 @@ export function TeamPage() {
 
     async function addOrUpdateMember() {
         if (!selectedGroupId) return;
+        if (selectedGroupReadonly) return;
         const agentUserId = String(addMemberAgentId || "");
         if (!agentUserId) return;
         const weight = Math.max(0, Math.min(100, Number(addMemberWeight || 0) || 0));
@@ -681,6 +697,7 @@ export function TeamPage() {
 
     async function removeMember(agentUserId: string) {
         if (!selectedGroupId) return;
+        if (selectedGroupReadonly) return;
         try {
             await http.delete(
                 `/api/v1/skill-groups/${encodeURIComponent(selectedGroupId)}/members/${encodeURIComponent(agentUserId)}`,
@@ -1088,7 +1105,7 @@ export function TeamPage() {
                                             selectedGroupId ? (
                                                 <Space direction="vertical" size={12} style={{ width: "100%" }}>
                                                     <Typography.Title level={5} style={{ margin: 0 }}>
-                                                        {groups.find((g) => g.id === selectedGroupId)?.name || selectedGroupId}
+                                                        {selectedGroup?.name || selectedGroupId}
                                                     </Typography.Title>
 
                                                     <Descriptions size="small" column={1}>
@@ -1108,6 +1125,7 @@ export function TeamPage() {
                                                                     onChange={(v) => setAddMemberAgentId(String(v || ""))}
                                                                     showSearch
                                                                     optionFilterProp="label"
+                                                                    disabled={selectedGroupReadonly}
                                                                 />
                                                                 <Space style={{ justifyContent: "space-between", width: "100%" }}>
                                                                     <Typography.Text>{t("team.weight")}</Typography.Text>
@@ -1116,11 +1134,12 @@ export function TeamPage() {
                                                                         max={100}
                                                                         value={addMemberWeight}
                                                                         onChange={(v) => setAddMemberWeight(Number(v || 0))}
+                                                                        disabled={selectedGroupReadonly}
                                                                     />
                                                                 </Space>
                                                                 <Button
                                                                     type="primary"
-                                                                    disabled={!addMemberAgentId}
+                                                                    disabled={!addMemberAgentId || selectedGroupReadonly}
                                                                     loading={addingMember}
                                                                     onClick={() => void addOrUpdateMember()}
                                                                 >
@@ -1142,7 +1161,7 @@ export function TeamPage() {
                                                                 return (
                                                                     <List.Item
                                                                         actions={
-                                                                            isAdmin
+                                                                            isAdmin && !selectedGroupReadonly
                                                                                 ? [
                                                                                       <Button
                                                                                           key="remove"

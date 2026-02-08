@@ -6,6 +6,7 @@ import com.chatlive.support.auth.repo.EmailVerificationCodeRepository;
 import com.chatlive.support.auth.service.crypto.PasswordHasher;
 import com.chatlive.support.auth.service.jwt.JwtService;
 import com.chatlive.support.chat.repo.TenantRepository;
+import com.chatlive.support.chat.repo.SkillGroupRepository;
 import com.chatlive.support.common.email.EmailDeliveryService;
 import com.chatlive.support.common.email.EmailTemplates;
 import com.chatlive.support.user.repo.UserAccountRepository;
@@ -24,6 +25,7 @@ public class OnboardingAuthService {
     private static final String E164_PHONE_REGEX = "^\\+[1-9]\\d{7,14}$";
 
     private final TenantRepository tenantRepository;
+    private final SkillGroupRepository skillGroupRepository;
     private final UserAccountRepository userAccountRepository;
     private final PasswordHasher passwordHasher;
     private final JwtService jwtService;
@@ -46,6 +48,7 @@ public class OnboardingAuthService {
 
     public OnboardingAuthService(
             TenantRepository tenantRepository,
+            SkillGroupRepository skillGroupRepository,
             UserAccountRepository userAccountRepository,
             PasswordHasher passwordHasher,
             JwtService jwtService,
@@ -57,6 +60,7 @@ public class OnboardingAuthService {
             @Value("${app.onboarding.invite-ttl-hours:72}") long inviteTtlHours
     ) {
         this.tenantRepository = tenantRepository;
+        this.skillGroupRepository = skillGroupRepository;
         this.userAccountRepository = userAccountRepository;
         this.passwordHasher = passwordHasher;
         this.jwtService = jwtService;
@@ -95,6 +99,14 @@ public class OnboardingAuthService {
                 passwordHasher.hash(password),
                 false
         );
+
+        // Ensure system fallback group exists and new agent/admin is a member.
+        try {
+            var fallbackId = skillGroupRepository.ensureFallbackGroup(tenantId);
+            skillGroupRepository.upsertMember(fallbackId, userId, 0);
+        } catch (Exception ignored) {
+            // best-effort; routing can still fall back to tenant-wide pool
+        }
 
         var code = TokenUtil.newSixDigitCode();
         var codeHash = TokenUtil.sha256Base64Url(code);
@@ -216,6 +228,14 @@ public class OnboardingAuthService {
                 passwordHasher.hash(password),
                 true
         );
+
+        // Ensure system fallback group exists and new agent/admin is a member.
+        try {
+            var fallbackId = skillGroupRepository.ensureFallbackGroup(invite.tenantId());
+            skillGroupRepository.upsertMember(fallbackId, userId, 0);
+        } catch (Exception ignored) {
+            // best-effort
+        }
 
         agentInviteRepository.markAccepted(invite.id(), Instant.now(), userId);
 

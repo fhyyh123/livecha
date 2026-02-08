@@ -132,25 +132,32 @@ public class AssignmentService {
 
     @Transactional
     public void autoAssignNewConversation(String tenantId, String conversationId, String skillGroupId) {
-        var groupKey = (skillGroupId == null || skillGroupId.isBlank()) ? DEFAULT_GROUP_KEY : skillGroupId;
+        boolean requestedGroup = skillGroupId != null && !skillGroupId.isBlank();
 
-        var cursor = assignCursorRepository.lockForUpdate(tenantId, groupKey);
+        // Decide candidates first (no locks). If the requested group is empty/unavailable, fallback to default pool.
+        String effectiveGroupKey = requestedGroup ? skillGroupId : DEFAULT_GROUP_KEY;
+        List<AgentProfileRepository.AgentCandidateRow> candidates = requestedGroup
+                ? agentProfileRepository.listOnlineCandidatesForGroup(tenantId, skillGroupId)
+                : agentProfileRepository.listOnlineCandidatesForTenant(tenantId);
 
-        List<AgentProfileRepository.AgentCandidateRow> candidates = (skillGroupId == null || skillGroupId.isBlank())
-                ? agentProfileRepository.listOnlineCandidatesForTenant(tenantId)
-                : agentProfileRepository.listOnlineCandidatesForGroup(tenantId, skillGroupId);
+        if (requestedGroup && candidates.isEmpty()) {
+            effectiveGroupKey = DEFAULT_GROUP_KEY;
+            candidates = agentProfileRepository.listOnlineCandidatesForTenant(tenantId);
+        }
 
         if (candidates.isEmpty()) {
             // keep queued
             return;
         }
 
+        var cursor = assignCursorRepository.lockForUpdate(tenantId, effectiveGroupKey);
+
         var candidateIds = candidates.stream().map(AgentProfileRepository.AgentCandidateRow::userId).toList();
         var loads = conversationRepository.countActiveAssignedByAgents(tenantId, candidateIds);
 
         var ctx = new AssignmentContext(
                 tenantId,
-                groupKey,
+            effectiveGroupKey,
                 cursor.lastAgentUserId(),
                 candidates,
                 loads
@@ -165,7 +172,7 @@ public class AssignmentService {
 
         var updated = conversationRepository.tryAssignToAgent(tenantId, conversationId, selected.userId());
         if (updated == 1) {
-            assignCursorRepository.updateLastAgent(tenantId, groupKey, selected.userId());
+            assignCursorRepository.updateLastAgent(tenantId, effectiveGroupKey, selected.userId());
 
             var agentUserId = selected.userId();
             afterCommit(() -> {

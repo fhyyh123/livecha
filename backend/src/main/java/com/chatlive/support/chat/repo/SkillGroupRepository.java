@@ -10,7 +10,15 @@ import java.util.UUID;
 @Repository
 public class SkillGroupRepository {
 
-    public record SkillGroupRow(String id, String tenantId, String name, boolean enabled) {
+    public record SkillGroupRow(
+            String id,
+            String tenantId,
+            String name,
+            boolean enabled,
+            String groupType,
+            boolean isFallback,
+            String systemKey
+    ) {
     }
 
     public record SkillGroupMemberRow(String groupId, String agentUserId, int weight) {
@@ -20,6 +28,59 @@ public class SkillGroupRepository {
 
     public SkillGroupRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public Optional<SkillGroupRow> findFallbackByTenant(String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) return Optional.empty();
+        var sql = """
+                select id, tenant_id, name, enabled, group_type, is_fallback, system_key
+                from skill_group
+                where tenant_id = ? and is_fallback = true
+                limit 1
+                """;
+        var list = jdbcTemplate.query(sql, (rs, rowNum) -> new SkillGroupRow(
+                rs.getString("id"),
+                rs.getString("tenant_id"),
+                rs.getString("name"),
+                rs.getBoolean("enabled"),
+                rs.getString("group_type"),
+                rs.getBoolean("is_fallback"),
+                rs.getString("system_key")
+        ), tenantId);
+        return list.stream().findFirst();
+    }
+
+    /**
+     * Ensure the tenant has a system fallback group ("General").
+     */
+    public String ensureFallbackGroup(String tenantId) {
+        var existing = findFallbackByTenant(tenantId);
+        if (existing.isPresent()) return existing.get().id();
+
+        var id = "sg_" + UUID.randomUUID();
+        var name = "General";
+        var systemKey = "general";
+
+        var pg = """
+                insert into skill_group(id, tenant_id, name, enabled, group_type, is_fallback, system_key, created_at)
+                values (?, ?, ?, true, 'system', true, ?, now())
+                """;
+        var h2 = """
+                insert into skill_group(id, tenant_id, name, enabled, group_type, is_fallback, system_key, created_at)
+                values (?, ?, ?, true, 'system', true, ?, current_timestamp)
+                """;
+
+        try {
+            jdbcTemplate.update(pg, id, tenantId, name, systemKey);
+        } catch (Exception ignored) {
+            try {
+                jdbcTemplate.update(h2, id, tenantId, name, systemKey);
+            } catch (Exception ignored2) {
+                // ignore; likely a race inserting the same fallback group
+            }
+        }
+
+        return findFallbackByTenant(tenantId).map(SkillGroupRow::id).orElse(id);
     }
 
     public String create(String tenantId, String name, Boolean enabled) {
@@ -42,19 +103,22 @@ public class SkillGroupRepository {
     }
 
     public Optional<SkillGroupRow> findById(String tenantId, String groupId) {
-        var sql = "select id, tenant_id, name, enabled from skill_group where tenant_id = ? and id = ? limit 1";
+        var sql = "select id, tenant_id, name, enabled, group_type, is_fallback, system_key from skill_group where tenant_id = ? and id = ? limit 1";
         var list = jdbcTemplate.query(sql, (rs, rowNum) -> new SkillGroupRow(
                 rs.getString("id"),
                 rs.getString("tenant_id"),
                 rs.getString("name"),
-                rs.getBoolean("enabled")
+            rs.getBoolean("enabled"),
+            rs.getString("group_type"),
+            rs.getBoolean("is_fallback"),
+            rs.getString("system_key")
         ), tenantId, groupId);
         return list.stream().findFirst();
     }
 
     public List<SkillGroupRow> listByTenant(String tenantId) {
         var sql = """
-                select id, tenant_id, name, enabled
+            select id, tenant_id, name, enabled, group_type, is_fallback, system_key
                 from skill_group
                 where tenant_id = ?
                 order by created_at desc
@@ -64,13 +128,16 @@ public class SkillGroupRepository {
                 rs.getString("id"),
                 rs.getString("tenant_id"),
                 rs.getString("name"),
-                rs.getBoolean("enabled")
+            rs.getBoolean("enabled"),
+            rs.getString("group_type"),
+            rs.getBoolean("is_fallback"),
+            rs.getString("system_key")
         ), tenantId);
     }
 
         public List<SkillGroupRow> listForAgent(String tenantId, String agentUserId) {
         var sql = """
-            select g.id, g.tenant_id, g.name, g.enabled
+            select g.id, g.tenant_id, g.name, g.enabled, g.group_type, g.is_fallback, g.system_key
             from skill_group g
             join skill_group_member m on m.group_id = g.id
             where g.tenant_id = ?
@@ -82,7 +149,10 @@ public class SkillGroupRepository {
             rs.getString("id"),
             rs.getString("tenant_id"),
             rs.getString("name"),
-            rs.getBoolean("enabled")
+            rs.getBoolean("enabled"),
+            rs.getString("group_type"),
+            rs.getBoolean("is_fallback"),
+            rs.getString("system_key")
         ), tenantId, agentUserId);
         }
 
