@@ -154,16 +154,36 @@ function appendQueryParams(rawUrl: string, params: Record<string, string>): stri
     }
 }
 
-function buildPreviewScriptTagHtml(params: { scriptUrl: string; siteKey: string; embedUrl: string }): string {
-    const { scriptUrl, siteKey, embedUrl } = params;
+function buildPreviewScriptTagHtml(params: { scriptUrl: string; siteKey: string; embedUrl: string; origin?: string | null }): string {
+    const { scriptUrl, siteKey, embedUrl, origin } = params;
     const lines: string[] = [];
     lines.push("<script");
     lines.push("  defer");
     lines.push(`  src=\"${escapeAttr(scriptUrl)}\"`);
     lines.push(`  data-chatlive-site-key=\"${escapeAttr(siteKey)}\"`);
     lines.push(`  data-chatlive-embed-url=\"${escapeAttr(embedUrl)}\"`);
+    if (origin) lines.push(`  data-chatlive-origin=\"${escapeAttr(origin)}\"`);
     lines.push("></script>");
     return lines.join("\n");
+}
+
+function normalizePreviewOriginFromAllowlist(domains: string[], fallbackOrigin: string): string {
+    const first = String(domains?.[0] || "").trim();
+    if (!first) return fallbackOrigin;
+
+    if (first.includes("://")) {
+        try {
+            return new URL(first).origin;
+        } catch {
+            return fallbackOrigin;
+        }
+    }
+
+    try {
+        return new URL(`${window.location.protocol}//${first}`).origin;
+    } catch {
+        return fallbackOrigin;
+    }
 }
 
 export function WidgetLanguagePage() {
@@ -179,6 +199,8 @@ export function WidgetLanguagePage() {
     const [sitesError, setSitesError] = useState<string>("");
     const [sites, setSites] = useState<SiteItem[]>([]);
     const [siteId, setSiteId] = useState<string>("");
+
+    const [allowlistDomains, setAllowlistDomains] = useState<string[]>([]);
 
     const [cfgLoading, setCfgLoading] = useState(false);
     const [cfgError, setCfgError] = useState<string>("");
@@ -255,6 +277,32 @@ export function WidgetLanguagePage() {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAdmin, meLoading]);
+
+    useEffect(() => {
+        if (meLoading) return;
+        if (!isAdmin) return;
+
+        if (!siteId) {
+            setAllowlistDomains([]);
+            return;
+        }
+
+        let mounted = true;
+        http
+            .get<string[]>(`/api/v1/admin/sites/${encodeURIComponent(siteId)}/allowlist`)
+            .then((res) => {
+                if (!mounted) return;
+                setAllowlistDomains(Array.isArray(res.data) ? res.data : []);
+            })
+            .catch(() => {
+                if (!mounted) return;
+                setAllowlistDomains([]);
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, [isAdmin, meLoading, siteId]);
 
     useEffect(() => {
         if (meLoading) return;
@@ -419,10 +467,12 @@ export function WidgetLanguagePage() {
         if (!snippet?.embed_url) return null;
 
         const previewEmbedUrl = appendQueryParams(snippet.embed_url, { chatlive_preview: "1" });
+        const previewOrigin = normalizePreviewOriginFromAllowlist(allowlistDomains, window.location.origin);
         const scriptTag = buildPreviewScriptTagHtml({
             scriptUrl: snippet.widget_script_url,
             siteKey: selectedSite.public_key,
             embedUrl: previewEmbedUrl,
+            origin: previewOrigin,
         });
 
         const css = `
@@ -497,7 +547,7 @@ export function WidgetLanguagePage() {
   </body>
 </html>`;
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedSite?.public_key, snippet?.embed_url, snippet?.widget_script_url, previewReload, t]);
+    }, [allowlistDomains, selectedSite?.public_key, snippet?.embed_url, snippet?.widget_script_url, previewReload, t]);
 
     const previewIframeStyle: CSSProperties = useMemo(
         () => ({ width: "100%", height: "100%", border: 0, borderRadius: 12, overflow: "hidden" }),

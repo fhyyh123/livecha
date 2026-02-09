@@ -381,6 +381,8 @@ export function PreChatFormPage() {
     const [sites, setSites] = useState<SiteItem[]>([]);
     const [siteId, setSiteId] = useState<string>("");
 
+    const [allowlistDomains, setAllowlistDomains] = useState<string[]>([]);
+
     const [cfgLoading, setCfgLoading] = useState(false);
     const [cfgError, setCfgError] = useState<string>("");
     const [saving, setSaving] = useState(false);
@@ -397,6 +399,23 @@ export function PreChatFormPage() {
     }, [siteId, sites]);
 
     const selectedSite = useMemo(() => sites.find((s) => s.id === siteId) || null, [sites, siteId]);
+
+    const previewOrigin = useMemo(() => {
+        const first = String(allowlistDomains?.[0] || "").trim();
+        if (!first) return window.location.origin;
+        if (first.includes("://")) {
+            try {
+                return new URL(first).origin;
+            } catch {
+                return window.location.origin;
+            }
+        }
+        try {
+            return new URL(`${window.location.protocol}//${first}`).origin;
+        } catch {
+            return window.location.origin;
+        }
+    }, [allowlistDomains]);
 
     useEffect(() => {
         let mounted = true;
@@ -450,6 +469,32 @@ export function PreChatFormPage() {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAdmin, meLoading]);
+
+    useEffect(() => {
+        if (meLoading) return;
+        if (!isAdmin) return;
+
+        if (!siteId) {
+            setAllowlistDomains([]);
+            return;
+        }
+
+        let mounted = true;
+        http
+            .get<string[]>(`/api/v1/admin/sites/${encodeURIComponent(siteId)}/allowlist`)
+            .then((res) => {
+                if (!mounted) return;
+                setAllowlistDomains(Array.isArray(res.data) ? res.data : []);
+            })
+            .catch(() => {
+                if (!mounted) return;
+                setAllowlistDomains([]);
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, [isAdmin, meLoading, siteId]);
 
     useEffect(() => {
         if (meLoading) return;
@@ -589,7 +634,7 @@ export function PreChatFormPage() {
     const previewIframe = selectedSite?.public_key ? (
         <iframe
             title="visitor-preview"
-            src={`/visitor/embed?site_key=${encodeURIComponent(selectedSite.public_key)}`}
+            src={`/visitor/embed?site_key=${encodeURIComponent(selectedSite.public_key)}&chatlive_preview=1&origin=${encodeURIComponent(previewOrigin)}`}
             style={{ width: "100%", height: "100%", border: 0, borderRadius: 12, overflow: "hidden" }}
         />
     ) : (
