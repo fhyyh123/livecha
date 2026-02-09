@@ -205,6 +205,12 @@
     prefetchTimeoutId: null,
     prefetchFallbackRendered: false,
     prefetchIgnoreLatePatch: false,
+
+    accessCheckDone: false,
+    accessCheckInFlight: false,
+    accessCheckUserConfig: null,
+    accessBanned: false,
+
     _keepAliveTimer: null,
     _autoHeightTimer: null,
     _autoHeightPending: null,
@@ -554,6 +560,66 @@
           });
       } catch (e) {
         resolve(null);
+      }
+    });
+  }
+
+  function extractBannedFlag(data) {
+    try {
+      if (!data) return false;
+      if (data && typeof data.banned === "boolean") return !!data.banned;
+      if (data && data.data && typeof data.data.banned === "boolean") return !!data.data.banned;
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function checkWidgetAccess(siteKey, origin, baseOverride) {
+    return new Promise(function (resolve) {
+      try {
+        var base = String(baseOverride || "") || getWidgetScriptOrigin() || "";
+        if (!base) {
+          resolve(false);
+          return;
+        }
+        if (!siteKey) {
+          resolve(false);
+          return;
+        }
+        if (typeof fetch !== "function") {
+          resolve(false);
+          return;
+        }
+
+        // Cache-bust.
+        var url =
+          base +
+          "/api/v1/public/widget/check?site_key=" +
+          encodeURIComponent(String(siteKey || "")) +
+          "&_ts=" +
+          String(Date.now());
+
+        fetch(url, {
+          method: "POST",
+          mode: "cors",
+          credentials: "omit",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ site_key: String(siteKey || ""), origin: String(origin || "") }),
+        })
+          .then(function (r) {
+            if (!r || !r.ok) return null;
+            return r.json();
+          })
+          .then(function (data) {
+            resolve(extractBannedFlag(data));
+          })
+          .catch(function () {
+            resolve(false);
+          });
+      } catch (e) {
+        resolve(false);
       }
     });
   }
@@ -1613,6 +1679,57 @@
         welcomeText: state.config.welcomeText || null,
         page: getPageInfo(),
       });
+      return;
+    }
+
+    // First: access check gate. If banned, do not render the launcher at all.
+    // This is intentionally best-effort and only blocks rendering when the backend confirms banned=true.
+    if (!state.accessCheckDone && !state.accessCheckInFlight) {
+      try {
+        var seed0 = merge(merge({}, DEFAULTS), userConfig || {});
+        var apiBase0 = getBootstrapApiOrigin(seed0) || "";
+        var canCheck0 = !!seed0.siteKey && !!apiBase0 && typeof fetch === "function";
+        if (!canCheck0) {
+          state.accessCheckDone = true;
+        } else {
+          var o0 = computeOrigin(seed0);
+          if (!o0) {
+            // If we cannot reliably determine origin (e.g. srcdoc), skip check.
+            state.accessCheckDone = true;
+          } else {
+            state.accessCheckInFlight = true;
+            state.accessCheckUserConfig = userConfig || {};
+
+            checkWidgetAccess(seed0.siteKey, o0, apiBase0)
+              .then(function (banned) {
+                state.accessCheckDone = true;
+                state.accessCheckInFlight = false;
+                state.accessBanned = !!banned;
+                if (state.accessBanned) return;
+                init(state.accessCheckUserConfig || {});
+              })
+              .catch(function () {
+                state.accessCheckDone = true;
+                state.accessCheckInFlight = false;
+                state.accessBanned = false;
+                init(state.accessCheckUserConfig || {});
+              });
+            return;
+          }
+        }
+      } catch (e0) {
+        state.accessCheckDone = true;
+        state.accessCheckInFlight = false;
+        state.accessBanned = false;
+      }
+    }
+
+    if (state.accessCheckInFlight) {
+      state.accessCheckUserConfig = merge(merge({}, state.accessCheckUserConfig || {}), userConfig || {});
+      return;
+    }
+
+    if (state.accessBanned) {
       return;
     }
 

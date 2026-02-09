@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.chatlive.support.widget.repo.SiteBannedCustomerRepository;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import org.slf4j.Logger;
@@ -24,6 +25,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLDecoder;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -46,6 +48,7 @@ public class WsHandler extends TextWebSocketHandler {
     private final AssignmentService assignmentService;
     private final ConversationRepository conversationRepository;
     private final ConversationEventRepository conversationEventRepository;
+    private final SiteBannedCustomerRepository bannedCustomerRepository;
     private final Set<String> allowedVisitorOrigins;
 
     public WsHandler(
@@ -59,6 +62,7 @@ public class WsHandler extends TextWebSocketHandler {
             AssignmentService assignmentService,
             ConversationRepository conversationRepository,
             ConversationEventRepository conversationEventRepository,
+            SiteBannedCustomerRepository bannedCustomerRepository,
             @Value("${app.widget.public-embed-url:http://localhost:5173/visitor/embed}") String publicEmbedUrl,
             @Value("${app.ws.public-allowed-origins:}") String extraAllowedOriginsCsv
     ) {
@@ -72,6 +76,7 @@ public class WsHandler extends TextWebSocketHandler {
         this.assignmentService = assignmentService;
         this.conversationRepository = conversationRepository;
         this.conversationEventRepository = conversationEventRepository;
+        this.bannedCustomerRepository = bannedCustomerRepository;
 
         this.allowedVisitorOrigins = buildAllowedVisitorOrigins(publicEmbedUrl, extraAllowedOriginsCsv);
     }
@@ -114,6 +119,16 @@ public class WsHandler extends TextWebSocketHandler {
             try {
                 var claims = jwtService.parse(token);
 
+                if ("visitor".equals(claims.role()) && isVisitorBanned(session, claims.siteId())) {
+                    try {
+                        sendError(session, "banned_customer", null);
+                    } catch (Exception ignore) {
+                        // ignore
+                    }
+                    closeQuietly(session, CloseStatus.NOT_ACCEPTABLE);
+                    return;
+                }
+
                 // Browser safety: only allow visitor WS connections from our embed app origin(s).
                 if ("visitor".equals(claims.role()) && !isVisitorOriginAllowed(session)) {
                     try {
@@ -131,7 +146,8 @@ public class WsHandler extends TextWebSocketHandler {
 
                 var client = params.getOrDefault("client", "unknown");
                 var agentSessionId = params.get("session_id");
-                sessionRegistry.bind(session, new WsSessionRegistry.SessionContext(claims, client, agentSessionId));
+                var clientIp = resolveClientIp(session);
+                sessionRegistry.bind(session, new WsSessionRegistry.SessionContext(claims, client, agentSessionId, clientIp));
 
                 ObjectNode ok = objectMapper.createObjectNode();
                 ok.put("type", "AUTH_OK");
@@ -211,7 +227,8 @@ public class WsHandler extends TextWebSocketHandler {
                                     sessionRegistry.bind(session, new WsSessionRegistry.SessionContext(
                                             ctx.claims(),
                                             ctx.client(),
-                                            newSessionId
+                                            newSessionId,
+                                            ctx.clientIp()
                                     ));
 
                                     ObjectNode refresh = objectMapper.createObjectNode();
@@ -282,15 +299,23 @@ public class WsHandler extends TextWebSocketHandler {
             return;
         }
 
+        if ("visitor".equals(claims.role()) && isVisitorBanned(session, claims.siteId())) {
+            sendError(session, "banned_customer", null);
+            closeQuietly(session, CloseStatus.NOT_ACCEPTABLE);
+            return;
+        }
+
         if ("visitor".equals(claims.role()) && !isVisitorOriginAllowed(session)) {
             sendError(session, "origin_not_allowed", null);
             closeQuietly(session, CloseStatus.NOT_ACCEPTABLE);
             return;
         }
 
+
         var client = root.path("client").asText("unknown");
         var agentSessionId = root.path("session_id").asText(null);
-        sessionRegistry.bind(session, new WsSessionRegistry.SessionContext(claims, client, agentSessionId));
+        var clientIp = resolveClientIp(session);
+        sessionRegistry.bind(session, new WsSessionRegistry.SessionContext(claims, client, agentSessionId, clientIp));
 
         // Important: assignment eligibility uses agent_profile.status = 'online' (plus active agent_session).
         // However, the UI/WS may display an agent as "online" when a presence session exists even if
@@ -391,6 +416,126 @@ public class WsHandler extends TextWebSocketHandler {
         } catch (Exception ex) {
             return true;
         }
+    }
+
+    private boolean isVisitorBanned(WebSocketSession session, String siteId) {
+        if (siteId == null || siteId.isBlank()) return false;
+        var ip = resolveClientIp(session);
+        if (ip == null || ip.isBlank()) return false;
+        try {
+            return bannedCustomerRepository.isBannedNow(siteId, ip);
+        } catch (Exception ignore) {
+            return false;
+        }
+    }
+
+    private static String resolveClientIp(WebSocketSession session) {
+        if (session == null) return null;
+
+        var xff = firstHeader(session, "X-Forwarded-For");
+        var ip = firstIpFromXff(xff);
+        if (isUsableIp(ip)) return ip;
+
+        ip = normalizeIp(firstHeader(session, "X-Real-IP"));
+        if (isUsableIp(ip)) return ip;
+
+        ip = firstIpFromForwarded(firstHeader(session, "Forwarded"));
+        if (isUsableIp(ip)) return ip;
+
+        try {
+            InetSocketAddress ra = session.getRemoteAddress();
+            if (ra != null) {
+                if (ra.getAddress() != null) {
+                    ip = normalizeIp(ra.getAddress().getHostAddress());
+                } else {
+                    ip = normalizeIp(ra.getHostString());
+                }
+                if (isUsableIp(ip)) return ip;
+            }
+        } catch (Exception ignore) {
+            // ignore
+        }
+
+        return null;
+    }
+
+    private static String firstHeader(WebSocketSession session, String name) {
+        if (session == null || name == null || name.isBlank()) return null;
+        try {
+            var headers = session.getHandshakeHeaders();
+            if (headers == null) return null;
+            var v = headers.getFirst(name);
+            if (v == null) return null;
+            var t = v.trim();
+            return t.isEmpty() ? null : t;
+        } catch (Exception ignore) {
+            return null;
+        }
+    }
+
+    private static String firstIpFromXff(String xff) {
+        if (xff == null || xff.isBlank()) return null;
+        var parts = xff.split(",");
+        for (var p : parts) {
+            var ip = normalizeIp(p);
+            if (isUsableIp(ip)) return ip;
+        }
+        return null;
+    }
+
+    private static String firstIpFromForwarded(String forwarded) {
+        if (forwarded == null || forwarded.isBlank()) return null;
+        var entries = forwarded.split(",");
+        for (var entry : entries) {
+            var e = entry.trim();
+            if (e.isEmpty()) continue;
+            var parts = e.split(";");
+            for (var part : parts) {
+                var kv = part.trim();
+                if (kv.isEmpty()) continue;
+                if (!kv.toLowerCase().startsWith("for=")) continue;
+                var raw = kv.substring(4).trim();
+                if (raw.startsWith("\"") && raw.endsWith("\"") && raw.length() >= 2) {
+                    raw = raw.substring(1, raw.length() - 1);
+                }
+                if (raw.startsWith("[") && raw.contains("]")) {
+                    raw = raw.substring(1, raw.indexOf(']'));
+                }
+                var ip = normalizeIp(raw);
+                if (isUsableIp(ip)) return ip;
+            }
+        }
+        return null;
+    }
+
+    private static String normalizeIp(String raw) {
+        if (raw == null) return null;
+        var ip = raw.trim();
+        if (ip.isEmpty()) return null;
+        if ("unknown".equalsIgnoreCase(ip)) return null;
+
+        // Strip IPv6 brackets if present.
+        if (ip.startsWith("[") && ip.contains("]")) {
+            ip = ip.substring(1, ip.indexOf(']')).trim();
+        }
+
+        // Remove port if present (best-effort, for IPv4 like 1.2.3.4:5678).
+        var colon = ip.indexOf(':');
+        var dot = ip.indexOf('.');
+        if (colon > 0 && dot >= 0) {
+            var candidate = ip.substring(0, colon);
+            if (candidate.chars().filter(ch -> ch == '.').count() == 3) {
+                ip = candidate;
+            }
+        }
+
+        return ip.toLowerCase();
+    }
+
+    private static boolean isUsableIp(String ip) {
+        if (ip == null || ip.isBlank()) return false;
+        if ("unknown".equalsIgnoreCase(ip)) return false;
+        return true;
     }
 
     private static Set<String> buildAllowedVisitorOrigins(String publicEmbedUrl, String extraAllowedOriginsCsv) {

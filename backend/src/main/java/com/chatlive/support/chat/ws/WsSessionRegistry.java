@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class WsSessionRegistry {
 
-    public record SessionContext(JwtClaims claims, String client, String agentSessionId) {
+    public record SessionContext(JwtClaims claims, String client, String agentSessionId, String clientIp) {
     }
 
     private final Map<String, SessionContext> sessions = new ConcurrentHashMap<>();

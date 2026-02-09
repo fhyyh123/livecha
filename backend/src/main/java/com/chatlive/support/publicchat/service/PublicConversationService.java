@@ -7,6 +7,7 @@ import com.chatlive.support.chat.repo.ConversationPreChatFieldRepository;
 import com.chatlive.support.chat.service.AssignmentService;
 import com.chatlive.support.chat.service.MessageService;
 import com.chatlive.support.chat.ws.WsBroadcaster;
+import com.chatlive.support.common.geo.ClientIpResolver;
 import com.chatlive.support.common.geo.VisitorGeoUpdater;
 import com.chatlive.support.publicchat.api.CreateOrRecoverConversationRequest;
 import com.chatlive.support.publicchat.api.CreateOrRecoverConversationResponse;
@@ -14,6 +15,7 @@ import com.chatlive.support.publicchat.api.PublicPageViewEventRequest;
 import com.chatlive.support.publicchat.api.PublicSendFileMessageRequest;
 import com.chatlive.support.publicchat.api.PublicSendTextMessageRequest;
 import com.chatlive.support.user.repo.UserAccountRepository;
+import com.chatlive.support.widget.repo.SiteBannedCustomerRepository;
 import com.chatlive.support.widget.repo.VisitorRepository;
 import com.chatlive.support.widget.repo.WidgetConfigRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,6 +41,7 @@ public class PublicConversationService {
     private final MessageService messageService;
     private final WsBroadcaster wsBroadcaster;
     private final VisitorGeoUpdater visitorGeoUpdater;
+    private final SiteBannedCustomerRepository bannedCustomerRepository;
     private final ConversationPreChatFieldRepository conversationPreChatFieldRepository;
     private final ObjectMapper objectMapper;
 
@@ -52,6 +55,7 @@ public class PublicConversationService {
             MessageService messageService,
             WsBroadcaster wsBroadcaster,
             VisitorGeoUpdater visitorGeoUpdater,
+            SiteBannedCustomerRepository bannedCustomerRepository,
             ConversationPreChatFieldRepository conversationPreChatFieldRepository,
             ObjectMapper objectMapper
     ) {
@@ -64,8 +68,20 @@ public class PublicConversationService {
         this.messageService = messageService;
         this.wsBroadcaster = wsBroadcaster;
         this.visitorGeoUpdater = visitorGeoUpdater;
+        this.bannedCustomerRepository = bannedCustomerRepository;
         this.conversationPreChatFieldRepository = conversationPreChatFieldRepository;
         this.objectMapper = objectMapper;
+    }
+
+    private void requireNotBanned(HttpServletRequest request, JwtClaims claims) {
+        if (claims == null) return;
+        var siteId = claims.siteId();
+        if (siteId == null || siteId.isBlank()) return;
+        var ip = ClientIpResolver.resolve(request);
+        if (ip == null || ip.isBlank()) return;
+        if (bannedCustomerRepository.isBannedNow(siteId, ip.trim().toLowerCase())) {
+            throw new IllegalArgumentException("banned_customer");
+        }
     }
 
     private record PreChatFieldConfig(
@@ -82,6 +98,7 @@ public class PublicConversationService {
         if (claims == null || !"visitor".equals(claims.role())) {
             throw new IllegalArgumentException("forbidden");
         }
+        requireNotBanned(request, claims);
         visitorGeoUpdater.refreshGeoIfNeeded(claims.userId(), claims.siteId(), request);
         if (conversationId == null || conversationId.isBlank()) {
             throw new IllegalArgumentException("missing_conversation_id");
@@ -100,6 +117,7 @@ public class PublicConversationService {
         if (claims == null || !"visitor".equals(claims.role())) {
             throw new IllegalArgumentException("forbidden");
         }
+        requireNotBanned(request, claims);
         visitorGeoUpdater.refreshGeoIfNeeded(claims.userId(), claims.siteId(), request);
         if (conversationId == null || conversationId.isBlank()) {
             throw new IllegalArgumentException("missing_conversation_id");
@@ -124,6 +142,8 @@ public class PublicConversationService {
         if (claims.siteId() == null || claims.siteId().isBlank()) {
             throw new IllegalArgumentException("forbidden");
         }
+
+        requireNotBanned(request, claims);
 
         var config = widgetConfigRepository.findBySiteId(claims.siteId()).orElse(null);
         var preChatEnabled = config != null && config.preChatEnabled();

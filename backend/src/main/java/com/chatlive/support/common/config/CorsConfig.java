@@ -70,9 +70,9 @@ public class CorsConfig {
             allowed = true;
         }
 
-        // Secondary rule: for bootstrap only, also allow the customer site origins (site allowlist).
-        // This supports future variants where the host page calls bootstrap directly.
-        if (!allowed && "/api/v1/public/widget/bootstrap".equals(path)) {
+        // Secondary rule: for widget endpoints called from the host page, also allow the customer site origins
+        // (site allowlist). This supports variants where the host page calls widget APIs directly.
+        if (!allowed && ("/api/v1/public/widget/bootstrap".equals(path) || "/api/v1/public/widget/check".equals(path))) {
             var siteKey = request.getParameter("site_key");
             if (siteKey != null && !siteKey.isBlank()) {
                 var site = siteRepository.findByPublicKey(siteKey).orElse(null);

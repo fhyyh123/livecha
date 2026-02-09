@@ -35,6 +35,7 @@ const VisitorEmbedPage = lazy(() => import("./pages/VisitorEmbedPage").then((m) 
 const ChatPagePublic = lazy(() => import("./pages/ChatPagePublic").then((m) => ({ default: m.ChatPagePublic })));
 const SitesPage = lazy(() => import("./pages/SitesPage").then((m) => ({ default: m.SitesPage })));
 const TrustedDomainsPage = lazy(() => import("./pages/TrustedDomainsPage").then((m) => ({ default: m.TrustedDomainsPage })));
+const BannedCustomersPage = lazy(() => import("./pages/BannedCustomersPage").then((m) => ({ default: m.BannedCustomersPage })));
 const WidgetCustomizePage = lazy(() => import("./pages/WidgetCustomizePage").then((m) => ({ default: m.WidgetCustomizePage })));
 const WidgetLanguagePage = lazy(() => import("./pages/WidgetLanguagePage.tsx").then((m) => ({ default: m.WidgetLanguagePage })));
 const PreChatFormPage = lazy(() => import("./pages/PreChatFormPage").then((m) => ({ default: m.PreChatFormPage })));
@@ -363,6 +364,14 @@ function App() {
                 element={
                   <Suspense fallback={<RouteFallback />}>
                     <TrustedDomainsPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/settings/security/banned-customers"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <BannedCustomersPage />
                   </Suspense>
                 }
               />

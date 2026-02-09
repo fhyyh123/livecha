@@ -10,6 +10,7 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -94,6 +95,46 @@ public class WsBroadcaster {
         if (payload == null) return;
         payload.put("type", "AGENT_STATUS");
         broadcastToTenantAgents(tenantId, payload);
+    }
+
+    /**
+     * Immediately disconnect live visitor WS sessions for a site+ip.
+     *
+     * This is used for security actions like banning a visitor IP.
+     */
+    public int kickVisitorSessionsBySiteAndIp(String siteId, String ip, String code) {
+        if (siteId == null || siteId.isBlank()) return 0;
+        if (ip == null || ip.isBlank()) return 0;
+
+        int kicked = 0;
+        var snapshot = new ArrayList<>(liveSessions.values());
+        for (var s : snapshot) {
+            if (s == null || !s.isOpen()) continue;
+            var ctx = sessionRegistry.get(s).orElse(null);
+            if (ctx == null || ctx.claims() == null) continue;
+            if (!"visitor".equals(ctx.claims().role())) continue;
+            if (ctx.claims().siteId() == null || !siteId.equals(ctx.claims().siteId())) continue;
+            if (ctx.clientIp() == null || !ip.equalsIgnoreCase(ctx.clientIp())) continue;
+
+            try {
+                ObjectNode err = objectMapper.createObjectNode();
+                err.put("type", "ERROR");
+                err.put("code", code == null || code.isBlank() ? "forbidden" : code);
+                err.put("message", code == null || code.isBlank() ? "forbidden" : code);
+                send(s, err);
+            } catch (Exception ignored) {
+                // best-effort
+            }
+
+            try {
+                s.close();
+            } catch (Exception ignored) {
+                // best-effort
+            }
+            kicked += 1;
+        }
+
+        return kicked;
     }
 
     public void notifyInboxChanged(String tenantId, String agentUserId, String conversationId, String reason) {

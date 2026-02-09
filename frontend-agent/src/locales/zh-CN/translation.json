@@ -898,6 +898,36 @@
       }
     }
   },
+  "bannedCustomers": {
+    "title": "禁止的访客",
+    "subtitle": "按访客 IP 地址阻止其使用小组件。",
+    "adminOnlyHint": "仅管理员",
+    "selectSite": "站点",
+    "empty": "你还没有禁止任何访客",
+    "banCustomer": "禁止访客",
+    "table": {
+      "ip": "访客 IP",
+      "expires": "禁止到期时间"
+    },
+    "modal": {
+      "title": "禁止访客",
+      "ipLabel": "访客 IP",
+      "ipPlaceholder": "例如 203.0.113.10",
+      "ipRequired": "请填写 IP",
+      "ipInvalid": "IP 格式不正确",
+      "durationLabel": "时长",
+      "durationRequired": "请选择时长"
+    },
+    "duration": {
+      "1d": "1 天",
+      "3d": "3 天",
+      "7d": "7 天",
+      "30d": "30 天",
+      "6m": "6 个月",
+      "1y": "1 年",
+      "3y": "3 年"
+    }
+  },
   "widgetLanguage": {
     "title": "语言",
     "adminOnlyHint": "仅管理员可配置",
@@ -1057,6 +1087,8 @@
     "identityRequiredDetail": "该站点已启用预聊天表单，请提供 name 或 email 至少一个。",
     "originNotAllowedTitle": "来源域名不允许",
     "originNotAllowedDetail": "请联系站点管理员把当前域名加入 allowlist。",
+    "bannedCustomerTitle": "访问已被阻止",
+    "bannedCustomerDetail": "你的 IP 地址不允许使用该聊天。",
     "invalidResponseTitle": "服务响应异常",
     "invalidResponseDetail": "服务返回格式不符合预期。",
     "requestFailed": "请求失败",

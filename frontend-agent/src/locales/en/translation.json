@@ -902,6 +902,36 @@
       }
     }
   },
+  "bannedCustomers": {
+    "title": "Banned customers",
+    "subtitle": "Block specific visitor IP addresses from using the widget.",
+    "adminOnlyHint": "Admin only",
+    "selectSite": "Site",
+    "empty": "You haven't banned any customers yet",
+    "banCustomer": "Ban customer",
+    "table": {
+      "ip": "Customer IP",
+      "expires": "Banned until"
+    },
+    "modal": {
+      "title": "Ban customer",
+      "ipLabel": "Customer IP",
+      "ipPlaceholder": "e.g. 203.0.113.10",
+      "ipRequired": "IP is required",
+      "ipInvalid": "Invalid IP",
+      "durationLabel": "Duration",
+      "durationRequired": "Duration is required"
+    },
+    "duration": {
+      "1d": "1 day",
+      "3d": "3 days",
+      "7d": "7 days",
+      "30d": "30 days",
+      "6m": "6 months",
+      "1y": "1 year",
+      "3y": "3 years"
+    }
+  },
   "widgetLanguage": {
     "title": "Language",
     "adminOnlyHint": "Admin only",
@@ -1061,6 +1091,8 @@
     "identityRequiredDetail": "This site uses a pre-chat form. Please provide at least name or email.",
     "originNotAllowedTitle": "Origin not allowed",
     "originNotAllowedDetail": "Please ask the site admin to add current domain to allowlist.",
+    "bannedCustomerTitle": "Access blocked",
+    "bannedCustomerDetail": "You are not allowed to use this chat from your IP address.",
     "invalidResponseTitle": "Invalid server response",
     "invalidResponseDetail": "Server returned an unexpected format.",
     "requestFailed": "Request failed",

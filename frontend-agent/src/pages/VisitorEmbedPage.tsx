@@ -415,6 +415,7 @@ function formatPublicError(
     if (c === "missing_site_key") return { title: t("visitorEmbed.missingSiteKey"), detail: t("visitorEmbed.missingSiteKeyDetail") };
     if (c === "identity_required") return { title: t("visitorEmbed.identityRequiredTitle"), detail: t("visitorEmbed.identityRequiredDetail") };
     if (c === "origin_not_allowed") return { title: t("visitorEmbed.originNotAllowedTitle"), detail: t("visitorEmbed.originNotAllowedDetail") };
+    if (c === "banned_customer") return { title: t("visitorEmbed.bannedCustomerTitle"), detail: t("visitorEmbed.bannedCustomerDetail") };
     if (c === "invalid_response") return { title: t("visitorEmbed.invalidResponseTitle"), detail: t("visitorEmbed.invalidResponseDetail") };
     if (c === "bootstrap_failed") return { title: t("visitorEmbed.bootstrapFailed") };
     if (c === "create_failed") return { title: t("visitorEmbed.createFailed") };
@@ -1770,6 +1771,18 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
             },
             onEvent: (e: WsInboundEvent) => {
                 if (!e || typeof e !== "object") return;
+                if (e.type === "ERROR") {
+                    const r = asRecord(e);
+                    const code = typeof r?.code === "string" ? r.code : "";
+                    if (code) {
+                        setError(code);
+                        if (code === "banned_customer") {
+                            wsRef.current?.close();
+                            wsRef.current = null;
+                        }
+                    }
+                    return;
+                }
                 if (e.type === "MSG") {
                     if (isMessageItem(e.msg)) addMessages([e.msg], "live");
                     return;

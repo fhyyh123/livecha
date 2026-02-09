@@ -2,9 +2,11 @@ package com.chatlive.support.widget.service;
 
 import com.chatlive.support.auth.service.jwt.JwtService;
 import com.chatlive.support.common.geo.VisitorGeoUpdater;
+import com.chatlive.support.common.geo.ClientIpResolver;
 import com.chatlive.support.widget.api.WidgetBootstrapRequest;
 import com.chatlive.support.widget.api.WidgetBootstrapResponse;
 import com.chatlive.support.widget.api.WidgetConfigDto;
+import com.chatlive.support.widget.repo.SiteBannedCustomerRepository;
 import com.chatlive.support.widget.repo.SiteDomainAllowlistRepository;
 import com.chatlive.support.widget.repo.SiteRepository;
 import com.chatlive.support.widget.repo.VisitorRepository;
@@ -39,6 +41,7 @@ public class PublicWidgetService {
 
     private final SiteRepository siteRepository;
     private final SiteDomainAllowlistRepository allowlistRepository;
+    private final SiteBannedCustomerRepository bannedCustomerRepository;
     private final WidgetConfigRepository widgetConfigRepository;
     private final VisitorRepository visitorRepository;
     private final VisitorGeoUpdater visitorGeoUpdater;
@@ -49,6 +52,7 @@ public class PublicWidgetService {
     public PublicWidgetService(
             SiteRepository siteRepository,
             SiteDomainAllowlistRepository allowlistRepository,
+            SiteBannedCustomerRepository bannedCustomerRepository,
             WidgetConfigRepository widgetConfigRepository,
             VisitorRepository visitorRepository,
             VisitorGeoUpdater visitorGeoUpdater,
@@ -58,6 +62,7 @@ public class PublicWidgetService {
     ) {
         this.siteRepository = siteRepository;
         this.allowlistRepository = allowlistRepository;
+        this.bannedCustomerRepository = bannedCustomerRepository;
         this.widgetConfigRepository = widgetConfigRepository;
         this.visitorRepository = visitorRepository;
         this.visitorGeoUpdater = visitorGeoUpdater;
@@ -74,6 +79,11 @@ public class PublicWidgetService {
 
         if (!"active".equals(site.status())) {
             throw new IllegalArgumentException("site_disabled");
+        }
+
+        var ip = ClientIpResolver.resolve(request);
+        if (ip != null && !ip.isBlank() && bannedCustomerRepository.isBannedNow(site.id(), ip.trim().toLowerCase())) {
+            throw new IllegalArgumentException("banned_customer");
         }
 
         if (site.allowlistEnabled() && !allowlistRepository.isAllowed(site.id(), host)) {
@@ -179,6 +189,28 @@ public class PublicWidgetService {
                 site.id(),
                 config
         );
+    }
+
+    /**
+     * Lightweight check for the launcher (host page) so it can decide whether to render.
+     * This must be safe to call from arbitrary origins and should not throw.
+     */
+    public boolean isBannedNow(HttpServletRequest request, String siteKey) {
+        try {
+            if (siteKey == null || siteKey.isBlank()) return false;
+
+            var site = siteRepository.findByPublicKey(siteKey)
+                    .orElse(null);
+            if (site == null) return false;
+            if (!"active".equals(site.status())) return false;
+
+            var ip = ClientIpResolver.resolve(request);
+            if (ip == null || ip.isBlank()) return false;
+
+            return bannedCustomerRepository.isBannedNow(site.id(), ip.trim().toLowerCase());
+        } catch (Exception ignore) {
+            return false;
+        }
     }
 
     private static String extractHost(String origin) {

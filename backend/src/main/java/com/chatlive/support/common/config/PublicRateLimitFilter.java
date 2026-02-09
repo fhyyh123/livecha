@@ -24,6 +24,7 @@ public class PublicRateLimitFilter extends OncePerRequestFilter {
 
     // Keep limits conservative for demo; tighten later with config.
     private static final int LIMIT_BOOTSTRAP_PER_MINUTE = 60;
+    private static final int LIMIT_WIDGET_CHECK_PER_MINUTE = 120;
     private static final int LIMIT_CREATE_CONV_PER_MINUTE = 20;
     private static final int LIMIT_SEND_MSG_PER_MINUTE = 60;
     private static final int LIMIT_LIST_MSG_PER_MINUTE = 120;
@@ -56,6 +57,9 @@ public class PublicRateLimitFilter extends OncePerRequestFilter {
         if ("/api/v1/public/widget/bootstrap".equals(path)) {
             limit = LIMIT_BOOTSTRAP_PER_MINUTE;
             bucket = "bootstrap";
+        } else if ("/api/v1/public/widget/check".equals(path)) {
+            limit = LIMIT_WIDGET_CHECK_PER_MINUTE;
+            bucket = "widget_check";
         } else if ("POST".equals(method) && "/api/v1/public/conversations".equals(path)) {
             limit = LIMIT_CREATE_CONV_PER_MINUTE;
             bucket = "create_conv";
@@ -81,7 +85,7 @@ public class PublicRateLimitFilter extends OncePerRequestFilter {
     private String buildKey(String bucket, HttpServletRequest request) {
         var ip = extractClientIp(request);
 
-        if ("bootstrap".equals(bucket)) {
+        if ("bootstrap".equals(bucket) || "widget_check".equals(bucket)) {
             var siteKey = Optional.ofNullable(request.getParameter("site_key")).orElse("");
             return bucket + ":" + siteKey + ":" + ip;
         }
