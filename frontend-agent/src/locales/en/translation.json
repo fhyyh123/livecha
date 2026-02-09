@@ -860,6 +860,32 @@
       "showAgentPhoto": "Show agent photo"
     }
   },
+  "widgetWelcome": {
+    "title": "Welcome screen",
+    "adminOnlyHint": "Admin only",
+    "setupForSite": "Setup for site",
+    "setupForGroup": "Setup for group",
+    "selectSite": "Select a site",
+    "allGroups": "All groups",
+    "groupActiveHint": "Editing group: {{name}}",
+    "sections": {
+      "customizeHeader": "Customize header",
+      "manageContent": "Manage content",
+      "changeSettings": "Change settings"
+    },
+    "showLogo": "Show logo",
+    "uploadLogo": "Upload logo",
+    "logoHint": "Recommended: square image (PNG/JPG/WebP/GIF)",
+    "welcomeText": "Welcome text",
+    "welcomeTextPlaceholder": "e.g. Welcome! Text us",
+    "showWelcomeScreen": "Show welcome screen",
+    "showWelcomeScreenHint": "When enabled, visitors will see a Home tab before chat.",
+    "preview": {
+      "title": "Preview",
+      "reload": "Reload",
+      "fakePage": "Your website (preview)"
+    }
+  },
   "trustedDomains": {
     "title": "Trusted domains",
     "subtitle": "Protect your widget from being added to unauthorized sites by creating a list of trusted domains.",
@@ -1107,6 +1133,14 @@
     "nameOptional": "name (optional)",
     "emailOptional": "email (optional)",
     "startConversation": "Start conversation",
+    "welcome": {
+      "defaultTitle": "Welcome!\nText us",
+      "backToChat": "Back to chat",
+      "backHint": "Tap to continue",
+      "agentFallback": "Support",
+      "home": "Home",
+      "chat": "Chat"
+    },
     "leaveContactTitle": "Leave contact (optional)",
     "leaveContactOk": "Submit and close",
     "leaveContactCancel": "Skip and close",

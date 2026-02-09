@@ -38,6 +38,7 @@ const TrustedDomainsPage = lazy(() => import("./pages/TrustedDomainsPage").then(
 const BannedCustomersPage = lazy(() => import("./pages/BannedCustomersPage").then((m) => ({ default: m.BannedCustomersPage })));
 const WidgetCustomizePage = lazy(() => import("./pages/WidgetCustomizePage").then((m) => ({ default: m.WidgetCustomizePage })));
 const WidgetLanguagePage = lazy(() => import("./pages/WidgetLanguagePage.tsx").then((m) => ({ default: m.WidgetLanguagePage })));
+const WidgetWelcomePage = lazy(() => import("./pages/WidgetWelcomePage").then((m) => ({ default: m.WidgetWelcomePage })));
 const PreChatFormPage = lazy(() => import("./pages/PreChatFormPage").then((m) => ({ default: m.PreChatFormPage })));
 const AskForEmailPage = lazy(() => import("./pages/AskForEmailPage").then((m) => ({ default: m.AskForEmailPage })));
 const PostChatFormPage = lazy(() => import("./pages/PostChatFormPage").then((m) => ({ default: m.PostChatFormPage })));
@@ -388,6 +389,14 @@ function App() {
                 element={
                   <Suspense fallback={<RouteFallback />}>
                     <WidgetLanguagePage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/settings/widget/welcome"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <WidgetWelcomePage />
                   </Suspense>
                 }
               />

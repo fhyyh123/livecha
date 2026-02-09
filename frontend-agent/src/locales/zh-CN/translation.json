@@ -856,6 +856,32 @@
       "showAgentPhoto": "显示经纪人照片"
     }
   },
+  "widgetWelcome": {
+    "title": "欢迎屏幕",
+    "adminOnlyHint": "仅管理员可操作",
+    "setupForSite": "为站点设置",
+    "setupForGroup": "为分组设置",
+    "selectSite": "选择一个站点",
+    "allGroups": "全部分组",
+    "groupActiveHint": "正在编辑分组：{{name}}",
+    "sections": {
+      "customizeHeader": "自定义标题栏",
+      "manageContent": "管理内容",
+      "changeSettings": "更改设置"
+    },
+    "showLogo": "显示徽标",
+    "uploadLogo": "上传徽标",
+    "logoHint": "建议：方形图片（PNG/JPG/WebP/GIF）",
+    "welcomeText": "欢迎语",
+    "welcomeTextPlaceholder": "例如：欢迎！给我们发消息",
+    "showWelcomeScreen": "显示欢迎屏幕",
+    "showWelcomeScreenHint": "开启后，访客会先看到 Home 页签，再进入聊天。",
+    "preview": {
+      "title": "预览",
+      "reload": "重新加载",
+      "fakePage": "网站页面（预览）"
+    }
+  },
   "trustedDomains": {
     "title": "受信任的域名",
     "subtitle": "通过创建受信任域名列表，防止小部件被未授权的网站加载。",
@@ -1103,6 +1129,14 @@
     "nameOptional": "name（可选）",
     "emailOptional": "email（可选）",
     "startConversation": "开始对话",
+    "welcome": {
+      "defaultTitle": "欢迎！\n给我们发消息",
+      "backToChat": "返回聊天",
+      "backHint": "点击继续",
+      "agentFallback": "客服",
+      "home": "主页",
+      "chat": "聊天"
+    },
     "leaveContactTitle": "留下联系方式（可选）",
     "leaveContactOk": "提交并关闭",
     "leaveContactCancel": "跳过并关闭",

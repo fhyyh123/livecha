@@ -5,6 +5,7 @@ public record WidgetConfigDto(
         String pre_chat_fields_json,
         String theme_color,
         String welcome_text,
+        Boolean show_welcome_screen,
         String cookie_domain,
         String cookie_samesite,
         String widget_language,

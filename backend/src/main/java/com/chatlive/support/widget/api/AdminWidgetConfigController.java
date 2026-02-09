@@ -37,6 +37,7 @@ public class AdminWidgetConfigController {
     private static final int DEFAULT_OFFSET_X = 20;
     private static final int DEFAULT_OFFSET_Y = 20;
     private static final boolean DEFAULT_DEBUG = false;
+    private static final boolean DEFAULT_SHOW_WELCOME_SCREEN = true;
 
     private final JwtService jwtService;
     private final SiteRepository siteRepository;
@@ -74,6 +75,7 @@ public class AdminWidgetConfigController {
                 null,
                 null,
                 null,
+                DEFAULT_SHOW_WELCOME_SCREEN,
                 null,
                 null,
                 "en",
@@ -112,6 +114,7 @@ public class AdminWidgetConfigController {
                 row.preChatFieldsJson(),
                 row.themeColor(),
                 row.welcomeText(),
+                Boolean.TRUE.equals(row.showWelcomeScreen()),
                 row.cookieDomain(),
                 row.cookieSameSite(),
                 row.widgetLanguage(),
@@ -176,10 +179,15 @@ public class AdminWidgetConfigController {
         var site = siteRepository.findById(claims.tenantId(), siteId)
                 .orElseThrow(() -> new IllegalArgumentException("site_not_found"));
 
+        var existing = widgetConfigRepository.findBySiteId(site.id()).orElse(null);
+
             var preChatEnabled = req != null && req.pre_chat_enabled();
         var preChatFieldsJson = emptyToNull(req == null ? null : req.pre_chat_fields_json());
         var themeColor = emptyToNull(req == null ? null : req.theme_color());
         var welcomeText = emptyToNull(req == null ? null : req.welcome_text());
+        var showWelcomeScreen = req != null && req.show_welcome_screen() != null
+                ? req.show_welcome_screen()
+                : (existing == null ? DEFAULT_SHOW_WELCOME_SCREEN : Boolean.TRUE.equals(existing.showWelcomeScreen()));
         var cookieDomain = emptyToNull(req == null ? null : req.cookie_domain());
         var cookieSameSite = normalizeSameSite(req == null ? null : req.cookie_samesite());
 
@@ -219,6 +227,7 @@ public class AdminWidgetConfigController {
         preChatFieldsJson,
                 themeColor,
                 welcomeText,
+            showWelcomeScreen,
                 cookieDomain,
             cookieSameSite,
             widgetLanguage,
@@ -257,6 +266,7 @@ public class AdminWidgetConfigController {
                 null,
                 null,
                 null,
+                DEFAULT_SHOW_WELCOME_SCREEN,
                 null,
                 null,
                 "en",
@@ -295,6 +305,7 @@ public class AdminWidgetConfigController {
                 row.preChatFieldsJson(),
                 row.themeColor(),
                 row.welcomeText(),
+                Boolean.TRUE.equals(row.showWelcomeScreen()),
                 row.cookieDomain(),
                 row.cookieSameSite(),
                 row.widgetLanguage(),

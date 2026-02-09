@@ -106,6 +106,9 @@
     siteKey: "",
     embedUrl: "",
     origin: null,
+    // Optional: route conversations and per-group widget settings.
+    // Must be a skill_group.id (e.g. "sg_...")
+    skillGroupId: null,
     // visitor_id persistence hints (optional): forwarded to iframe as query params.
     // - cookieDomain: e.g. ".example.com" (cross-subdomain)
     // - cookieSameSite: "Lax" | "Strict" | "None"
@@ -154,6 +157,7 @@
     widgetLanguage: null,
     widgetPhrasesJson: null,
     welcomeText: null,
+    showWelcomeScreen: null,
   };
 
   var PM_CHANNEL = "chatlive.widget";
@@ -486,13 +490,16 @@
       // Launcher avatar option
       if (typeof ws.show_agent_photo === "boolean") out.showAgentPhoto = ws.show_agent_photo;
 
+      // Welcome screen toggle
+      if (typeof ws.show_welcome_screen === "boolean") out.showWelcomeScreen = ws.show_welcome_screen;
+
       return out;
     } catch (e) {
       return null;
     }
   }
 
-  function prefetchBootstrapConfig(siteKey, origin, baseOverride) {
+  function prefetchBootstrapConfig(siteKey, origin, baseOverride, skillGroupId) {
     return new Promise(function (resolve) {
       try {
         // Use the widget script origin as the API origin.
@@ -528,7 +535,11 @@
           credentials: "omit",
           cache: "no-store",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ site_key: String(siteKey || ""), origin: String(origin || "") }),
+          body: JSON.stringify({
+            site_key: String(siteKey || ""),
+            origin: String(origin || ""),
+            skill_group_id: skillGroupId ? String(skillGroupId) : null,
+          }),
         })
           .then(function (r) {
             if (!r || !r.ok) return null;
@@ -791,6 +802,8 @@
     if (config.cookieDomain) qs += "&cookie_domain=" + encodeURIComponent(String(config.cookieDomain));
     var ss = normalizeSameSite(config.cookieSameSite);
     if (ss) qs += "&cookie_samesite=" + encodeURIComponent(ss);
+
+    if (config.skillGroupId) qs += "&skill_group_id=" + encodeURIComponent(String(config.skillGroupId));
 
     // Keep query clean if embedUrl already has '?' (allow future extensions)
     return config.embedUrl + (config.embedUrl.indexOf("?") >= 0 ? "&" : "?") + qs;
@@ -1377,6 +1390,7 @@
       postToIframe(MSG.HOST_INIT, {
         open: !!state.open,
         themeColor: state.config.themeColor || null,
+        skillGroupId: state.config.skillGroupId || null,
         themeMode: state.config.themeMode || "light",
         colorSettingsMode: state.config.colorSettingsMode || "theme",
         colorOverridesJson: state.config.colorOverridesJson || null,
@@ -1385,6 +1399,7 @@
         widgetLanguage: state.config.widgetLanguage || null,
         widgetPhrasesJson: state.config.widgetPhrasesJson || null,
         welcomeText: state.config.welcomeText || null,
+        showWelcomeScreen: typeof state.config.showWelcomeScreen === "boolean" ? state.config.showWelcomeScreen : null,
         page: getPageInfo(),
       });
       postHostVisibility();
@@ -1669,6 +1684,7 @@
       postToIframe(MSG.HOST_INIT, {
         open: !!state.open,
         themeColor: state.config.themeColor || null,
+        skillGroupId: state.config.skillGroupId || null,
         themeMode: state.config.themeMode || "light",
         colorSettingsMode: state.config.colorSettingsMode || "theme",
         colorOverridesJson: state.config.colorOverridesJson || null,
@@ -1677,6 +1693,7 @@
         widgetLanguage: state.config.widgetLanguage || null,
         widgetPhrasesJson: state.config.widgetPhrasesJson || null,
         welcomeText: state.config.welcomeText || null,
+        showWelcomeScreen: typeof state.config.showWelcomeScreen === "boolean" ? state.config.showWelcomeScreen : null,
         page: getPageInfo(),
       });
       return;
@@ -1769,7 +1786,7 @@
             state.prefetchTimeoutId = null;
           }
 
-          prefetchBootstrapConfig(seed.siteKey, computeOrigin(seed), apiBase)
+          prefetchBootstrapConfig(seed.siteKey, computeOrigin(seed), apiBase, seed.skillGroupId)
             .then(function (patch) {
               // If we already rendered a fallback due to timeout, don't apply late patches
               // to avoid a visible style switch.
@@ -2432,6 +2449,7 @@
       siteKey: siteKey,
       embedUrl: embedUrl,
       origin: el.dataset.chatliveOrigin || null,
+      skillGroupId: el.dataset.chatliveSkillGroupId || undefined,
       cookieDomain: el.dataset.chatliveCookieDomain || undefined,
       cookieSameSite: normalizeSameSite(el.dataset.chatliveCookieSamesite) || undefined,
       position: el.dataset.chatlivePosition || undefined,

@@ -1,7 +1,7 @@
 import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, ConfigProvider, Image, Input, Modal, Popover, Select, Tooltip } from "antd";
 import type { TextAreaRef } from "antd/es/input/TextArea";
-import { ArrowUpOutlined, FileAddOutlined, LeftOutlined, MinusOutlined, PlusOutlined, ScanOutlined, SmileOutlined } from "@ant-design/icons";
+import { ArrowUpOutlined, FileAddOutlined, HomeOutlined, LeftOutlined, MessageOutlined, MinusOutlined, PlusOutlined, ScanOutlined, SmileOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 
 import { WsClient, type WsInboundEvent, type WsStatus } from "../ws/wsClient";
@@ -87,6 +87,7 @@ type WidgetConfig = {
     color_settings_mode?: string | null;
     color_overrides_json?: string | null;
     welcome_text?: string | null;
+    show_welcome_screen?: boolean | null;
     cookie_domain?: string | null;
     cookie_samesite?: string | null;
     widget_language?: string | null;
@@ -527,8 +528,29 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
     const pendingPageViewsRef = useRef<HostPageViewPayload[]>([]);
     const hostInitThemeColorRef = useRef<string | null>(null);
 
-    const hostOverridesRef = useRef<{ widgetLanguage?: "en" | "zh-CN"; widgetPhrasesJson?: string | null; welcomeText?: string | null }>({});
+    const hostOverridesRef = useRef<{
+        widgetLanguage?: "en" | "zh-CN";
+        widgetPhrasesJson?: string | null;
+        welcomeText?: string | null;
+        showWelcomeScreen?: boolean | null;
+    }>({});
     const [hostWelcomeOverride, setHostWelcomeOverride] = useState<string | null>(null);
+    const [hostShowWelcomeScreenOverride, setHostShowWelcomeScreenOverride] = useState<boolean | null>(null);
+    const [hostSkillGroupId, setHostSkillGroupId] = useState<string | null>(null);
+
+    const skillGroupIdFromQuery = useMemo(() => {
+        try {
+            const u = new URL(window.location.href);
+            const v = u.searchParams.get("skill_group_id") || "";
+            const t = v.trim();
+            return t ? t : null;
+        } catch {
+            return null;
+        }
+    }, []);
+
+    const [activeScreen, setActiveScreen] = useState<"home" | "chat">("chat");
+    const didInitWelcomeScreenRef = useRef(false);
 
     // In some cross-origin iframe contexts, iframe document visibility/focus can be unreliable.
     // Host page (widget.js) can optionally send HOST_VISIBILITY so we can decide read receipts correctly.
@@ -1034,7 +1056,9 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
 
     function postToHost(type: string, payload?: unknown) {
         if (window === window.parent) return;
-        const targetOrigin = allowedParentOrigin || "*";
+        // In preview mode, the parent is the admin app, but `origin` query param may be
+        // a trusted-domain allowlist origin; using it as targetOrigin would drop messages.
+        const targetOrigin = isHostPreview ? "*" : (allowedParentOrigin || "*");
         try {
             window.parent.postMessage(
                 {
@@ -1175,7 +1199,12 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
 
     // postMessage bridge: listen host commands.
     useEffect(() => {
-        const applyHostOverrides = (ov: { widgetLanguage?: "en" | "zh-CN"; widgetPhrasesJson?: string | null; welcomeText?: string | null }) => {
+        const applyHostOverrides = (ov: {
+            widgetLanguage?: "en" | "zh-CN";
+            widgetPhrasesJson?: string | null;
+            welcomeText?: string | null;
+            showWelcomeScreen?: boolean | null;
+        }) => {
             if (!isHostPreview) return;
             try {
                 const nextLang = normalizeWidgetLanguage(ov.widgetLanguage);
@@ -1190,6 +1219,16 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
             try {
                 const wt = typeof ov.welcomeText === "string" ? ov.welcomeText.trim() : "";
                 setHostWelcomeOverride(wt ? wt : null);
+            } catch {
+                // ignore
+            }
+
+            try {
+                if (typeof ov.showWelcomeScreen === "boolean") {
+                    setHostShowWelcomeScreenOverride(ov.showWelcomeScreen);
+                } else if (ov.showWelcomeScreen === null) {
+                    setHostShowWelcomeScreenOverride(null);
+                }
             } catch {
                 // ignore
             }
@@ -1218,6 +1257,15 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                 if (typeof payloadRec?.colorSettingsMode === "string") setHostColorSettingsMode(payloadRec.colorSettingsMode);
                 if (typeof payloadRec?.colorOverridesJson === "string") setHostColorOverridesJson(payloadRec.colorOverridesJson);
 
+                if (typeof payloadRec?.showWelcomeScreen === "boolean") setHostShowWelcomeScreenOverride(payloadRec.showWelcomeScreen);
+
+                if (typeof payloadRec?.skillGroupId === "string") {
+                    const t = payloadRec.skillGroupId.trim();
+                    setHostSkillGroupId(t ? t : null);
+                } else if (payloadRec?.skillGroupId === null) {
+                    setHostSkillGroupId(null);
+                }
+
                 const pv = normalizePageViewPayload(payloadRec?.page);
                 if (pv) enqueuePageView(pv);
 
@@ -1225,7 +1273,8 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                     const widgetLanguage = normalizeWidgetLanguage(payloadRec?.widgetLanguage ?? payloadRec?.widget_language);
                     const widgetPhrasesJson = typeof payloadRec?.widgetPhrasesJson === "string" ? payloadRec.widgetPhrasesJson : null;
                     const welcomeText = typeof payloadRec?.welcomeText === "string" ? payloadRec.welcomeText : null;
-                    const ov = { widgetLanguage, widgetPhrasesJson, welcomeText };
+                    const showWelcomeScreen = typeof payloadRec?.showWelcomeScreen === "boolean" ? payloadRec.showWelcomeScreen : null;
+                    const ov = { widgetLanguage, widgetPhrasesJson, welcomeText, showWelcomeScreen };
                     hostOverridesRef.current = ov;
                     applyHostOverrides(ov);
                 }
@@ -1287,6 +1336,24 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const effectiveShowWelcomeScreen = useMemo(() => {
+        if (typeof hostShowWelcomeScreenOverride === "boolean") return hostShowWelcomeScreenOverride;
+        const v = bootstrap?.widget_config?.show_welcome_screen;
+        if (typeof v === "boolean") return v;
+        return true;
+    }, [bootstrap?.widget_config?.show_welcome_screen, hostShowWelcomeScreenOverride]);
+
+    useEffect(() => {
+        if (!effectiveShowWelcomeScreen) {
+            setActiveScreen("chat");
+            didInitWelcomeScreenRef.current = false;
+            return;
+        }
+        if (didInitWelcomeScreenRef.current) return;
+        didInitWelcomeScreenRef.current = true;
+        setActiveScreen("home");
+    }, [effectiveShowWelcomeScreen]);
 
     // Dynamic height reporting.
     useEffect(() => {
@@ -1445,6 +1512,7 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                     body: JSON.stringify({
                         channel: "web",
                         subject: "",
+                                                skill_group_id: (hostSkillGroupId || skillGroupIdFromQuery) || undefined,
                         name: reqName || undefined,
                         email: reqEmail || undefined,
                         pre_chat_fields,
@@ -2101,6 +2169,27 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
     }
 
     const isPreChatScreen = preChatEnabled && !conversation?.conversation_id;
+    const isWelcomeHome = effectiveShowWelcomeScreen && activeScreen === "home";
+
+    function hexToRgba(hex: string, alpha: number): string {
+        const h = String(hex || "").trim();
+        const m = /^#?([0-9a-f]{6})$/i.exec(h);
+        if (!m) return `rgba(0,0,0,${Math.max(0, Math.min(1, alpha))})`;
+        const n = parseInt(m[1], 16);
+        const r = (n >> 16) & 255;
+        const g = (n >> 8) & 255;
+        const b = n & 255;
+        const a = Math.max(0, Math.min(1, alpha));
+        return `rgba(${r},${g},${b},${a})`;
+    }
+
+    const welcomeBg = useMemo(() => {
+        const a1 = effectiveThemeMode === "dark" ? 0.28 : 0.18;
+        const a2 = effectiveThemeMode === "dark" ? 0.22 : 0.12;
+        const c1 = hexToRgba(uiPrimary, a1);
+        const c2 = hexToRgba(uiPrimary, a2);
+        return `radial-gradient(120% 80% at 15% 10%, ${c1} 0%, rgba(0,0,0,0) 55%), radial-gradient(120% 80% at 85% 15%, ${c2} 0%, rgba(0,0,0,0) 60%), ${uiChatBg}`;
+    }, [effectiveThemeMode, uiChatBg, uiPrimary]);
 
     return (
         <ConfigProvider
@@ -2141,109 +2230,159 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                         border: `1px solid ${uiBorder}`,
                         margin: 0,
                         minHeight: 0,
+                        position: "relative",
                     }}
                 >
-                    {/* Header */}
-                    <div
-                        style={{
-                            flex: "0 0 auto",
-                            position: "relative",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            padding: "12px 10px",
-                            background: uiChatBg,
-                        }}
-                    >
-                        <div style={{ position: "absolute", left: 10, display: "flex", alignItems: "center" }}>
-                            <Button
-                                type="text"
-                                size="small"
-                                icon={<LeftOutlined />}
-                                aria-label={t("visitorEmbed.backAria")}
-                                style={{ width: 32, height: 32 }}
-                                onClick={() => {
-                                    // In embedded mode, this behaves like minimize.
-                                    if (window !== window.parent) {
+                    {/* Welcome screen: no title bar, only a minimize button */}
+                    {isWelcomeHome && window !== window.parent ? (
+                        <div style={{ position: "absolute", top: 10, right: 10, zIndex: 5 }}>
+                            <Tooltip title={t("visitorEmbed.minimize")}>
+                                <Button
+                                    size="small"
+                                    type="text"
+                                    aria-label={t("visitorEmbed.minimizeAria")}
+                                    icon={<MinusOutlined />}
+                                    style={{ width: 32, height: 32 }}
+                                    onClick={() => {
                                         if (shouldAskIdentityOnClose()) {
-                                            pendingCloseReasonRef.current = "back";
+                                            pendingCloseReasonRef.current = "minimize";
                                             setIdentityModalOpen(true);
                                         } else {
-                                            postToHost(MSG.WIDGET_REQUEST_CLOSE, { reason: "back" });
+                                            postToHost(MSG.WIDGET_REQUEST_CLOSE, { reason: "minimize" });
                                         }
-                                    }
-                                }}
-                            />
+                                    }}
+                                />
+                            </Tooltip>
                         </div>
+                    ) : null}
 
-                        <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
-                            <div
-                                style={{
-                                    maxWidth: "92%",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 8,
-                                    padding: "6px 12px",
-                                    borderRadius: 999,
-                                    background: uiPanelBg,
-                                    border: `1px solid ${uiBorder}`,
-                                    boxShadow: "0 10px 20px rgba(0,0,0,.08)",
-                                }}
-                            >
-                                <div
-                                    aria-hidden
-                                    style={{ width: 28, height: 28, flex: "0 0 auto" }}
-                                >
-                                    {bootstrap?.widget_config?.show_logo && bootstrap?.widget_config?.logo_url ? (
-                                        <img
-                                            alt=""
-                                            src={String(bootstrap.widget_config.logo_url || "")}
-                                            style={{ width: 28, height: 28, borderRadius: 10, objectFit: "cover", display: "block" }}
-                                        />
-                                    ) : (
-                                        <div style={{ width: 28, height: 28, borderRadius: 10, background: uiPrimary }} />
-                                    )}
-                                </div>
-                                <div style={{ minWidth: 0, display: "flex", flexDirection: "column", lineHeight: 1.1, textAlign: "center" }}>
-                                    <div style={{ fontWeight: 800, color: uiTextMain, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                        {headerTitle}
-                                    </div>
-                                    {!hostOpen && unread ? (
-                                        <div style={{ fontSize: 12, color: uiTextMuted, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                                            <span style={{ color: "#ef4444", fontWeight: 700 }}>{t("visitorEmbed.unread", { count: unread })}</span>
-                                            {peerTyping ? <span style={{ color: "#7c3aed", fontWeight: 600 }}>{t("visitorEmbed.typing")}</span> : null}
-                                        </div>
-                                    ) : peerTyping ? (
-                                        <div style={{ fontSize: 12, color: uiTextMuted, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                                            <span style={{ color: "#7c3aed", fontWeight: 600 }}>{t("visitorEmbed.typing")}</span>
-                                        </div>
-                                    ) : null}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style={{ position: "absolute", right: 10, display: "flex", alignItems: "center", gap: 4 }}>
-                            {window !== window.parent ? (
-                                <Tooltip title={t("visitorEmbed.minimize")}>
+                    {/* Header (chat mode) */}
+                    {!isWelcomeHome ? (
+                        <div
+                            style={{
+                                flex: "0 0 auto",
+                                position: "relative",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                padding: "12px 10px",
+                                background: uiChatBg,
+                            }}
+                        >
+                            {effectiveShowWelcomeScreen && activeScreen === "chat" ? (
+                                <div style={{ position: "absolute", left: 10, display: "flex", alignItems: "center" }}>
                                     <Button
-                                        size="small"
                                         type="text"
-                                        aria-label={t("visitorEmbed.minimizeAria")}
-                                        icon={<MinusOutlined />}
+                                        size="small"
+                                        icon={<LeftOutlined />}
+                                        aria-label={t("visitorEmbed.backAria")}
                                         style={{ width: 32, height: 32 }}
                                         onClick={() => {
-                                            if (shouldAskIdentityOnClose()) {
-                                                pendingCloseReasonRef.current = "minimize";
-                                                setIdentityModalOpen(true);
-                                            } else {
-                                                postToHost(MSG.WIDGET_REQUEST_CLOSE, { reason: "minimize" });
-                                            }
+                                            setActiveScreen("home");
                                         }}
                                     />
-                                </Tooltip>
+                                </div>
                             ) : null}
+
+                            <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
+                                <div
+                                    style={{
+                                        maxWidth: "92%",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 8,
+                                        padding: "6px 12px",
+                                        borderRadius: 999,
+                                        background: uiPanelBg,
+                                        border: `1px solid ${uiBorder}`,
+                                        boxShadow: "0 10px 20px rgba(0,0,0,.08)",
+                                    }}
+                                >
+                                    <div aria-hidden style={{ width: 28, height: 28, flex: "0 0 auto" }}>
+                                        {bootstrap?.widget_config?.show_logo ? (
+                                            bootstrap?.widget_config?.logo_url ? (
+                                                <img
+                                                    alt=""
+                                                    src={String(bootstrap.widget_config.logo_url || "")}
+                                                    style={{ width: 28, height: 28, borderRadius: 10, objectFit: "cover", display: "block" }}
+                                                />
+                                            ) : (
+                                                <img
+                                                    alt=""
+                                                    src="/window.png"
+                                                    style={{ width: 28, height: 28, borderRadius: 10, objectFit: "cover", display: "block" }}
+                                                />
+                                            )
+                                        ) : null}
+                                    </div>
+                                    <div style={{ minWidth: 0, display: "flex", flexDirection: "column", lineHeight: 1.1, textAlign: "center" }}>
+                                        <div
+                                            style={{
+                                                fontWeight: 800,
+                                                color: uiTextMain,
+                                                fontSize: 14,
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                            }}
+                                        >
+                                            {headerTitle}
+                                        </div>
+                                        {!hostOpen && unread ? (
+                                            <div
+                                                style={{
+                                                    fontSize: 12,
+                                                    color: uiTextMuted,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    gap: 6,
+                                                }}
+                                            >
+                                                <span style={{ color: "#ef4444", fontWeight: 700 }}>{t("visitorEmbed.unread", { count: unread })}</span>
+                                                {peerTyping ? <span style={{ color: "#7c3aed", fontWeight: 600 }}>{t("visitorEmbed.typing")}</span> : null}
+                                            </div>
+                                        ) : peerTyping ? (
+                                            <div
+                                                style={{
+                                                    fontSize: 12,
+                                                    color: uiTextMuted,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    gap: 6,
+                                                }}
+                                            >
+                                                <span style={{ color: "#7c3aed", fontWeight: 600 }}>{t("visitorEmbed.typing")}</span>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ position: "absolute", right: 10, display: "flex", alignItems: "center", gap: 4 }}>
+                                {window !== window.parent ? (
+                                    <Tooltip title={t("visitorEmbed.minimize")}>
+                                        <Button
+                                            size="small"
+                                            type="text"
+                                            aria-label={t("visitorEmbed.minimizeAria")}
+                                            icon={<MinusOutlined />}
+                                            style={{ width: 32, height: 32 }}
+                                            onClick={() => {
+                                                if (shouldAskIdentityOnClose()) {
+                                                    pendingCloseReasonRef.current = "minimize";
+                                                    setIdentityModalOpen(true);
+                                                } else {
+                                                    postToHost(MSG.WIDGET_REQUEST_CLOSE, { reason: "minimize" });
+                                                }
+                                            }}
+                                        />
+                                    </Tooltip>
+                                ) : null}
+                            </div>
                         </div>
-                    </div>
+                    ) : null}
 
                     {/* Scrollable content */}
                     <div
@@ -2253,8 +2392,8 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                             minHeight: 0,
                             WebkitOverflowScrolling: "touch",
                             overscrollBehavior: "contain",
-                            background: uiChatBg,
-                            padding: "14px 12px",
+                            background: isWelcomeHome ? welcomeBg : uiChatBg,
+                            padding: isWelcomeHome ? 0 : "14px 12px",
                             borderBottomLeftRadius: isPreChatScreen ? 18 : undefined,
                             borderBottomRightRadius: isPreChatScreen ? 18 : undefined,
                         }}
@@ -2278,25 +2417,208 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                             />
                         ) : null}
 
-                        {(hostWelcomeOverride || bootstrap?.widget_config?.welcome_text) ? (
-                            <div style={{ display: "flex", justifyContent: "center", margin: "10px 0 14px" }}>
+                        {effectiveShowWelcomeScreen && activeScreen === "home" ? (
+                            <div
+                                style={{
+                                    minHeight: "100%",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    padding: "18px 16px 14px",
+                                    boxSizing: "border-box",
+                                }}
+                            >
+                                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+                                    <div aria-hidden style={{ width: 40, height: 40, flex: "0 0 auto" }}>
+                                        {bootstrap?.widget_config?.show_logo ? (
+                                            bootstrap?.widget_config?.logo_url ? (
+                                                <img
+                                                    alt=""
+                                                    src={String(bootstrap.widget_config.logo_url || "")}
+                                                    style={{ width: 40, height: 40, borderRadius: 14, objectFit: "cover", display: "block" }}
+                                                />
+                                            ) : (
+                                                <img
+                                                    alt=""
+                                                    src="/window.png"
+                                                    style={{ width: 40, height: 40, borderRadius: 14, objectFit: "cover", display: "block" }}
+                                                />
+                                            )
+                                        ) : null}
+                                    </div>
+                                </div>
+
                                 <div
                                     style={{
-                                        maxWidth: "92%",
-                                        background: effectiveThemeMode === "dark" ? "rgba(255,255,255,.08)" : "rgba(15,23,42,.06)",
-                                        color: effectiveThemeMode === "dark" ? "rgba(229,231,235,.85)" : "rgba(15,23,42,.7)",
-                                        padding: "8px 12px",
-                                        borderRadius: 999,
-                                        fontSize: 12,
-                                        textAlign: "center",
+                                        fontSize: 40,
+                                        fontWeight: 900,
+                                        color: uiTextMain,
+                                        lineHeight: 1.05,
+                                        whiteSpace: "pre-line",
+                                        marginBottom: 18,
                                     }}
                                 >
-                                    {hostWelcomeOverride || bootstrap?.widget_config?.welcome_text}
+                                    {hostWelcomeOverride || bootstrap?.widget_config?.welcome_text || t("visitorEmbed.welcome.defaultTitle")}
+                                </div>
+
+                                <div style={{ flex: "1 1 auto", display: "flex", justifyContent: "center" }}>
+                                    <div
+                                        style={{
+                                            background: uiPanelBg,
+                                            borderRadius: 18,
+                                            padding: 14,
+                                            border: `1px solid ${uiBorder}`,
+                                            boxShadow: "0 10px 28px rgba(0,0,0,.08)",
+                                            width: "100%",
+                                            maxWidth: 420,
+                                            margin: "0 auto",
+                                        }}
+                                    >
+                                        {conversation?.conversation_id ? (
+                                            <>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                                                    <div
+                                                        style={{
+                                                            width: 44,
+                                                            height: 44,
+                                                            borderRadius: 999,
+                                                            overflow: "hidden",
+                                                            background:
+                                                                effectiveThemeMode === "dark" ? "rgba(255,255,255,.10)" : "rgba(15,23,42,.06)",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            flex: "0 0 auto",
+                                                            color: uiTextMain,
+                                                            fontWeight: 800,
+                                                        }}
+                                                        aria-hidden
+                                                    >
+                                                        {detail?.assigned_agent_avatar_url ? (
+                                                            <img
+                                                                alt=""
+                                                                src={String(detail.assigned_agent_avatar_url)}
+                                                                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                                            />
+                                                        ) : (
+                                                            initials(String(detail?.assigned_agent_display_name || ""))
+                                                        )}
+                                                    </div>
+
+                                                    <div style={{ minWidth: 0, flex: "1 1 auto" }}>
+                                                        <div style={{ fontWeight: 800, color: uiTextMain, fontSize: 13, lineHeight: 1.1, marginBottom: 4 }}>
+                                                            {detail?.assigned_agent_display_name || t("visitorEmbed.welcome.agentFallback")}
+                                                        </div>
+                                                        <div
+                                                            style={{
+                                                                color: uiTextMuted,
+                                                                fontSize: 12,
+                                                                whiteSpace: "nowrap",
+                                                                overflow: "hidden",
+                                                                textOverflow: "ellipsis",
+                                                            }}
+                                                        >
+                                                            {(() => {
+                                                                const last = messages.length ? messages[messages.length - 1] : null;
+                                                                const txt = last?.content?.text ? String(last.content.text) : "";
+                                                                return txt || t("visitorEmbed.welcome.backHint");
+                                                            })()}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <Button type="primary" block onClick={() => setActiveScreen("chat")} disabled={loading}>
+                                                    {t("visitorEmbed.welcome.backToChat")}
+                                                </Button>
+                                            </>
+                                        ) : (
+                                            <Button type="primary" block onClick={() => setActiveScreen("chat")} disabled={loading}>
+                                                {t("visitorEmbed.startConversation")}
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div
+                                    style={{
+                                        position: "sticky",
+                                        bottom: 0,
+                                        paddingTop: 18,
+                                        paddingBottom: 4,
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            background: uiPanelBg,
+                                            borderRadius: 999,
+                                            border: `1px solid ${uiBorder}`,
+                                            padding: 6,
+                                            display: "flex",
+                                            gap: 6,
+                                            boxShadow: "0 10px 28px rgba(0,0,0,.08)",
+                                            width: "100%",
+                                            maxWidth: 420,
+                                            margin: "0 auto",
+                                        }}
+                                    >
+                                        <Button
+                                            type="text"
+                                            style={{
+                                                height: 52,
+                                                flex: 1,
+                                                fontWeight: 700,
+                                                borderRadius: 999,
+                                                background: effectiveThemeMode === "dark" ? "rgba(255,255,255,.08)" : "rgba(15,23,42,.06)",
+                                                padding: 0,
+                                            }}
+                                            onClick={() => setActiveScreen("home")}
+                                        >
+                                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>
+                                                <HomeOutlined style={{ fontSize: 18, lineHeight: 1 }} />
+                                                <div style={{ fontSize: 12, lineHeight: 1.1 }}>{t("visitorEmbed.welcome.home")}</div>
+                                            </div>
+                                        </Button>
+                                        <Button
+                                            type="text"
+                                            style={{
+                                                height: 52,
+                                                flex: 1,
+                                                fontWeight: 700,
+                                                borderRadius: 999,
+                                                background: "transparent",
+                                                padding: 0,
+                                            }}
+                                            onClick={() => setActiveScreen("chat")}
+                                        >
+                                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>
+                                                <MessageOutlined style={{ fontSize: 18, lineHeight: 1 }} />
+                                                <div style={{ fontSize: 12, lineHeight: 1.1 }}>{t("visitorEmbed.welcome.chat")}</div>
+                                            </div>
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                         ) : null}
 
-                        {isPreChatScreen ? (
+                        <div style={{ display: effectiveShowWelcomeScreen && activeScreen === "home" ? "none" : "block" }}>
+                            {!effectiveShowWelcomeScreen && (hostWelcomeOverride || bootstrap?.widget_config?.welcome_text) ? (
+                                <div style={{ display: "flex", justifyContent: "center", margin: "10px 0 14px" }}>
+                                    <div
+                                        style={{
+                                            maxWidth: "92%",
+                                            background: effectiveThemeMode === "dark" ? "rgba(255,255,255,.08)" : "rgba(15,23,42,.06)",
+                                            color: effectiveThemeMode === "dark" ? "rgba(229,231,235,.85)" : "rgba(15,23,42,.7)",
+                                            padding: "8px 12px",
+                                            borderRadius: 999,
+                                            fontSize: 12,
+                                            textAlign: "center",
+                                        }}
+                                    >
+                                        {hostWelcomeOverride || bootstrap?.widget_config?.welcome_text}
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            {isPreChatScreen ? (
                             <div style={{ background: uiPanelBg, borderRadius: 14, padding: 12, border: `1px solid ${uiBorder}`, marginBottom: 12 }}>
                                 <div style={{ color: uiTextMuted, fontSize: 13, marginBottom: 10 }}>
                                     {preChatInfoText || t("visitorEmbed.preChat.defaultInfo")}
@@ -2626,10 +2948,12 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                             </>
                         ) : null}
 
+                        </div>
+
                     </div>
 
                     {/* Bottom composer (pinned) */}
-                    {!isPreChatScreen ? (
+                    {!isPreChatScreen && (!effectiveShowWelcomeScreen || activeScreen === "chat") ? (
                         <div
                             style={{
                                 flex: "0 0 auto",

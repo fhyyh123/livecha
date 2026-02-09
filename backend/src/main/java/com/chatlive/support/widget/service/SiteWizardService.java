@@ -48,6 +48,7 @@ public class SiteWizardService {
                 null,
                 emptyToNull(themeColor),
                 emptyToNull(welcomeText),
+            true,
                 emptyToNull(cookieDomain),
                 emptyToNull(cookieSameSite),
                 "en",

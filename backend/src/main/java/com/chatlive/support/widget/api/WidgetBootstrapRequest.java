@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 public record WidgetBootstrapRequest(
         @NotBlank(message = "site_key_required") String site_key,
         @NotBlank(message = "origin_required") String origin,
-        String visitor_id
+        String visitor_id,
+        String skill_group_id
 ) {
 }

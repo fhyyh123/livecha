@@ -11,6 +11,7 @@ import com.chatlive.support.widget.repo.SiteDomainAllowlistRepository;
 import com.chatlive.support.widget.repo.SiteRepository;
 import com.chatlive.support.widget.repo.VisitorRepository;
 import com.chatlive.support.widget.repo.WidgetConfigRepository;
+import com.chatlive.support.widget.repo.WidgetWelcomeGroupConfigRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -38,6 +39,7 @@ public class PublicWidgetService {
     private static final int DEFAULT_OFFSET_X = 20;
     private static final int DEFAULT_OFFSET_Y = 20;
     private static final boolean DEFAULT_DEBUG = false;
+    private static final boolean DEFAULT_SHOW_WELCOME_SCREEN = true;
 
     private final SiteRepository siteRepository;
     private final SiteDomainAllowlistRepository allowlistRepository;
@@ -47,6 +49,7 @@ public class PublicWidgetService {
     private final VisitorGeoUpdater visitorGeoUpdater;
     private final JwtService jwtService;
     private final WidgetLogoUrlService widgetLogoUrlService;
+    private final WidgetWelcomeGroupConfigRepository widgetWelcomeGroupConfigRepository;
     private final Duration visitorTtl;
 
     public PublicWidgetService(
@@ -58,6 +61,7 @@ public class PublicWidgetService {
             VisitorGeoUpdater visitorGeoUpdater,
             JwtService jwtService,
             WidgetLogoUrlService widgetLogoUrlService,
+            WidgetWelcomeGroupConfigRepository widgetWelcomeGroupConfigRepository,
             @Value("${app.jwt.visitor-ttl-seconds:7200}") long visitorTtlSeconds
     ) {
         this.siteRepository = siteRepository;
@@ -68,6 +72,7 @@ public class PublicWidgetService {
         this.visitorGeoUpdater = visitorGeoUpdater;
         this.jwtService = jwtService;
         this.widgetLogoUrlService = widgetLogoUrlService;
+        this.widgetWelcomeGroupConfigRepository = widgetWelcomeGroupConfigRepository;
         this.visitorTtl = Duration.ofSeconds(visitorTtlSeconds);
     }
 
@@ -96,6 +101,7 @@ public class PublicWidgetService {
                 r.preChatFieldsJson(),
                 r.themeColor(),
                 r.welcomeText(),
+                r.showWelcomeScreen() != null ? r.showWelcomeScreen() : DEFAULT_SHOW_WELCOME_SCREEN,
                 r.cookieDomain(),
                 r.cookieSameSite(),
                 r.widgetLanguage(),
@@ -132,6 +138,7 @@ public class PublicWidgetService {
                     null,
                     null,
                     null,
+                    DEFAULT_SHOW_WELCOME_SCREEN,
                     null,
                     null,
                     "en",
@@ -164,6 +171,56 @@ public class PublicWidgetService {
                     false
             ));
 
+        // Apply optional group-specific overrides (welcome screen only).
+        try {
+            var gid = req == null ? null : req.skill_group_id();
+            if (gid != null && !gid.isBlank()) {
+                var row = widgetWelcomeGroupConfigRepository.find(site.id(), gid.trim()).orElse(null);
+                if (row != null) {
+                    var nextWelcome = row.welcomeText() != null ? row.welcomeText() : config.welcome_text();
+                    var nextShow = row.showWelcomeScreen() != null ? row.showWelcomeScreen() : config.show_welcome_screen();
+                    config = new WidgetConfigDto(
+                            config.pre_chat_enabled(),
+                            config.pre_chat_fields_json(),
+                            config.theme_color(),
+                            nextWelcome,
+                            nextShow,
+                            config.cookie_domain(),
+                            config.cookie_samesite(),
+                            config.widget_language(),
+                            config.widget_phrases_json(),
+                            config.pre_chat_message(),
+                            config.pre_chat_name_label(),
+                            config.pre_chat_email_label(),
+                            config.pre_chat_name_required(),
+                            config.pre_chat_email_required(),
+                            config.launcher_style(),
+                            config.theme_mode(),
+                            config.color_settings_mode(),
+                            config.color_overrides_json(),
+                            config.position(),
+                            config.z_index(),
+                            config.launcher_text(),
+                            config.width(),
+                            config.height(),
+                            config.auto_height(),
+                            config.auto_height_mode(),
+                            config.min_height(),
+                            config.max_height_ratio(),
+                            config.mobile_breakpoint(),
+                            config.mobile_fullscreen(),
+                            config.offset_x(),
+                            config.offset_y(),
+                            config.debug(),
+                            config.show_logo(),
+                            config.logo_url(),
+                            config.show_agent_photo()
+                    );
+                }
+            }
+        } catch (Exception ignore) {
+            // ignore
+        }
         String visitorId;
         if (req.visitor_id() != null && !req.visitor_id().isBlank()) {
             var existing = visitorRepository.findByIdAndSite(req.visitor_id(), site.id()).orElse(null);
