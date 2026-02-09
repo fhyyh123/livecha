@@ -135,12 +135,25 @@
     "title": "Inactivity timeouts",
     "hint": "Configure when a chat is considered idle (visitor inactivity) and when chats are automatically archived (long inactivity).",
     "adminOnlyHint": "Admin only",
+    "agentNoReplyTransfer": {
+      "before": "If the agent hasn't replied in",
+      "after": "minutes, transfer the visitor to another agent.",
+      "help": "Applies only when a chat has just started. After the first agent reply, longer response times won't trigger transfers."
+    },
+    "visitorIdle": {
+      "before": "If the visitor is inactive for",
+      "after": "minutes, show idle."
+    },
     "visitorIdleEnabled": {
       "label": "Enable idle marker"
     },
     "visitorIdleMinutes": {
       "label": "Show idle marker after (minutes)",
       "help": "Only visitor messages reset this timer."
+    },
+    "inactivityArchive": {
+      "before": "If there's no new message for",
+      "after": "minutes, auto-archive the chat."
     },
     "inactivityArchiveEnabled": {
       "label": "Enable auto-archive"

@@ -1,6 +1,8 @@
 import { http } from "./http";
 
 export type InactivityTimeoutsDto = {
+    agent_no_reply_transfer_enabled: boolean;
+    agent_no_reply_transfer_minutes: number;
     visitor_idle_enabled: boolean;
     visitor_idle_minutes: number;
     inactivity_archive_enabled: boolean;
@@ -13,6 +15,8 @@ export type FileSharingDto = {
 };
 
 export const DEFAULT_INACTIVITY_TIMEOUTS: InactivityTimeoutsDto = {
+    agent_no_reply_transfer_enabled: true,
+    agent_no_reply_transfer_minutes: 3,
     visitor_idle_enabled: true,
     visitor_idle_minutes: 10,
     inactivity_archive_enabled: true,
@@ -33,15 +37,24 @@ export function getCachedInactivityTimeouts(): InactivityTimeoutsDto {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return DEFAULT_INACTIVITY_TIMEOUTS;
         const parsed = JSON.parse(raw) as Partial<InactivityTimeoutsDto>;
+        const tEnabled =
+            typeof parsed.agent_no_reply_transfer_enabled === "boolean"
+                ? parsed.agent_no_reply_transfer_enabled
+                : DEFAULT_INACTIVITY_TIMEOUTS.agent_no_reply_transfer_enabled;
         const vEnabled = typeof parsed.visitor_idle_enabled === "boolean" ? parsed.visitor_idle_enabled : DEFAULT_INACTIVITY_TIMEOUTS.visitor_idle_enabled;
         const aEnabled =
             typeof parsed.inactivity_archive_enabled === "boolean"
                 ? parsed.inactivity_archive_enabled
                 : DEFAULT_INACTIVITY_TIMEOUTS.inactivity_archive_enabled;
 
+        const t = Number(parsed.agent_no_reply_transfer_minutes ?? 0);
+
         const v = Number(parsed.visitor_idle_minutes ?? 0);
         const a = Number(parsed.inactivity_archive_minutes ?? 0);
         return {
+            agent_no_reply_transfer_enabled: tEnabled,
+            agent_no_reply_transfer_minutes:
+                Number.isFinite(t) && t > 0 ? t : DEFAULT_INACTIVITY_TIMEOUTS.agent_no_reply_transfer_minutes,
             visitor_idle_enabled: vEnabled,
             visitor_idle_minutes: Number.isFinite(v) && v > 0 ? v : DEFAULT_INACTIVITY_TIMEOUTS.visitor_idle_minutes,
             inactivity_archive_enabled: aEnabled,

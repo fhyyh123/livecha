@@ -21,6 +21,14 @@ public class ConversationRepository {
     public record InactiveConversationRow(String id, Instant lastMsgAt) {
     }
 
+        public record NoReplyTransferCandidateRow(
+            String id,
+            String assignedAgentUserId,
+            String skillGroupId,
+            Instant assignedAt
+        ) {
+        }
+
         public record IdleCandidateRow(
             String id,
             Instant createdAt,
@@ -172,6 +180,100 @@ public class ConversationRepository {
                                 where tenant_id = ? and id = ?
                                 """;
                 return jdbcTemplate.update(sql, agentUserId, tenantId, conversationId);
+        }
+
+        public int unassignToQueued(String tenantId, String conversationId, String expectedAgentUserId) {
+                if (tenantId == null || tenantId.isBlank()) return 0;
+                if (conversationId == null || conversationId.isBlank()) return 0;
+                if (expectedAgentUserId == null || expectedAgentUserId.isBlank()) return 0;
+
+                var sql = """
+                                update conversation
+                                set status = 'queued',
+                                        assigned_agent_user_id = null
+                                where tenant_id = ?
+                                    and id = ?
+                                    and status = 'assigned'
+                                    and closed_at is null
+                                    and assigned_agent_user_id = ?
+                                """;
+                return jdbcTemplate.update(sql, tenantId, conversationId, expectedAgentUserId);
+        }
+
+            public int tryRestoreAssignment(String tenantId, String conversationId, String agentUserId) {
+                if (tenantId == null || tenantId.isBlank()) return 0;
+                if (conversationId == null || conversationId.isBlank()) return 0;
+                if (agentUserId == null || agentUserId.isBlank()) return 0;
+
+                var sql = """
+                        update conversation
+                        set status = 'assigned',
+                            assigned_agent_user_id = ?
+                        where tenant_id = ?
+                          and id = ?
+                          and status = 'queued'
+                          and closed_at is null
+                          and assigned_agent_user_id is null
+                        """;
+                return jdbcTemplate.update(sql, agentUserId, tenantId, conversationId);
+            }
+
+        /**
+         * List assigned conversations that should be transferred because the assigned agent hasn't replied.
+         *
+         * Condition:
+         *  - status=assigned and assigned_agent_user_id not null
+         *  - last assigned event is before cutoff
+         *  - there exists at least one customer message
+         *  - there exists no agent message
+         */
+        public List<NoReplyTransferCandidateRow> listNoReplyTransferCandidates(String tenantId, Instant assignedBefore, int limit) {
+                if (tenantId == null || tenantId.isBlank()) return List.of();
+                if (assignedBefore == null) return List.of();
+                int safeLimit = Math.max(1, Math.min(limit, 500));
+
+                var sql = """
+                                select c.id,
+                                             c.assigned_agent_user_id,
+                                             c.skill_group_id,
+                                             ae.assigned_at
+                                from conversation c
+                                join (
+                                        select conversation_id, max(created_at) as assigned_at
+                                        from conversation_event
+                                        where tenant_id = ?
+                                            and event_key = 'assigned'
+                                        group by conversation_id
+                                ) ae on ae.conversation_id = c.id
+                                where c.tenant_id = ?
+                                    and c.status = 'assigned'
+                                    and c.closed_at is null
+                                    and c.assigned_agent_user_id is not null
+                                    and ae.assigned_at < ?
+                                    and exists (
+                                            select 1
+                                            from message m
+                                            where m.tenant_id = c.tenant_id
+                                                and m.conversation_id = c.id
+                                                and m.sender_type = 'customer'
+                                    )
+                                    and not exists (
+                                            select 1
+                                            from message m
+                                            where m.tenant_id = c.tenant_id
+                                                and m.conversation_id = c.id
+                                                and m.sender_type = 'agent'
+                                    )
+                                order by ae.assigned_at asc
+                                limit ?
+                                """;
+
+                return jdbcTemplate.query(sql, (rs, rowNum) -> new NoReplyTransferCandidateRow(
+                                rs.getString("id"),
+                                rs.getString("assigned_agent_user_id"),
+                                rs.getString("skill_group_id"),
+                                rs.getTimestamp("assigned_at").toInstant()
+                ), tenantId, tenantId, Timestamp.from(assignedBefore), safeLimit);
         }
 
         public int tryClaim(String tenantId, String conversationId, String agentUserId) {

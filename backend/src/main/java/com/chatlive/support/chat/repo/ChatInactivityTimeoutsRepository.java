@@ -10,6 +10,8 @@ public class ChatInactivityTimeoutsRepository {
 
     public record Row(
             String tenantId,
+            boolean agentNoReplyTransferEnabled,
+            int agentNoReplyTransferMinutes,
         boolean visitorIdleEnabled,
             int visitorIdleMinutes,
         boolean inactivityArchiveEnabled,
@@ -25,9 +27,11 @@ public class ChatInactivityTimeoutsRepository {
 
     public Optional<Row> findByTenantId(String tenantId) {
         if (tenantId == null || tenantId.isBlank()) return Optional.empty();
-        var sql = "select tenant_id, visitor_idle_enabled, visitor_idle_minutes, inactivity_archive_enabled, inactivity_archive_minutes from chat_inactivity_timeouts where tenant_id = ? limit 1";
+        var sql = "select tenant_id, agent_no_reply_transfer_enabled, agent_no_reply_transfer_minutes, visitor_idle_enabled, visitor_idle_minutes, inactivity_archive_enabled, inactivity_archive_minutes from chat_inactivity_timeouts where tenant_id = ? limit 1";
         var list = jdbcTemplate.query(sql, (rs, rowNum) -> new Row(
                 rs.getString("tenant_id"),
+            rs.getBoolean("agent_no_reply_transfer_enabled"),
+            rs.getInt("agent_no_reply_transfer_minutes"),
                 rs.getBoolean("visitor_idle_enabled"),
                 rs.getInt("visitor_idle_minutes"),
                 rs.getBoolean("inactivity_archive_enabled"),
@@ -36,12 +40,38 @@ public class ChatInactivityTimeoutsRepository {
         return list.stream().findFirst();
     }
 
-    public void upsert(String tenantId, boolean visitorIdleEnabled, int visitorIdleMinutes, boolean inactivityArchiveEnabled, int inactivityArchiveMinutes) {
-        var updateSql = "update chat_inactivity_timeouts set visitor_idle_enabled = ?, visitor_idle_minutes = ?, inactivity_archive_enabled = ?, inactivity_archive_minutes = ?, updated_at = current_timestamp where tenant_id = ?";
-        var updated = jdbcTemplate.update(updateSql, visitorIdleEnabled, visitorIdleMinutes, inactivityArchiveEnabled, inactivityArchiveMinutes, tenantId);
+        public void upsert(
+            String tenantId,
+            boolean agentNoReplyTransferEnabled,
+            int agentNoReplyTransferMinutes,
+            boolean visitorIdleEnabled,
+            int visitorIdleMinutes,
+            boolean inactivityArchiveEnabled,
+            int inactivityArchiveMinutes
+        ) {
+        var updateSql = "update chat_inactivity_timeouts set agent_no_reply_transfer_enabled = ?, agent_no_reply_transfer_minutes = ?, visitor_idle_enabled = ?, visitor_idle_minutes = ?, inactivity_archive_enabled = ?, inactivity_archive_minutes = ?, updated_at = current_timestamp where tenant_id = ?";
+        var updated = jdbcTemplate.update(
+            updateSql,
+            agentNoReplyTransferEnabled,
+            agentNoReplyTransferMinutes,
+            visitorIdleEnabled,
+            visitorIdleMinutes,
+            inactivityArchiveEnabled,
+            inactivityArchiveMinutes,
+            tenantId
+        );
         if (updated > 0) return;
 
-        var insertSql = "insert into chat_inactivity_timeouts(tenant_id, visitor_idle_enabled, visitor_idle_minutes, inactivity_archive_enabled, inactivity_archive_minutes, updated_at) values (?,?,?,?,?, current_timestamp)";
-        jdbcTemplate.update(insertSql, tenantId, visitorIdleEnabled, visitorIdleMinutes, inactivityArchiveEnabled, inactivityArchiveMinutes);
+        var insertSql = "insert into chat_inactivity_timeouts(tenant_id, agent_no_reply_transfer_enabled, agent_no_reply_transfer_minutes, visitor_idle_enabled, visitor_idle_minutes, inactivity_archive_enabled, inactivity_archive_minutes, updated_at) values (?,?,?,?,?,?,?, current_timestamp)";
+        jdbcTemplate.update(
+            insertSql,
+            tenantId,
+            agentNoReplyTransferEnabled,
+            agentNoReplyTransferMinutes,
+            visitorIdleEnabled,
+            visitorIdleMinutes,
+            inactivityArchiveEnabled,
+            inactivityArchiveMinutes
+        );
     }
 }

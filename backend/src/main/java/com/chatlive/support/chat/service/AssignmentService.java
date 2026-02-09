@@ -132,6 +132,17 @@ public class AssignmentService {
 
     @Transactional
     public void autoAssignNewConversation(String tenantId, String conversationId, String skillGroupId) {
+        autoAssignNewConversationExcluding(tenantId, conversationId, skillGroupId, null);
+    }
+
+    /**
+     * Auto-assign a conversation, optionally excluding one agent userId.
+     *
+     * This is used by the "agent no reply -> transfer" feature to ensure the conversation doesn't get
+     * assigned back to the same agent immediately.
+     */
+    @Transactional
+    public void autoAssignNewConversationExcluding(String tenantId, String conversationId, String skillGroupId, String excludeAgentUserId) {
         boolean requestedGroup = skillGroupId != null && !skillGroupId.isBlank();
 
         // Decide candidates first (no locks). If the requested group is empty/unavailable, fallback to default pool.
@@ -143,6 +154,11 @@ public class AssignmentService {
         if (requestedGroup && candidates.isEmpty()) {
             effectiveGroupKey = DEFAULT_GROUP_KEY;
             candidates = agentProfileRepository.listOnlineCandidatesForTenant(tenantId);
+        }
+
+        if (excludeAgentUserId != null && !excludeAgentUserId.isBlank()) {
+            final String exclude = excludeAgentUserId;
+            candidates = candidates.stream().filter(c -> c != null && !exclude.equals(c.userId())).toList();
         }
 
         if (candidates.isEmpty()) {

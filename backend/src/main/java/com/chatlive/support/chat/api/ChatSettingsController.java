@@ -19,6 +19,8 @@ public class ChatSettingsController {
     private final ChatInactivityTimeoutsRepository inactivityTimeoutsRepository;
     private final ChatFileSharingSettingsRepository fileSharingSettingsRepository;
 
+    private final boolean defaultAgentNoReplyTransferEnabled;
+    private final int defaultAgentNoReplyTransferMinutes;
     private final boolean defaultVisitorIdleEnabled;
     private final int defaultVisitorIdleMinutes;
     private final boolean defaultInactivityArchiveEnabled;
@@ -31,6 +33,8 @@ public class ChatSettingsController {
             JwtService jwtService,
             ChatInactivityTimeoutsRepository inactivityTimeoutsRepository,
             ChatFileSharingSettingsRepository fileSharingSettingsRepository,
+            @Value("${app.chat.agent-no-reply-transfer.enabled:true}") boolean defaultAgentNoReplyTransferEnabled,
+            @Value("${app.chat.agent-no-reply-transfer.minutes:3}") int defaultAgentNoReplyTransferMinutes,
             @Value("${app.chat.visitor-idle.enabled:true}") boolean defaultVisitorIdleEnabled,
             @Value("${app.chat.visitor-idle.minutes:10}") int defaultVisitorIdleMinutes,
             @Value("${app.conversation.inactivity-archive.enabled:true}") boolean defaultInactivityArchiveEnabled,
@@ -41,6 +45,9 @@ public class ChatSettingsController {
         this.jwtService = jwtService;
         this.inactivityTimeoutsRepository = inactivityTimeoutsRepository;
         this.fileSharingSettingsRepository = fileSharingSettingsRepository;
+
+        this.defaultAgentNoReplyTransferEnabled = defaultAgentNoReplyTransferEnabled;
+        this.defaultAgentNoReplyTransferMinutes = clampMinutes(defaultAgentNoReplyTransferMinutes);
         this.defaultVisitorIdleEnabled = defaultVisitorIdleEnabled;
         this.defaultVisitorIdleMinutes = clampMinutes(defaultVisitorIdleMinutes);
         this.defaultInactivityArchiveEnabled = defaultInactivityArchiveEnabled;
@@ -58,6 +65,8 @@ public class ChatSettingsController {
         var row = inactivityTimeoutsRepository.findByTenantId(claims.tenantId()).orElse(null);
         if (row == null) {
             return ApiResponse.ok(new InactivityTimeoutsDto(
+                defaultAgentNoReplyTransferEnabled,
+                defaultAgentNoReplyTransferMinutes,
                 defaultVisitorIdleEnabled,
                 defaultVisitorIdleMinutes,
                 defaultInactivityArchiveEnabled,
@@ -65,6 +74,8 @@ public class ChatSettingsController {
             ));
         }
         return ApiResponse.ok(new InactivityTimeoutsDto(
+            row.agentNoReplyTransferEnabled(),
+            clampMinutes(row.agentNoReplyTransferMinutes()),
             row.visitorIdleEnabled(),
             clampMinutes(row.visitorIdleMinutes()),
             row.inactivityArchiveEnabled(),

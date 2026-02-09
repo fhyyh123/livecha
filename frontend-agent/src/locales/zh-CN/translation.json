@@ -137,6 +137,15 @@
       "hint": "配置会话何时显示“空闲”（仅看访客不发消息），以及会话何时会被系统自动归档（长时间无消息）。",
       "adminOnlyHint": "仅管理员可设置",
     "learnMore": "了解更多",
+    "agentNoReplyTransfer": {
+      "before": "当代理人没有回应时",
+      "after": "分钟，将访客转接给另一位客服人员。",
+      "help": "仅适用于聊天刚刚开始的情况。之后的所有回复都可以更长，但不会导致聊天转接。"
+    },
+    "visitorIdle": {
+      "before": "当访客没有新消息时",
+      "after": "分钟，显示空闲。"
+    },
     "visitorIdleEnabled": {
       "label": "启用空闲提示"
     },
@@ -144,6 +153,10 @@
         "label": "访客不发消息多久后显示空闲（分钟）",
         "help": "只有访客消息会重置空闲计时，客服消息不会重置。"
       },
+    "inactivityArchive": {
+      "before": "当聊天中没有新消息时",
+      "after": "分钟，自动归档会话。"
+    },
     "inactivityArchiveEnabled": {
       "label": "启用自动归档"
     },
