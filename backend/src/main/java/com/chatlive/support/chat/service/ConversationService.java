@@ -32,6 +32,7 @@ public class ConversationService {
     private final ConversationMarkRepository conversationMarkRepository;
     private final AgentProfileRepository agentProfileRepository;
     private final ConversationPreChatFieldRepository conversationPreChatFieldRepository;
+    private final TranscriptForwardingService transcriptForwardingService;
 
     public ConversationService(
             ConversationRepository conversationRepository,
@@ -43,7 +44,8 @@ public class ConversationService {
             SkillGroupRepository skillGroupRepository,
             ConversationMarkRepository conversationMarkRepository,
             AgentProfileRepository agentProfileRepository,
-            ConversationPreChatFieldRepository conversationPreChatFieldRepository
+            ConversationPreChatFieldRepository conversationPreChatFieldRepository,
+            TranscriptForwardingService transcriptForwardingService
     ) {
         this.conversationRepository = conversationRepository;
         this.wsSessionRegistry = wsSessionRegistry;
@@ -55,6 +57,7 @@ public class ConversationService {
         this.conversationMarkRepository = conversationMarkRepository;
         this.agentProfileRepository = agentProfileRepository;
         this.conversationPreChatFieldRepository = conversationPreChatFieldRepository;
+        this.transcriptForwardingService = transcriptForwardingService;
     }
 
     private String resolveAgentLabel(String userId) {
@@ -246,7 +249,8 @@ public class ConversationService {
 
         // Idempotent: closing an already-closed conversation is OK.
         // Persist reason for list rendering; do not infer inactivity minutes for manual close.
-        conversationRepository.closeConversation(claims.tenantId(), conversationId, claims.userId(), safeReason, null);
+        var updated = conversationRepository.closeConversation(claims.tenantId(), conversationId, claims.userId(), safeReason, null);
+        final boolean transitioned = updated > 0;
         afterCommit(() -> {
             ObjectNode data = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
             data.put("by_user_id", claims.userId());
@@ -258,6 +262,10 @@ public class ConversationService {
                 data.put("reason", safeReason);
             }
             wsBroadcaster.broadcastConversationEvent(claims.tenantId(), conversationId, "archived", data);
+
+            if (transitioned) {
+                transcriptForwardingService.trySendOnArchived(claims.tenantId(), conversationId, safeReason, claims.userId());
+            }
         });
     }
 
@@ -279,7 +287,7 @@ public class ConversationService {
         long safeMinutes = Math.max(1, Math.min(inactivityMinutes, 365L * 24 * 60));
 
         // Idempotent.
-        conversationRepository.closeConversation(
+        var updated = conversationRepository.closeConversation(
             tenantId,
             conversationId,
             null,
@@ -287,12 +295,18 @@ public class ConversationService {
             (int) safeMinutes
         );
 
+        final boolean transitioned = updated > 0;
+
         afterCommit(() -> {
             ObjectNode data = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
             data.put("mode", "auto");
             data.put("reason", "inactivity_" + safeMinutes);
             data.put("inactivity_minutes", safeMinutes);
             wsBroadcaster.broadcastConversationEvent(tenantId, conversationId, "archived", data);
+
+            if (transitioned) {
+                transcriptForwardingService.trySendOnArchived(tenantId, conversationId, "inactivity_" + safeMinutes, null);
+            }
         });
     }
 

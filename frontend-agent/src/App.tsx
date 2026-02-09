@@ -44,6 +44,7 @@ const TicketFormPage = lazy(() => import("./pages/TicketFormPage").then((m) => (
 const InactivityTimeoutsPage = lazy(() => import("./pages/InactivityTimeoutsPage").then((m) => ({ default: m.InactivityTimeoutsPage })));
 const FileSharingPage = lazy(() => import("./pages/FileSharingPage").then((m) => ({ default: m.FileSharingPage })));
 const ChatAssignmentPage = lazy(() => import("./pages/ChatAssignmentPage").then((m) => ({ default: m.ChatAssignmentPage })));
+const TranscriptForwardingPage = lazy(() => import("./pages/TranscriptForwardingPage").then((m) => ({ default: m.TranscriptForwardingPage })));
 const InvitesPage = lazy(() => import("./pages/InvitesPage").then((m) => ({ default: m.InvitesPage })));
 const TeamPage = lazy(() => import("./pages/TeamPage").then((m) => ({ default: m.TeamPage })));
 const SkillGroupEditPage = lazy(() => import("./pages/SkillGroupEditPage").then((m) => ({ default: m.SkillGroupEditPage })));
@@ -442,6 +443,14 @@ function App() {
                 element={
                   <Suspense fallback={<RouteFallback />}>
                     <ChatAssignmentPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/settings/chat-settings/transcript-forwarding"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <TranscriptForwardingPage />
                   </Suspense>
                 }
               />

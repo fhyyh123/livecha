@@ -197,6 +197,17 @@
       "visitors": "访客端"
     }
   },
+  "transcriptForwarding": {
+    "title": "聊天记录转发",
+    "hint": "自动将聊天记录转发到一组邮箱地址。",
+    "noBackfillHint": "启用转发前已归档的聊天不会发送。",
+    "adminOnlyHint": "仅管理员可操作",
+    "forwardToEmailLabel": "将所有聊天记录转发到邮箱",
+    "placeholder": "name@company.com",
+    "inputHelp": "按回车或空格添加。最多只能添加 1 个邮箱地址。",
+    "max1Error": "最多只能添加 1 个邮箱地址。",
+    "invalidEmailError": "请输入有效的邮箱地址。"
+  },
   "archives": {
     "title": "档案",
     "myArchives": "档案（{{count}}）"

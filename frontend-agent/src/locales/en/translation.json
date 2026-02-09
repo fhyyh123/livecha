@@ -195,6 +195,17 @@
       "visitors": "Visitors"
     }
   },
+  "transcriptForwarding": {
+    "title": "Transcript forwarding",
+    "hint": "Automatically forward your chat transcripts to a list of email addresses.",
+    "noBackfillHint": "Chats archived before setting up transcript forwarding will not be sent.",
+    "adminOnlyHint": "Admin only",
+    "forwardToEmailLabel": "Forward all chat transcript to email",
+    "placeholder": "name@company.com",
+    "inputHelp": "Hit enter or space to add a new one. You can add up to 1 email addresses.",
+    "max1Error": "You can add up to 1 email address.",
+    "invalidEmailError": "Please enter a valid email address."
+  },
   "archives": {
     "title": "Archives",
     "myArchives": "Archives ({{count}})"

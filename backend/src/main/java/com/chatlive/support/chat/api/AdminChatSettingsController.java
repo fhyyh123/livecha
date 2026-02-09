@@ -5,6 +5,7 @@ import com.chatlive.support.auth.service.jwt.JwtService;
 import com.chatlive.support.chat.repo.AssignmentStrategyConfigRepository;
 import com.chatlive.support.chat.repo.ChatFileSharingSettingsRepository;
 import com.chatlive.support.chat.repo.ChatInactivityTimeoutsRepository;
+import com.chatlive.support.chat.repo.ChatTranscriptForwardingSettingsRepository;
 import com.chatlive.support.common.api.ApiResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -15,6 +16,9 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/admin/chat-settings")
 public class AdminChatSettingsController {
@@ -23,6 +27,7 @@ public class AdminChatSettingsController {
     private final ChatInactivityTimeoutsRepository inactivityTimeoutsRepository;
     private final ChatFileSharingSettingsRepository fileSharingSettingsRepository;
     private final AssignmentStrategyConfigRepository assignmentStrategyConfigRepository;
+    private final ChatTranscriptForwardingSettingsRepository transcriptForwardingSettingsRepository;
 
     private final String defaultAssignmentStrategyKey;
 
@@ -41,6 +46,7 @@ public class AdminChatSettingsController {
             ChatInactivityTimeoutsRepository inactivityTimeoutsRepository,
             ChatFileSharingSettingsRepository fileSharingSettingsRepository,
             AssignmentStrategyConfigRepository assignmentStrategyConfigRepository,
+            ChatTranscriptForwardingSettingsRepository transcriptForwardingSettingsRepository,
             @Value("${app.chat.agent-no-reply-transfer.enabled:true}") boolean defaultAgentNoReplyTransferEnabled,
             @Value("${app.chat.agent-no-reply-transfer.minutes:3}") int defaultAgentNoReplyTransferMinutes,
             @Value("${app.chat.visitor-idle.enabled:true}") boolean defaultVisitorIdleEnabled,
@@ -55,6 +61,7 @@ public class AdminChatSettingsController {
         this.inactivityTimeoutsRepository = inactivityTimeoutsRepository;
         this.fileSharingSettingsRepository = fileSharingSettingsRepository;
         this.assignmentStrategyConfigRepository = assignmentStrategyConfigRepository;
+        this.transcriptForwardingSettingsRepository = transcriptForwardingSettingsRepository;
         this.defaultAgentNoReplyTransferEnabled = defaultAgentNoReplyTransferEnabled;
         this.defaultAgentNoReplyTransferMinutes = clampMinutes(defaultAgentNoReplyTransferMinutes);
         this.defaultVisitorIdleEnabled = defaultVisitorIdleEnabled;
@@ -66,6 +73,49 @@ public class AdminChatSettingsController {
         this.defaultAgentFileEnabled = defaultAgentFileEnabled;
 
         this.defaultAssignmentStrategyKey = normalizeStrategyKey(defaultAssignmentStrategyKey);
+    }
+
+    public record TranscriptForwardingDto(List<String> emails) {
+    }
+
+    @GetMapping("/transcript-forwarding")
+    public ApiResponse<TranscriptForwardingDto> getTranscriptForwarding(
+            @RequestHeader(value = "Authorization", required = false) String authorization
+    ) {
+        var claims = requireAdminClaims(authorization);
+        var row = transcriptForwardingSettingsRepository.findByTenantId(claims.tenantId()).orElse(null);
+        if (row == null) {
+            return ApiResponse.ok(new TranscriptForwardingDto(List.of()));
+        }
+
+        var email = row.forwardToEmail();
+        if (email == null || email.trim().isBlank()) {
+            return ApiResponse.ok(new TranscriptForwardingDto(List.of()));
+        }
+        return ApiResponse.ok(new TranscriptForwardingDto(List.of(email.trim())));
+    }
+
+    @PutMapping("/transcript-forwarding")
+    public ApiResponse<TranscriptForwardingDto> putTranscriptForwarding(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestBody TranscriptForwardingDto req
+    ) {
+        var claims = requireAdminClaims(authorization);
+
+        var list = req == null ? List.<String>of() : (req.emails() == null ? List.<String>of() : req.emails());
+        var cleaned = new ArrayList<String>();
+        for (var e : list) {
+            if (e == null) continue;
+            var t = e.trim();
+            if (t.isBlank()) continue;
+            if (!isValidEmail(t)) throw new IllegalArgumentException("invalid_email");
+            if (!cleaned.contains(t)) cleaned.add(t);
+        }
+        if (cleaned.size() > 1) throw new IllegalArgumentException("max_1_email");
+
+        var email = cleaned.isEmpty() ? null : cleaned.get(0);
+        transcriptForwardingSettingsRepository.upsert(claims.tenantId(), email);
+        return getTranscriptForwarding(authorization);
     }
 
     public record ChatAssignmentDto(String mode) {
@@ -248,5 +298,13 @@ public class AdminChatSettingsController {
             case "leastopen" -> "least_open";
             default -> key;
         };
+    }
+
+    private static boolean isValidEmail(String input) {
+        var s = input == null ? "" : input.trim();
+        if (s.isBlank()) return false;
+        if (s.length() > 254) return false;
+        // Simple sanity check; avoids heavy RFC parsing.
+        return s.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     }
 }

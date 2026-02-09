@@ -18,6 +18,10 @@ export type ChatAssignmentDto = {
     mode: "auto" | "manual";
 };
 
+export type TranscriptForwardingDto = {
+    emails: string[];
+};
+
 export const DEFAULT_INACTIVITY_TIMEOUTS: InactivityTimeoutsDto = {
     agent_no_reply_transfer_enabled: true,
     agent_no_reply_transfer_minutes: 3,
@@ -36,9 +40,15 @@ export const DEFAULT_CHAT_ASSIGNMENT: ChatAssignmentDto = {
     mode: "auto",
 };
 
+export const DEFAULT_TRANSCRIPT_FORWARDING: TranscriptForwardingDto = {
+    emails: [],
+};
+
 const STORAGE_KEY = "chatlive.chatSettings.inactivityTimeouts" as const;
 
 const STORAGE_KEY_FILE_SHARING = "chatlive.chatSettings.fileSharing" as const;
+
+const STORAGE_KEY_TRANSCRIPT_FORWARDING = "chatlive.chatSettings.transcriptForwarding" as const;
 
 export function getCachedInactivityTimeouts(): InactivityTimeoutsDto {
     try {
@@ -105,6 +115,29 @@ export function setCachedFileSharing(v: FileSharingDto) {
     }
 }
 
+export function getCachedTranscriptForwarding(): TranscriptForwardingDto {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY_TRANSCRIPT_FORWARDING);
+        if (!raw) return DEFAULT_TRANSCRIPT_FORWARDING;
+        const parsed = JSON.parse(raw) as Partial<TranscriptForwardingDto>;
+        const list = Array.isArray(parsed.emails) ? parsed.emails : [];
+        const cleaned = list
+            .map((x) => String(x || "").trim())
+            .filter((x) => x);
+        return { emails: cleaned.slice(0, 1) };
+    } catch {
+        return DEFAULT_TRANSCRIPT_FORWARDING;
+    }
+}
+
+export function setCachedTranscriptForwarding(v: TranscriptForwardingDto) {
+    try {
+        localStorage.setItem(STORAGE_KEY_TRANSCRIPT_FORWARDING, JSON.stringify(v));
+    } catch {
+        // ignore
+    }
+}
+
 export async function fetchInactivityTimeouts(): Promise<InactivityTimeoutsDto> {
     const res = await http.get<InactivityTimeoutsDto>("/api/v1/chat-settings/inactivity-timeouts");
     const data = res.data || DEFAULT_INACTIVITY_TIMEOUTS;
@@ -166,4 +199,36 @@ export async function updateChatAssignmentAdmin(groupId: string, values: ChatAss
     return {
         mode: data.mode === "manual" ? "manual" : "auto",
     };
+}
+
+export async function fetchTranscriptForwardingAdmin(): Promise<TranscriptForwardingDto> {
+    const res = await http.get<TranscriptForwardingDto>("/api/v1/admin/chat-settings/transcript-forwarding");
+    const data = res.data || DEFAULT_TRANSCRIPT_FORWARDING;
+    const emails = Array.isArray(data.emails) ? data.emails : [];
+    const cleaned = emails
+        .map((x) => String(x || "").trim())
+        .filter((x) => x)
+        .slice(0, 1);
+    const next = { emails: cleaned };
+    setCachedTranscriptForwarding(next);
+    return next;
+}
+
+export async function updateTranscriptForwardingAdmin(values: TranscriptForwardingDto): Promise<TranscriptForwardingDto> {
+    const payload: TranscriptForwardingDto = {
+        emails: (Array.isArray(values.emails) ? values.emails : [])
+            .map((x) => String(x || "").trim())
+            .filter((x) => x)
+            .slice(0, 1),
+    };
+    const res = await http.put<TranscriptForwardingDto>("/api/v1/admin/chat-settings/transcript-forwarding", payload);
+    const data = res.data || payload;
+    const emails = Array.isArray(data.emails) ? data.emails : payload.emails;
+    const cleaned = emails
+        .map((x) => String(x || "").trim())
+        .filter((x) => x)
+        .slice(0, 1);
+    const next = { emails: cleaned };
+    setCachedTranscriptForwarding(next);
+    return next;
 }
