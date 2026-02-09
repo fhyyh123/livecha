@@ -153,6 +153,17 @@
       "required": "Required"
     }
   },
+  "fileSharing": {
+    "title": "File sharing",
+    "hint": "Share and receive files during chats. Files that can be a potential threat will be automatically filtered out. You can then decide if you want to access them or not.",
+    "learnMoreUrl": "https://www.livecha.com/help/file-sharing/",
+    "adminOnlyHint": "Admin only",
+    "enableFor": {
+      "label": "Enable file sharing for:",
+      "agents": "Agents",
+      "visitors": "Visitors"
+    }
+  },
   "archives": {
     "title": "Archives",
     "myArchives": "Archives ({{count}})"
@@ -178,6 +189,7 @@
     "english": "English",
     "chinese": "Chinese"
     ,
+    "learnMore": "Learn more",
     "loadFailed": "Load failed",
     "saveFailed": "Save failed",
     "saved": "Saved",

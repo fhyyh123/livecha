@@ -3,6 +3,7 @@ package com.chatlive.support.chat.service;
 import com.chatlive.support.auth.service.jwt.JwtClaims;
 import com.chatlive.support.chat.api.MessageItem;
 import com.chatlive.support.chat.api.MessagePage;
+import com.chatlive.support.chat.repo.ChatFileSharingSettingsRepository;
 import com.chatlive.support.chat.repo.ConversationRepository;
 import com.chatlive.support.chat.repo.MessageRepository;
 import com.chatlive.support.chat.repo.MessageStateRepository;
@@ -24,6 +25,10 @@ public class MessageService {
     private final WsSessionRegistry wsSessionRegistry;
     private final AttachmentService attachmentService;
     private final AssignmentService assignmentService;
+    private final ChatFileSharingSettingsRepository fileSharingSettingsRepository;
+
+    private final boolean defaultVisitorFileEnabled;
+    private final boolean defaultAgentFileEnabled;
 
     public MessageService(
             ConversationRepository conversationRepository,
@@ -32,7 +37,10 @@ public class MessageService {
             ObjectMapper objectMapper,
             WsSessionRegistry wsSessionRegistry,
             AttachmentService attachmentService,
-            AssignmentService assignmentService
+            AssignmentService assignmentService,
+            ChatFileSharingSettingsRepository fileSharingSettingsRepository,
+            @org.springframework.beans.factory.annotation.Value("${app.chat.file-sharing.visitor-enabled:true}") boolean defaultVisitorFileEnabled,
+            @org.springframework.beans.factory.annotation.Value("${app.chat.file-sharing.agent-enabled:true}") boolean defaultAgentFileEnabled
     ) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
@@ -41,6 +49,9 @@ public class MessageService {
         this.wsSessionRegistry = wsSessionRegistry;
         this.attachmentService = attachmentService;
         this.assignmentService = assignmentService;
+        this.fileSharingSettingsRepository = fileSharingSettingsRepository;
+        this.defaultVisitorFileEnabled = defaultVisitorFileEnabled;
+        this.defaultAgentFileEnabled = defaultAgentFileEnabled;
     }
 
     public record SendResult(MessageItem item, boolean inserted, boolean reopened) {
@@ -86,6 +97,10 @@ public class MessageService {
             String clientMsgId,
             String attachmentId
     ) {
+        if (!isFileSharingEnabledForRole(claims)) {
+            throw new IllegalArgumentException("file_sharing_disabled");
+        }
+
         var conv = conversationRepository.findAccess(claims.tenantId(), conversationId)
                 .orElseThrow(() -> new IllegalArgumentException("conversation_not_found"));
         ensureCanAccessConversation(claims, conv);
@@ -127,6 +142,18 @@ public class MessageService {
         }
 
         return new SendResult(toItem(insert.row(), content), insert.inserted(), reopened);
+    }
+
+    private boolean isFileSharingEnabledForRole(JwtClaims claims) {
+        if (claims == null) return false;
+        var row = fileSharingSettingsRepository.findByTenantId(claims.tenantId()).orElse(null);
+        var visitorEnabled = row == null ? defaultVisitorFileEnabled : row.visitorFileEnabled();
+        var agentEnabled = row == null ? defaultAgentFileEnabled : row.agentFileEnabled();
+
+        var role = claims.role();
+        if ("visitor".equals(role)) return visitorEnabled;
+        if ("agent".equals(role) || "admin".equals(role)) return agentEnabled;
+        return true;
     }
 
     private boolean maybeReopenIfClosedOnInboundMessage(JwtClaims claims, ConversationRepository.ConversationAccessRow conv) {

@@ -7,6 +7,11 @@ export type InactivityTimeoutsDto = {
     inactivity_archive_minutes: number;
 };
 
+export type FileSharingDto = {
+    visitor_file_enabled: boolean;
+    agent_file_enabled: boolean;
+};
+
 export const DEFAULT_INACTIVITY_TIMEOUTS: InactivityTimeoutsDto = {
     visitor_idle_enabled: true,
     visitor_idle_minutes: 10,
@@ -14,7 +19,14 @@ export const DEFAULT_INACTIVITY_TIMEOUTS: InactivityTimeoutsDto = {
     inactivity_archive_minutes: 60,
 };
 
+export const DEFAULT_FILE_SHARING: FileSharingDto = {
+    visitor_file_enabled: true,
+    agent_file_enabled: true,
+};
+
 const STORAGE_KEY = "chatlive.chatSettings.inactivityTimeouts" as const;
+
+const STORAGE_KEY_FILE_SHARING = "chatlive.chatSettings.fileSharing" as const;
 
 export function getCachedInactivityTimeouts(): InactivityTimeoutsDto {
     try {
@@ -48,6 +60,30 @@ export function setCachedInactivityTimeouts(v: InactivityTimeoutsDto) {
     }
 }
 
+export function getCachedFileSharing(): FileSharingDto {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY_FILE_SHARING);
+        if (!raw) return DEFAULT_FILE_SHARING;
+        const parsed = JSON.parse(raw) as Partial<FileSharingDto>;
+        return {
+            visitor_file_enabled:
+                typeof parsed.visitor_file_enabled === "boolean" ? parsed.visitor_file_enabled : DEFAULT_FILE_SHARING.visitor_file_enabled,
+            agent_file_enabled:
+                typeof parsed.agent_file_enabled === "boolean" ? parsed.agent_file_enabled : DEFAULT_FILE_SHARING.agent_file_enabled,
+        };
+    } catch {
+        return DEFAULT_FILE_SHARING;
+    }
+}
+
+export function setCachedFileSharing(v: FileSharingDto) {
+    try {
+        localStorage.setItem(STORAGE_KEY_FILE_SHARING, JSON.stringify(v));
+    } catch {
+        // ignore
+    }
+}
+
 export async function fetchInactivityTimeouts(): Promise<InactivityTimeoutsDto> {
     const res = await http.get<InactivityTimeoutsDto>("/api/v1/chat-settings/inactivity-timeouts");
     const data = res.data || DEFAULT_INACTIVITY_TIMEOUTS;
@@ -66,5 +102,26 @@ export async function updateInactivityTimeoutsAdmin(values: InactivityTimeoutsDt
     const res = await http.put<InactivityTimeoutsDto>("/api/v1/admin/chat-settings/inactivity-timeouts", values);
     const data = res.data || values;
     setCachedInactivityTimeouts(data);
+    return data;
+}
+
+export async function fetchFileSharing(): Promise<FileSharingDto> {
+    const res = await http.get<FileSharingDto>("/api/v1/chat-settings/file-sharing");
+    const data = res.data || DEFAULT_FILE_SHARING;
+    setCachedFileSharing(data);
+    return data;
+}
+
+export async function fetchFileSharingAdmin(): Promise<FileSharingDto> {
+    const res = await http.get<FileSharingDto>("/api/v1/admin/chat-settings/file-sharing");
+    const data = res.data || DEFAULT_FILE_SHARING;
+    setCachedFileSharing(data);
+    return data;
+}
+
+export async function updateFileSharingAdmin(values: FileSharingDto): Promise<FileSharingDto> {
+    const res = await http.put<FileSharingDto>("/api/v1/admin/chat-settings/file-sharing", values);
+    const data = res.data || values;
+    setCachedFileSharing(data);
     return data;
 }

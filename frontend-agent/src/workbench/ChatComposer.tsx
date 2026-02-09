@@ -31,6 +31,8 @@ export type ChatComposerProps = {
     uploading: boolean;
     uploadProps: UploadProps;
 
+    attachmentsEnabled?: boolean;
+
     onSendText: () => void;
     onOpenQuickReplies: () => void;
 };
@@ -43,6 +45,7 @@ export function ChatComposer({
     conversationStatus,
     uploading,
     uploadProps,
+    attachmentsEnabled = true,
     onSendText,
     onOpenQuickReplies,
 }: ChatComposerProps) {
@@ -63,12 +66,13 @@ export function ChatComposer({
     }, [pastedImages]);
 
     const composerDisabled = wsStatus !== "connected" || conversationStatus === "closed";
+    const attachmentsDisabled = composerDisabled || !attachmentsEnabled;
 
     const canSend = useMemo(() => {
         if (composerDisabled) return false;
         if (composerMode !== "message") return false;
-        return Boolean(draft.trim()) || pastedImages.length > 0;
-    }, [composerDisabled, composerMode, draft, pastedImages.length]);
+        return Boolean(draft.trim()) || (attachmentsEnabled && pastedImages.length > 0);
+    }, [attachmentsEnabled, composerDisabled, composerMode, draft, pastedImages.length]);
 
     function insertText(at: string) {
         if (!at) return;
@@ -85,7 +89,7 @@ export function ChatComposer({
     }
 
     function onComposerPaste(e: ReactClipboardEvent<HTMLTextAreaElement>) {
-        if (composerDisabled) return;
+        if (attachmentsDisabled) return;
         if (composerMode !== "message") return;
         const files = extractImageFilesFromClipboardData(e.clipboardData, { filenameBase: "pasted-image" });
         if (!files.length) return;
@@ -110,6 +114,7 @@ export function ChatComposer({
 
     async function sendPastedImagesIfAny(): Promise<void> {
         if (!pastedImages.length) return;
+        if (attachmentsDisabled) return;
         const beforeUpload = uploadProps?.beforeUpload;
         if (typeof beforeUpload !== "function") return;
 
@@ -224,17 +229,19 @@ export function ChatComposer({
                                 <Button size="small" icon={<ThunderboltOutlined />} onClick={onOpenQuickReplies} />
                             </Tooltip>
 
-                            <Upload {...uploadProps}>
-                                <Tooltip title={t("workbench.sendAttachment")}
-                                >
-                                    <Button
-                                        size="small"
-                                        icon={<PaperClipOutlined />}
-                                        loading={uploading}
-                                        disabled={composerDisabled}
-                                    />
-                                </Tooltip>
-                            </Upload>
+                            {attachmentsEnabled ? (
+                                <Upload {...uploadProps}>
+                                    <Tooltip title={t("workbench.sendAttachment")}
+                                    >
+                                        <Button
+                                            size="small"
+                                            icon={<PaperClipOutlined />}
+                                            loading={uploading}
+                                            disabled={attachmentsDisabled}
+                                        />
+                                    </Tooltip>
+                                </Upload>
+                            ) : null}
 
                             <Tooltip title={t("workbench.tags")}
                             >

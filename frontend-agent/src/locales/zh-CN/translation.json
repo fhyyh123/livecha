@@ -136,6 +136,7 @@
       "title": "不活跃超时",
       "hint": "配置会话何时显示“空闲”（仅看访客不发消息），以及会话何时会被系统自动归档（长时间无消息）。",
       "adminOnlyHint": "仅管理员可设置",
+    "learnMore": "了解更多",
     "visitorIdleEnabled": {
       "label": "启用空闲提示"
     },
@@ -153,6 +154,17 @@
       "common": {
         "required": "必填"
       }
+  },
+  "fileSharing": {
+    "title": "文件共享",
+    "hint": "在对话期间收发文件。可能有风险的文件会被自动过滤，然后你可以决定是否访问它们。",
+    "learnMoreUrl": "https://www.livecha.com/help/file-sharing/",
+    "adminOnlyHint": "仅管理员可操作",
+    "enableFor": {
+      "label": "启用文件共享给：",
+      "agents": "座席端",
+      "visitors": "访客端"
+    }
   },
   "archives": {
     "title": "档案",

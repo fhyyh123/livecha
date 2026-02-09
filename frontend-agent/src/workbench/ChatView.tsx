@@ -41,6 +41,7 @@ export type ChatViewProps = {
 
     uploading: boolean;
     uploadProps: UploadProps;
+        attachmentsEnabled?: boolean;
 
     onSendText: () => void;
     onDownload: (attachmentId?: string) => void;
@@ -256,6 +257,7 @@ export function ChatView({
     detail,
     uploading,
     uploadProps,
+    attachmentsEnabled,
     onSendText,
     onDownload,
     getAttachmentUrl,
@@ -830,6 +832,7 @@ export function ChatView({
                         conversationStatus={detail?.status}
                         uploading={uploading}
                         uploadProps={uploadProps}
+                            attachmentsEnabled={attachmentsEnabled}
                         onSendText={onSendText}
                         onOpenQuickReplies={onOpenQuickReplies}
                     />

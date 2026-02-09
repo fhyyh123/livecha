@@ -2,11 +2,13 @@ package com.chatlive.support.chat.service;
 
 import com.chatlive.support.auth.service.jwt.JwtClaims;
 import com.chatlive.support.chat.repo.AttachmentRepository;
+import com.chatlive.support.chat.repo.ChatFileSharingSettingsRepository;
 import com.chatlive.support.chat.repo.ConversationRepository;
 import com.chatlive.support.chat.ws.WsSessionRegistry;
 import com.chatlive.support.storage.s3.S3PresignService;
 import com.chatlive.support.storage.s3.S3Properties;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -22,21 +24,31 @@ public class AttachmentService {
     private final ConversationRepository conversationRepository;
     private final WsSessionRegistry wsSessionRegistry;
     private final AttachmentRepository attachmentRepository;
+    private final ChatFileSharingSettingsRepository fileSharingSettingsRepository;
     private final S3Properties s3Properties;
     private final ObjectProvider<S3PresignService> presignServiceProvider;
+
+    private final boolean defaultVisitorFileEnabled;
+    private final boolean defaultAgentFileEnabled;
 
     public AttachmentService(
             ConversationRepository conversationRepository,
             WsSessionRegistry wsSessionRegistry,
             AttachmentRepository attachmentRepository,
+            ChatFileSharingSettingsRepository fileSharingSettingsRepository,
             S3Properties s3Properties,
-            ObjectProvider<S3PresignService> presignServiceProvider
+            ObjectProvider<S3PresignService> presignServiceProvider,
+            @Value("${app.chat.file-sharing.visitor-enabled:true}") boolean defaultVisitorFileEnabled,
+            @Value("${app.chat.file-sharing.agent-enabled:true}") boolean defaultAgentFileEnabled
     ) {
         this.conversationRepository = conversationRepository;
         this.wsSessionRegistry = wsSessionRegistry;
         this.attachmentRepository = attachmentRepository;
+        this.fileSharingSettingsRepository = fileSharingSettingsRepository;
         this.s3Properties = s3Properties;
         this.presignServiceProvider = presignServiceProvider;
+        this.defaultVisitorFileEnabled = defaultVisitorFileEnabled;
+        this.defaultAgentFileEnabled = defaultAgentFileEnabled;
     }
 
     public record PresignUploadResult(
@@ -73,6 +85,10 @@ public class AttachmentService {
                 .orElseThrow(() -> new IllegalArgumentException("conversation_not_found"));
         ensureCanAccessConversation(claims, conv);
 
+        if (!isFileSharingEnabledForRole(claims)) {
+            throw new IllegalArgumentException("file_sharing_disabled");
+        }
+
         var safeFilename = sanitizeFilename(filename);
         var safeContentType = (contentType == null || contentType.isBlank()) ? "application/octet-stream" : contentType;
 
@@ -105,6 +121,19 @@ public class AttachmentService {
                 presigned.expiresInSeconds(),
                 s3Properties.maxUploadBytes()
         );
+    }
+
+    private boolean isFileSharingEnabledForRole(JwtClaims claims) {
+        if (claims == null) return false;
+        var tenantId = claims.tenantId();
+        var row = fileSharingSettingsRepository.findByTenantId(tenantId).orElse(null);
+        var visitorEnabled = row == null ? defaultVisitorFileEnabled : row.visitorFileEnabled();
+        var agentEnabled = row == null ? defaultAgentFileEnabled : row.agentFileEnabled();
+
+        var role = claims.role();
+        if ("visitor".equals(role)) return visitorEnabled;
+        if ("agent".equals(role) || "admin".equals(role)) return agentEnabled;
+        return true;
     }
 
     public PresignDownloadResult presignDownload(JwtClaims claims, String attachmentId) {

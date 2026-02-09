@@ -760,6 +760,7 @@ public class WsHandler extends TextWebSocketHandler {
             case "missing_conversation_id" -> "missing field: conversation_id";
             case "missing_text" -> "missing field: content.text";
             case "missing_attachment_id" -> "missing field: content.attachment_id";
+            case "file_sharing_disabled" -> "file sharing is disabled";
             case "unsupported_content_type" -> "unsupported content_type";
             case "missing_last_read_msg_id" -> "missing field: last_read_msg_id";
             case "last_read_msg_id_not_found" -> "last_read_msg_id not found";

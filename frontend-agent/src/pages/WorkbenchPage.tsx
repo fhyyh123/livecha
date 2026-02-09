@@ -5,6 +5,7 @@ import type { UploadProps } from "antd";
 import { InstagramOutlined, MessageOutlined, RightOutlined, WhatsAppOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { useChatStore } from "../store/chatStore";
+import { fetchFileSharing, getCachedFileSharing, type FileSharingDto } from "../providers/chatSettings";
 import { useSiteStore } from "../store/siteStore";
 import {
     ChatView,
@@ -31,6 +32,24 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
     const { id } = useParams();
     const screens = Grid.useBreakpoint();
     const isNarrow = !screens.lg;
+
+    const [fileSharing, setFileSharing] = useState<FileSharingDto>(() => getCachedFileSharing());
+
+    useEffect(() => {
+        let mounted = true;
+        // Best-effort refresh; fall back to cached.
+        fetchFileSharing()
+            .then((cfg) => {
+                if (!mounted) return;
+                setFileSharing(cfg);
+            })
+            .catch(() => {
+                // ignore
+            });
+        return () => {
+            mounted = false;
+        };
+    }, []);
 
     const [searchParams, setSearchParams] = useSearchParams();
 
@@ -363,7 +382,7 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
             return false;
         },
         showUploadList: false,
-        disabled: wsStatus !== "connected" || uploading || !selectedId || detail?.status === "closed",
+        disabled: wsStatus !== "connected" || uploading || !selectedId || detail?.status === "closed" || !fileSharing.agent_file_enabled,
     };
 
     useChatWorkbenchEffects({
@@ -614,6 +633,7 @@ export function WorkbenchPage({ mode = "inbox" }: WorkbenchPageProps) {
                                     detail={detail}
                                     uploading={uploading}
                                     uploadProps={uploadProps}
+                                    attachmentsEnabled={fileSharing.agent_file_enabled}
                                     onSendText={onSendText}
                                     onDownload={onDownload}
                                     getAttachmentUrl={downloadAttachment}

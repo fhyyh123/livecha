@@ -162,6 +162,11 @@ type PresignDownloadResponse = {
     expires_in_seconds?: number;
 };
 
+type FileSharingDto = {
+    visitor_file_enabled: boolean;
+    agent_file_enabled: boolean;
+};
+
 const VISITOR_ID_PREFIX = "chatlive.visitor_id.";
 const VISITOR_ID_COOKIE_PREFIX = "chatlive_vid_";
 const VISITOR_ID_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 400; // ~400 days
@@ -559,6 +564,8 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
     const [wsStatus, setWsStatus] = useState<WsStatus>("disconnected");
     const [uploading, setUploading] = useState(false);
 
+    const [visitorFileEnabled, setVisitorFileEnabled] = useState<boolean>(true);
+
     const wsRef = useRef<WsClient | null>(null);
 
     const refreshedDetailForAgentRef = useRef(false);
@@ -621,6 +628,28 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
             }
         })();
     }, [bootstrap?.visitor_token, conversation?.conversation_id]);
+
+    useEffect(() => {
+        const token = bootstrap?.visitor_token || "";
+        if (!token) return;
+
+        let mounted = true;
+        apiFetch<FileSharingDto>("/api/v1/chat-settings/file-sharing", {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then((cfg) => {
+                if (!mounted) return;
+                setVisitorFileEnabled(Boolean(cfg?.visitor_file_enabled));
+            })
+            .catch(() => {
+                // ignore
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, [bootstrap?.visitor_token]);
 
     const containerRef = useRef<HTMLDivElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -1836,6 +1865,7 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
     }
 
     async function sendFile(file: File): Promise<boolean> {
+        if (!visitorFileEnabled) return false;
         if (!file) return false;
         if (!bootstrap?.visitor_token) return false;
         // Pre-chat mode requires form submit first.
@@ -1876,6 +1906,7 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
 
     function onComposerPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
         if (!composerEnabled) return;
+        if (!visitorFileEnabled) return;
         const files = extractImageFilesFromClipboardData(e.clipboardData, { filenameBase: "pasted-image" });
         if (!files.length) return;
         try {
@@ -2628,69 +2659,21 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                                 }}
                             />
 
-                            {isMobileUi ? (
-                                <Tooltip title={t("visitorEmbed.attach.addFile")}>
-                                    <Button
-                                        type="text"
-                                        aria-label={t("visitorEmbed.attach.addFile")}
-                                        icon={<PlusOutlined />}
-                                        disabled={!composerEnabled}
-                                        onClick={() => fileInputRef.current?.click()}
-                                        style={{
-                                            width: 44,
-                                            height: 44,
-                                            borderRadius: 999,
-                                            background: effectiveThemeMode === "dark" ? "rgba(255,255,255,.08)" : "rgba(15,23,42,.06)",
-                                            color: uiTextMain,
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                        }}
-                                    />
-                                </Tooltip>
-                            ) : (
-                                <Popover
-                                    trigger="click"
-                                    placement="topLeft"
-                                    open={attachOpen}
-                                    onOpenChange={(o) => setAttachOpen(o)}
-                                    content={
-                                        <div style={{ display: "flex", flexDirection: "column", padding: 4, minWidth: 190 }}>
-                                            <Button
-                                                type="text"
-                                                icon={<FileAddOutlined />}
-                                                style={{ justifyContent: "flex-start", height: 38 }}
-                                                disabled={!composerEnabled}
-                                                onClick={() => {
-                                                    setAttachOpen(false);
-                                                    fileInputRef.current?.click();
-                                                }}
-                                            >
-                                                {t("visitorEmbed.attach.uploadFile")}
-                                            </Button>
-                                            <Button
-                                                type="text"
-                                                icon={<ScanOutlined />}
-                                                style={{ justifyContent: "flex-start", height: 38 }}
-                                                disabled={!composerEnabled}
-                                                onClick={() => void captureAndSendScreenshot()}
-                                            >
-                                                {t("visitorEmbed.attach.sendScreenshot")}
-                                            </Button>
-                                        </div>
-                                    }
-                                >
-                                    <Tooltip title={t("visitorEmbed.attach.add")}>
+                            {visitorFileEnabled ? (
+                                isMobileUi ? (
+                                    <Tooltip title={t("visitorEmbed.attach.addFile")}>
                                         <Button
                                             type="text"
-                                            aria-label={t("visitorEmbed.attach.add")}
+                                            aria-label={t("visitorEmbed.attach.addFile")}
                                             icon={<PlusOutlined />}
                                             disabled={!composerEnabled}
+                                            onClick={() => fileInputRef.current?.click()}
                                             style={{
                                                 width: 44,
                                                 height: 44,
                                                 borderRadius: 999,
-                                                background: effectiveThemeMode === "dark" ? "rgba(255,255,255,.08)" : "rgba(15,23,42,.06)",
+                                                background:
+                                                    effectiveThemeMode === "dark" ? "rgba(255,255,255,.08)" : "rgba(15,23,42,.06)",
                                                 color: uiTextMain,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -2698,8 +2681,62 @@ export function VisitorEmbedPage({ siteKey: siteKeyProp }: { siteKey?: string } 
                                             }}
                                         />
                                     </Tooltip>
-                                </Popover>
-                            )}
+                                ) : (
+                                    <Popover
+                                        trigger="click"
+                                        placement="topLeft"
+                                        open={attachOpen}
+                                        onOpenChange={(o) => setAttachOpen(o)}
+                                        content={
+                                            <div style={{ display: "flex", flexDirection: "column", padding: 4, minWidth: 190 }}>
+                                                <Button
+                                                    type="text"
+                                                    icon={<FileAddOutlined />}
+                                                    style={{ justifyContent: "flex-start", height: 38 }}
+                                                    disabled={!composerEnabled}
+                                                    onClick={() => {
+                                                        setAttachOpen(false);
+                                                        fileInputRef.current?.click();
+                                                    }}
+                                                >
+                                                    {t("visitorEmbed.attach.uploadFile")}
+                                                </Button>
+                                                <Button
+                                                    type="text"
+                                                    icon={<ScanOutlined />}
+                                                    style={{ justifyContent: "flex-start", height: 38 }}
+                                                    disabled={!composerEnabled}
+                                                    onClick={() => void captureAndSendScreenshot()}
+                                                >
+                                                    {t("visitorEmbed.attach.sendScreenshot")}
+                                                </Button>
+                                            </div>
+                                        }
+                                    >
+                                        <Tooltip title={t("visitorEmbed.attach.add")}>
+                                            <Button
+                                                type="text"
+                                                aria-label={t("visitorEmbed.attach.add")}
+                                                icon={<PlusOutlined />}
+                                                disabled={!composerEnabled}
+                                                style={{
+                                                    width: 44,
+                                                    height: 44,
+                                                    borderRadius: 999,
+                                                    background:
+                                                        effectiveThemeMode === "dark"
+                                                            ? "rgba(255,255,255,.08)"
+                                                            : "rgba(15,23,42,.06)",
+                                                    color: uiTextMain,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                }}
+                                            />
+                                        </Tooltip>
+                                    </Popover>
+                                )
+                            ) : null}
 
                             <div
                                 style={{

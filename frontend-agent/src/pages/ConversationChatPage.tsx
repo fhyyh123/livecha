@@ -15,6 +15,7 @@ import {
 import type { UploadProps } from "antd";
 
 import { useChatStore } from "../store/chatStore";
+import { fetchFileSharing, getCachedFileSharing, type FileSharingDto } from "../providers/chatSettings";
 import { isPreviewableImage } from "../utils/attachments";
 
 function formatBytes(n?: number) {
@@ -38,6 +39,23 @@ export function ConversationChatPage() {
 
     const wsStatus = useChatStore((s) => s.wsStatus);
     const uploading = useChatStore((s) => s.uploading);
+
+    const [fileSharing, setFileSharing] = useState<FileSharingDto>(() => getCachedFileSharing());
+
+    useEffect(() => {
+        let mounted = true;
+        fetchFileSharing()
+            .then((cfg) => {
+                if (!mounted) return;
+                setFileSharing(cfg);
+            })
+            .catch(() => {
+                // ignore
+            });
+        return () => {
+            mounted = false;
+        };
+    }, []);
 
     const messages = useChatStore(
         (s) => (conversationId ? (s.messagesByConversationId[conversationId] || []) : []),
@@ -139,7 +157,7 @@ export function ConversationChatPage() {
             return false;
         },
         showUploadList: false,
-        disabled: !wsConnected || uploading,
+        disabled: !wsConnected || uploading || !fileSharing.agent_file_enabled,
     };
 
     useEffect(() => {
