@@ -1402,13 +1402,16 @@ export function TeamPage() {
                                                                 label: t("team.detailsChatAssignment"),
                                                                 children: (
                                                                     <Typography.Link
-                                                                        onClick={() => {
-                                                                            notification.info({
-                                                                                message: t("team.comingSoon"),
-                                                                                description: t("team.detailsManageChatAssignment"),
-                                                                                placement: "bottomRight",
-                                                                                duration: 2,
-                                                                            });
+                                                                        onClick={(e) => {
+                                                                            e?.preventDefault();
+                                                                            e?.stopPropagation();
+
+                                                                            const groupId = String(selectedGroupId || "").trim();
+                                                                            if (!groupId) return;
+
+                                                                            navigate(
+                                                                                `/settings/chat-settings/chat-assignment?group_id=${encodeURIComponent(groupId)}`,
+                                                                            );
                                                                         }}
                                                                     >
                                                                         {t("team.detailsManageChatAssignment")}

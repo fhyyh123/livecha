@@ -166,6 +166,24 @@
       "required": "Required"
     }
   },
+  "chatAssignment": {
+    "title": "Chat assignment",
+    "hint": "Set up how chats are distributed among agents.",
+    "adminOnlyHint": "Admin only",
+    "setupForGroup": "Setup for group",
+    "groupPlaceholder": "Select a group",
+    "chooseTitle": "Choose how chats are distributed",
+    "auto": {
+      "title": "Auto assignment",
+      "desc": "Chats are evenly distributed among agents with accepting chats status. When all agents hit their limit, new visitors are queued.",
+      "tipBefore": "Set each agent's chat limit in their",
+      "tipLink": "profile details"
+    },
+    "manual": {
+      "title": "Manual selection",
+      "desc": "All agents get notified about a customer waiting in the queue. Chat will be assigned to the first agent who picks it up."
+    }
+  },
   "fileSharing": {
     "title": "File sharing",
     "hint": "Share and receive files during chats. Files that can be a potential threat will be automatically filtered out. You can then decide if you want to access them or not.",

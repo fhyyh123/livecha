@@ -2,10 +2,12 @@ package com.chatlive.support.chat.api;
 
 import com.chatlive.support.auth.service.jwt.JwtClaims;
 import com.chatlive.support.auth.service.jwt.JwtService;
+import com.chatlive.support.chat.repo.AssignmentStrategyConfigRepository;
 import com.chatlive.support.chat.repo.ChatFileSharingSettingsRepository;
 import com.chatlive.support.chat.repo.ChatInactivityTimeoutsRepository;
 import com.chatlive.support.common.api.ApiResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -20,6 +22,9 @@ public class AdminChatSettingsController {
     private final JwtService jwtService;
     private final ChatInactivityTimeoutsRepository inactivityTimeoutsRepository;
     private final ChatFileSharingSettingsRepository fileSharingSettingsRepository;
+    private final AssignmentStrategyConfigRepository assignmentStrategyConfigRepository;
+
+    private final String defaultAssignmentStrategyKey;
 
     private final boolean defaultAgentNoReplyTransferEnabled;
     private final int defaultAgentNoReplyTransferMinutes;
@@ -35,6 +40,7 @@ public class AdminChatSettingsController {
             JwtService jwtService,
             ChatInactivityTimeoutsRepository inactivityTimeoutsRepository,
             ChatFileSharingSettingsRepository fileSharingSettingsRepository,
+            AssignmentStrategyConfigRepository assignmentStrategyConfigRepository,
             @Value("${app.chat.agent-no-reply-transfer.enabled:true}") boolean defaultAgentNoReplyTransferEnabled,
             @Value("${app.chat.agent-no-reply-transfer.minutes:3}") int defaultAgentNoReplyTransferMinutes,
             @Value("${app.chat.visitor-idle.enabled:true}") boolean defaultVisitorIdleEnabled,
@@ -42,11 +48,13 @@ public class AdminChatSettingsController {
             @Value("${app.conversation.inactivity-archive.enabled:true}") boolean defaultInactivityArchiveEnabled,
             @Value("${app.conversation.inactivity-archive.minutes:60}") int defaultInactivityArchiveMinutes,
             @Value("${app.chat.file-sharing.visitor-enabled:true}") boolean defaultVisitorFileEnabled,
-            @Value("${app.chat.file-sharing.agent-enabled:true}") boolean defaultAgentFileEnabled
+            @Value("${app.chat.file-sharing.agent-enabled:true}") boolean defaultAgentFileEnabled,
+            @Value("${app.assignment.strategy:round_robin}") String defaultAssignmentStrategyKey
     ) {
         this.jwtService = jwtService;
         this.inactivityTimeoutsRepository = inactivityTimeoutsRepository;
         this.fileSharingSettingsRepository = fileSharingSettingsRepository;
+        this.assignmentStrategyConfigRepository = assignmentStrategyConfigRepository;
         this.defaultAgentNoReplyTransferEnabled = defaultAgentNoReplyTransferEnabled;
         this.defaultAgentNoReplyTransferMinutes = clampMinutes(defaultAgentNoReplyTransferMinutes);
         this.defaultVisitorIdleEnabled = defaultVisitorIdleEnabled;
@@ -56,6 +64,42 @@ public class AdminChatSettingsController {
 
         this.defaultVisitorFileEnabled = defaultVisitorFileEnabled;
         this.defaultAgentFileEnabled = defaultAgentFileEnabled;
+
+        this.defaultAssignmentStrategyKey = normalizeStrategyKey(defaultAssignmentStrategyKey);
+    }
+
+    public record ChatAssignmentDto(String mode) {
+    }
+
+    @GetMapping("/chat-assignment")
+    public ApiResponse<ChatAssignmentDto> getChatAssignment(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestParam(value = "group_id", required = false) String groupId
+    ) {
+        var claims = requireAdminClaims(authorization);
+        var groupKey = normalizeGroupKey(groupId);
+
+        var strategyKey = assignmentStrategyConfigRepository.findStrategyKey(claims.tenantId(), groupKey)
+                .orElse(defaultAssignmentStrategyKey);
+        strategyKey = normalizeStrategyKey(strategyKey);
+
+        var mode = "manual".equals(strategyKey) ? "manual" : "auto";
+        return ApiResponse.ok(new ChatAssignmentDto(mode));
+    }
+
+    @PutMapping("/chat-assignment")
+    public ApiResponse<ChatAssignmentDto> putChatAssignment(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestParam(value = "group_id", required = false) String groupId,
+            @RequestBody ChatAssignmentDto req
+    ) {
+        var claims = requireAdminClaims(authorization);
+        var groupKey = normalizeGroupKey(groupId);
+        var mode = (req == null || req.mode() == null) ? "auto" : req.mode().trim().toLowerCase();
+
+        var strategyKey = "manual".equals(mode) ? "manual" : "round_robin";
+        assignmentStrategyConfigRepository.upsert(claims.tenantId(), groupKey, strategyKey);
+        return getChatAssignment(authorization, groupId);
     }
 
     @GetMapping("/inactivity-timeouts")
@@ -188,5 +232,21 @@ public class AdminChatSettingsController {
 
     private static int clampMinutes(int minutes) {
         return Math.max(1, Math.min(minutes, 365 * 24 * 60));
+    }
+
+    private static String normalizeGroupKey(String groupKey) {
+        var gk = groupKey == null ? "" : groupKey.trim();
+        if (gk.isBlank()) return "*";
+        return gk;
+    }
+
+    private static String normalizeStrategyKey(String raw) {
+        var key = (raw == null ? "" : raw.trim().toLowerCase()).replace('-', '_');
+        if (key.isBlank()) return "round_robin";
+        return switch (key) {
+            case "roundrobin" -> "round_robin";
+            case "leastopen" -> "least_open";
+            default -> key;
+        };
     }
 }

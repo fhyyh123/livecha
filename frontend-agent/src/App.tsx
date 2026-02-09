@@ -43,6 +43,7 @@ const PostChatFormPage = lazy(() => import("./pages/PostChatFormPage").then((m) 
 const TicketFormPage = lazy(() => import("./pages/TicketFormPage").then((m) => ({ default: m.TicketFormPage })));
 const InactivityTimeoutsPage = lazy(() => import("./pages/InactivityTimeoutsPage").then((m) => ({ default: m.InactivityTimeoutsPage })));
 const FileSharingPage = lazy(() => import("./pages/FileSharingPage").then((m) => ({ default: m.FileSharingPage })));
+const ChatAssignmentPage = lazy(() => import("./pages/ChatAssignmentPage").then((m) => ({ default: m.ChatAssignmentPage })));
 const InvitesPage = lazy(() => import("./pages/InvitesPage").then((m) => ({ default: m.InvitesPage })));
 const TeamPage = lazy(() => import("./pages/TeamPage").then((m) => ({ default: m.TeamPage })));
 const SkillGroupEditPage = lazy(() => import("./pages/SkillGroupEditPage").then((m) => ({ default: m.SkillGroupEditPage })));
@@ -433,6 +434,14 @@ function App() {
                 element={
                   <Suspense fallback={<RouteFallback />}>
                     <FileSharingPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/settings/chat-settings/chat-assignment"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <ChatAssignmentPage />
                   </Suspense>
                 }
               />

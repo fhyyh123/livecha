@@ -2,6 +2,7 @@ package com.chatlive.support.chat.service;
 
 import com.chatlive.support.auth.service.jwt.JwtClaims;
 import com.chatlive.support.chat.repo.AgentProfileRepository;
+import com.chatlive.support.chat.repo.AssignmentStrategyConfigRepository;
 import com.chatlive.support.chat.repo.AssignCursorRepository;
 import com.chatlive.support.chat.repo.ConversationRepository;
 import com.chatlive.support.chat.service.assignment.AssignmentContext;
@@ -37,7 +38,10 @@ public class AssignmentService {
     private final AssignCursorRepository assignCursorRepository;
     private final WsBroadcaster wsBroadcaster;
     private final AssignmentStrategyResolver assignmentStrategyResolver;
+    private final AssignmentStrategyConfigRepository assignmentStrategyConfigRepository;
     private final UserAccountRepository userAccountRepository;
+
+    private final String defaultAssignmentStrategyKey;
 
         private final Counter onlineTriggerAttempts;
         private final Counter onlineTriggerAssignedTotal;
@@ -51,15 +55,20 @@ public class AssignmentService {
             AssignCursorRepository assignCursorRepository,
             WsBroadcaster wsBroadcaster,
             AssignmentStrategyResolver assignmentStrategyResolver,
+            AssignmentStrategyConfigRepository assignmentStrategyConfigRepository,
             UserAccountRepository userAccountRepository,
-            MeterRegistry meterRegistry
+            MeterRegistry meterRegistry,
+            @Value("${app.assignment.strategy:round_robin}") String defaultAssignmentStrategyKey
     ) {
         this.conversationRepository = conversationRepository;
         this.agentProfileRepository = agentProfileRepository;
         this.assignCursorRepository = assignCursorRepository;
         this.wsBroadcaster = wsBroadcaster;
         this.assignmentStrategyResolver = assignmentStrategyResolver;
+        this.assignmentStrategyConfigRepository = assignmentStrategyConfigRepository;
         this.userAccountRepository = userAccountRepository;
+
+        this.defaultAssignmentStrategyKey = normalizeStrategyKey(defaultAssignmentStrategyKey);
 
         // Low-cardinality metrics: do NOT tag by tenant/agent/conversation.
         this.onlineTriggerAttempts = Counter.builder("chatlive.assignment.online_trigger.attempts")
@@ -79,6 +88,22 @@ public class AssignmentService {
         this.onlineTriggerDuration = Timer.builder("chatlive.assignment.online_trigger.duration")
             .description("Duration of online-trigger assignment")
             .register(meterRegistry);
+    }
+
+    private static String normalizeGroupKey(String groupKey) {
+        var gk = (groupKey == null ? "" : groupKey.trim());
+        if (gk.isBlank()) return DEFAULT_GROUP_KEY;
+        return gk;
+    }
+
+    private static String normalizeStrategyKey(String raw) {
+        var key = (raw == null ? "" : raw.trim().toLowerCase()).replace('-', '_');
+        if (key.isBlank()) return "round_robin";
+        return switch (key) {
+            case "roundrobin" -> "round_robin";
+            case "leastopen" -> "least_open";
+            default -> key;
+        };
     }
 
     private String resolveAgentLabel(String userId) {
@@ -253,10 +278,22 @@ public class AssignmentService {
             var rows = conversationRepository.listQueuedForAgent(tenantId, agentUserId, scanLimit);
 
             var picked = new ArrayList<String>(Math.min(target, 32));
+            var strategyByGroupKey = new java.util.HashMap<String, String>();
             for (var row : rows) {
                 if (picked.size() >= target) {
                     break;
                 }
+
+                // Respect manual mode: do not auto-assign queued conversations in manual-selection groups.
+                var gk = normalizeGroupKey(row.skillGroupId());
+                var key = strategyByGroupKey.computeIfAbsent(gk, (k) -> {
+                    var dbKey = assignmentStrategyConfigRepository.findStrategyKey(tenantId, k).orElse(defaultAssignmentStrategyKey);
+                    return normalizeStrategyKey(dbKey);
+                });
+                if ("manual".equals(key)) {
+                    continue;
+                }
+
                 var updated = conversationRepository.tryAssignToAgent(tenantId, row.id(), agentUserId);
                 if (updated == 1) {
                     picked.add(row.id());

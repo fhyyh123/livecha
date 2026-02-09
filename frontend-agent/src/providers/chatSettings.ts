@@ -14,6 +14,10 @@ export type FileSharingDto = {
     agent_file_enabled: boolean;
 };
 
+export type ChatAssignmentDto = {
+    mode: "auto" | "manual";
+};
+
 export const DEFAULT_INACTIVITY_TIMEOUTS: InactivityTimeoutsDto = {
     agent_no_reply_transfer_enabled: true,
     agent_no_reply_transfer_minutes: 3,
@@ -26,6 +30,10 @@ export const DEFAULT_INACTIVITY_TIMEOUTS: InactivityTimeoutsDto = {
 export const DEFAULT_FILE_SHARING: FileSharingDto = {
     visitor_file_enabled: true,
     agent_file_enabled: true,
+};
+
+export const DEFAULT_CHAT_ASSIGNMENT: ChatAssignmentDto = {
+    mode: "auto",
 };
 
 const STORAGE_KEY = "chatlive.chatSettings.inactivityTimeouts" as const;
@@ -137,4 +145,25 @@ export async function updateFileSharingAdmin(values: FileSharingDto): Promise<Fi
     const data = res.data || values;
     setCachedFileSharing(data);
     return data;
+}
+
+export async function fetchChatAssignmentAdmin(groupId: string): Promise<ChatAssignmentDto> {
+    const res = await http.get<ChatAssignmentDto>("/api/v1/admin/chat-settings/chat-assignment", {
+        params: { group_id: groupId },
+    });
+    const data = res.data || DEFAULT_CHAT_ASSIGNMENT;
+    return {
+        mode: data.mode === "manual" ? "manual" : "auto",
+    };
+}
+
+export async function updateChatAssignmentAdmin(groupId: string, values: ChatAssignmentDto): Promise<ChatAssignmentDto> {
+    const payload: ChatAssignmentDto = { mode: values.mode === "manual" ? "manual" : "auto" };
+    const res = await http.put<ChatAssignmentDto>("/api/v1/admin/chat-settings/chat-assignment", payload, {
+        params: { group_id: groupId },
+    });
+    const data = res.data || payload;
+    return {
+        mode: data.mode === "manual" ? "manual" : "auto",
+    };
 }

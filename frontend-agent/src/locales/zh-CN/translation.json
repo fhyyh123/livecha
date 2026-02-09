@@ -168,6 +168,24 @@
         "required": "必填"
       }
   },
+  "chatAssignment": {
+    "title": "会话分配",
+    "hint": "设置会话如何在客服人员之间分配。",
+    "adminOnlyHint": "仅管理员可操作",
+    "setupForGroup": "为分组设置",
+    "groupPlaceholder": "选择分组",
+    "chooseTitle": "选择会话分配方式",
+    "auto": {
+      "title": "自动分配",
+      "desc": "会话会在处于可接待状态的客服之间均匀分配。当所有客服达到并发上限时，新访客将进入队列等待。",
+      "tipBefore": "可在",
+      "tipLink": "个人资料"
+    },
+    "manual": {
+      "title": "手动领取",
+      "desc": "当有访客在队列中等待时，所有客服都会收到通知。会话会分配给第一个领取的客服。"
+    }
+  },
   "fileSharing": {
     "title": "文件共享",
     "hint": "在对话期间收发文件。可能有风险的文件会被自动过滤，然后你可以决定是否访问它们。",
