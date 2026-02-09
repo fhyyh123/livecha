@@ -44,6 +44,7 @@ const TicketFormPage = lazy(() => import("./pages/TicketFormPage").then((m) => (
 const InactivityTimeoutsPage = lazy(() => import("./pages/InactivityTimeoutsPage").then((m) => ({ default: m.InactivityTimeoutsPage })));
 const InvitesPage = lazy(() => import("./pages/InvitesPage").then((m) => ({ default: m.InvitesPage })));
 const TeamPage = lazy(() => import("./pages/TeamPage").then((m) => ({ default: m.TeamPage })));
+const SkillGroupEditPage = lazy(() => import("./pages/SkillGroupEditPage").then((m) => ({ default: m.SkillGroupEditPage })));
 const ProfilePage = lazy(() => import("./pages/ProfilePage").then((m) => ({ default: m.ProfilePage })));
 const ChatPageSettingsPage = lazy(() => import("./pages/ChatPageSettingsPage").then((m) => ({ default: m.ChatPageSettingsPage })));
 const SettingsPlaceholderPage = lazy(() => import("./pages/SettingsPlaceholderPage").then((m) => ({ default: m.SettingsPlaceholderPage })));
@@ -449,6 +450,14 @@ function App() {
                 element={
                   <Suspense fallback={<RouteFallback />}>
                     <TeamPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/team/groups/:groupId/edit"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <SkillGroupEditPage />
                   </Suspense>
                 }
               />

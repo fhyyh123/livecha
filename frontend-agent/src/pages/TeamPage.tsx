@@ -3,6 +3,7 @@ import {
     Avatar,
     Button,
     Card,
+    Collapse,
     Dropdown,
     Descriptions,
     Divider,
@@ -13,7 +14,6 @@ import {
     Modal,
     Select,
     Space,
-    Switch,
     Table,
     Tabs,
     Tag,
@@ -22,7 +22,7 @@ import {
 } from "antd";
 import { DownOutlined, EllipsisOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { http, TOKEN_STORAGE_KEY } from "../providers/http";
 import { errorMessage } from "../utils/errorMessage";
@@ -96,6 +96,27 @@ function initials(name: string) {
     return t.slice(0, 1).toUpperCase();
 }
 
+function hashString(input: string): number {
+    // Small, deterministic hash for stable avatar colors.
+    const s = String(input || "");
+    let h = 5381;
+    for (let i = 0; i < s.length; i += 1) {
+        h = (h * 33) ^ s.charCodeAt(i);
+    }
+    return h >>> 0;
+}
+
+function avatarStyle(seed: string) {
+    const n = hashString(seed);
+    const hue = n % 360;
+    const sat = 72;
+    const light = 44;
+    return {
+        backgroundColor: `hsl(${hue} ${sat}% ${light}%)`,
+        color: "#fff",
+    } as const;
+}
+
 function isSystemOrFallbackGroup(g: SkillGroupItem | null | undefined): boolean {
     if (!g) return false;
     if (Boolean(g.is_fallback)) return true;
@@ -105,11 +126,15 @@ function isSystemOrFallbackGroup(g: SkillGroupItem | null | undefined): boolean 
 export function TeamPage() {
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [loading, setLoading] = useState(false);
 
     const [agents, setAgents] = useState<AgentListItem[]>([]);
     const [myStatus, setMyStatus] = useState<AgentStatusResponse | null>(null);
+
+    const [agentGroupsLoading, setAgentGroupsLoading] = useState(false);
+    const [agentGroups, setAgentGroups] = useState<SkillGroupItem[]>([]);
 
     const [activeTab, setActiveTab] = useState<"agents" | "groups">("agents");
     const [selectedAgentId, setSelectedAgentId] = useState<string>("");
@@ -124,15 +149,36 @@ export function TeamPage() {
 
     const [selectedGroupId, setSelectedGroupId] = useState<string>("");
 
+    useEffect(() => {
+        const st: any = (location as any)?.state;
+        if (!st) return;
+        if (st.tab === "groups") {
+            setActiveTab("groups");
+        }
+        if (typeof st.selectedGroupId === "string" && st.selectedGroupId) {
+            setSelectedGroupId(st.selectedGroupId);
+        }
+        // Clear state so refresh/navigation doesn't re-apply.
+        try {
+            navigate(location.pathname, { replace: true, state: null });
+        } catch {
+            // ignore
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const selectedGroup = useMemo(
         () => (selectedGroupId ? groups.find((g) => g.id === selectedGroupId) || null : null),
         [groups, selectedGroupId],
     );
-    const selectedGroupReadonly = isSystemOrFallbackGroup(selectedGroup);
 
     const [createGroupOpen, setCreateGroupOpen] = useState(false);
     const [createGroupLoading, setCreateGroupLoading] = useState(false);
-    const [createGroupForm] = Form.useForm<{ name: string; enabled: boolean }>();
+    const [createGroupForm] = Form.useForm<{ name: string; member_user_ids: string[] }>();
+
+    const createGroupMembers = Form.useWatch("member_user_ids", createGroupForm) as string[] | undefined;
+
+    const [deletingGroup, setDeletingGroup] = useState(false);
 
     const [chatLimitOpen, setChatLimitOpen] = useState(false);
     const [chatLimitSaving, setChatLimitSaving] = useState(false);
@@ -144,10 +190,6 @@ export function TeamPage() {
 
     const [groupStatsLoading, setGroupStatsLoading] = useState(false);
     const [groupStats, setGroupStats] = useState<Record<string, SkillGroupStats>>({});
-
-    const [addMemberAgentId, setAddMemberAgentId] = useState<string>("");
-    const [addMemberWeight, setAddMemberWeight] = useState<number>(1);
-    const [addingMember, setAddingMember] = useState(false);
 
     const [inviteOpen, setInviteOpen] = useState(false);
 
@@ -166,6 +208,43 @@ export function TeamPage() {
     }, [agentById, agents, selectedAgentId]);
 
     const isSelectedMe = Boolean(selectedAgent && effectiveMeUserId && selectedAgent.user_id === effectiveMeUserId);
+
+    useEffect(() => {
+        if (activeTab !== "agents") return;
+        const userId = String(selectedAgent?.user_id || "");
+        if (!userId) {
+            setAgentGroups([]);
+            return;
+        }
+
+        let cancelled = false;
+        setAgentGroupsLoading(true);
+        http
+            .get<SkillGroupItem[]>(`/api/v1/skill-groups/agents/${encodeURIComponent(userId)}`)
+            .then((res) => {
+                if (cancelled) return;
+                setAgentGroups(Array.isArray(res.data) ? res.data : []);
+            })
+            .catch((e: unknown) => {
+                if (cancelled) return;
+                setAgentGroups([]);
+                notification.error({
+                    message: t("team.agentGroupsLoadFailedTitle"),
+                    description: errorMessage(e, "load_agent_groups_failed"),
+                    placement: "bottomRight",
+                    duration: 3,
+                });
+            })
+            .finally(() => {
+                if (cancelled) return;
+                setAgentGroupsLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab, selectedAgent?.user_id]);
 
     function logoutNow() {
         localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -664,63 +743,19 @@ export function TeamPage() {
         }
     }
 
-    async function addOrUpdateMember() {
-        if (!selectedGroupId) return;
-        if (selectedGroupReadonly) return;
-        const agentUserId = String(addMemberAgentId || "");
-        if (!agentUserId) return;
-        const weight = Math.max(0, Math.min(100, Number(addMemberWeight || 0) || 0));
-
-        setAddingMember(true);
-        try {
-            await http.post(`/api/v1/skill-groups/${encodeURIComponent(selectedGroupId)}/members`, {
-                agent_user_id: agentUserId,
-                weight,
-            });
-            const res = await http.get<SkillGroupMemberItem[]>(
-                `/api/v1/skill-groups/${encodeURIComponent(selectedGroupId)}/members`,
-            );
-            setMembers(Array.isArray(res.data) ? res.data : []);
-            setAddMemberAgentId("");
-            setAddMemberWeight(1);
-        } catch (e: unknown) {
-            notification.error({
-                message: t("team.memberUpdateFailedTitle"),
-                description: errorMessage(e, "update_member_failed"),
-                placement: "bottomRight",
-                duration: 3,
-            });
-        } finally {
-            setAddingMember(false);
-        }
-    }
-
-    async function removeMember(agentUserId: string) {
-        if (!selectedGroupId) return;
-        if (selectedGroupReadonly) return;
-        try {
-            await http.delete(
-                `/api/v1/skill-groups/${encodeURIComponent(selectedGroupId)}/members/${encodeURIComponent(agentUserId)}`,
-            );
-            setMembers((prev) => prev.filter((m) => m.agent_user_id !== agentUserId));
-        } catch (e: unknown) {
-            notification.error({
-                message: t("team.memberRemoveFailedTitle"),
-                description: errorMessage(e, "remove_member_failed"),
-                placement: "bottomRight",
-                duration: 3,
-            });
-        }
-    }
-
-    async function createGroup(values: { name: string; enabled: boolean }) {
+    async function createGroup(values: { name: string; member_user_ids: string[] }) {
         const name = String(values?.name || "").trim();
+        const memberIds = Array.from(new Set((values?.member_user_ids || []).map((x) => String(x || "").trim()))).filter(
+            Boolean,
+        );
         if (!name) return;
+        if (!memberIds.length) return;
         setCreateGroupLoading(true);
         try {
             const res = await http.post<SkillGroupItem>("/api/v1/skill-groups", {
                 name,
-                enabled: Boolean(values?.enabled),
+                enabled: true,
+                member_user_ids: memberIds,
             });
             setGroups((prev) => [res.data as SkillGroupItem, ...prev]);
             setCreateGroupOpen(false);
@@ -737,12 +772,51 @@ export function TeamPage() {
         }
     }
 
-    const addMemberOptions = useMemo(() => {
-        const current = new Set(members.map((m) => m.agent_user_id));
-        return agents
-            .filter((a) => !current.has(a.user_id))
-            .map((a) => ({ value: a.user_id, label: a.username }));
-    }, [agents, members]);
+    function confirmDeleteGroup(group: SkillGroupItem) {
+        if (!isAdmin) return;
+        if (!group?.id) return;
+        if (isSystemOrFallbackGroup(group)) return;
+
+        const groupId = group.id;
+        const name = group.name || groupId;
+
+        Modal.confirm({
+            title: t("team.deleteGroupTitle"),
+            content: t("team.deleteGroupConfirm", { name }),
+            okText: t("common.delete"),
+            okButtonProps: { danger: true },
+            cancelText: t("common.cancel"),
+            onOk: async () => {
+                setDeletingGroup(true);
+                try {
+                    await http.delete(`/api/v1/skill-groups/${encodeURIComponent(groupId)}`);
+                    notification.success({
+                        message: t("common.saved"),
+                        placement: "bottomRight",
+                        duration: 1.5,
+                    });
+                    if (selectedGroupId === groupId) {
+                        setSelectedGroupId("");
+                        setMembers([]);
+                    }
+                    await refreshAll();
+                } catch (e: unknown) {
+                    const code = String((e as any)?.code || (e as any)?.message || "");
+                    const friendly =
+                        code === "group_in_use" ? t("team.deleteGroupInUse") : errorMessage(e, "delete_group_failed");
+                    notification.error({
+                        message: t("team.deleteGroupFailedTitle"),
+                        description: friendly,
+                        placement: "bottomRight",
+                        duration: 3,
+                    });
+                    throw e;
+                } finally {
+                    setDeletingGroup(false);
+                }
+            },
+        });
+    }
 
     const agentTableData = useMemo<AgentRow[]>(() => {
         const addRow: AgentRow = {
@@ -870,7 +944,9 @@ export function TeamPage() {
 
                                                                     return (
                                                                         <Space size={10}>
-                                                                            <Avatar>{initials(a.username)}</Avatar>
+                                                                            <Avatar style={avatarStyle(a.user_id || a.username)}>
+                                                                                {initials(a.username)}
+                                                                            </Avatar>
                                                                             <div style={{ lineHeight: 1.2 }}>
                                                                                 <Space size={8}>
                                                                                     <Typography.Text strong>{a.username}</Typography.Text>
@@ -923,7 +999,12 @@ export function TeamPage() {
                                             selectedAgent ? (
                                                 <Space direction="vertical" size={12} style={{ width: "100%" }}>
                                                     <Space size={10}>
-                                                        <Avatar size={48}>{initials(selectedAgent.username)}</Avatar>
+                                                        <Avatar
+                                                            size={48}
+                                                            style={avatarStyle(selectedAgent.user_id || selectedAgent.username)}
+                                                        >
+                                                            {initials(selectedAgent.username)}
+                                                        </Avatar>
                                                         <div>
                                                             <Typography.Title level={5} style={{ margin: 0 }}>
                                                                 {selectedAgent.username}
@@ -957,9 +1038,42 @@ export function TeamPage() {
                                                     </Descriptions>
 
                                                     <Divider style={{ margin: "8px 0" }} />
-                                                    <Card size="small" title={t("team.sections.groups")} bodyStyle={{ padding: 12 }}>
-                                                        <Typography.Text type="secondary">{t("team.comingSoon")}</Typography.Text>
-                                                    </Card>
+                                                    <Collapse
+                                                        size="small"
+                                                        defaultActiveKey={["groups"]}
+                                                        items={[
+                                                            {
+                                                                key: "groups",
+                                                                label: t("team.agentGroupsLabel", { count: agentGroups.length }),
+                                                                children: (
+                                                                    <List
+                                                                        loading={agentGroupsLoading}
+                                                                        dataSource={agentGroups}
+                                                                        locale={{ emptyText: t("team.noAgentGroups") }}
+                                                                        renderItem={(g) => (
+                                                                            <List.Item>
+                                                                                <List.Item.Meta
+                                                                                    avatar={
+                                                                                        <Avatar
+                                                                                            shape="square"
+                                                                                            size={24}
+                                                                                            style={{
+                                                                                                borderRadius: 6,
+                                                                                                ...avatarStyle(g.id || g.name),
+                                                                                            }}
+                                                                                        >
+                                                                                            {initials(g.name)}
+                                                                                        </Avatar>
+                                                                                    }
+                                                                                    title={<Typography.Text>{g.name}</Typography.Text>}
+                                                                                />
+                                                                            </List.Item>
+                                                                        )}
+                                                                    />
+                                                                ),
+                                                            },
+                                                        ]}
+                                                    />
                                                     <Card size="small" title={t("team.sections.workingHours")} bodyStyle={{ padding: 12 }}>
                                                         <Typography.Text type="secondary">{t("team.comingSoon")}</Typography.Text>
                                                     </Card>
@@ -992,7 +1106,7 @@ export function TeamPage() {
                                                             type="primary"
                                                             icon={<PlusOutlined />}
                                                             onClick={() => {
-                                                                createGroupForm.setFieldsValue({ name: "", enabled: true });
+                                                                createGroupForm.setFieldsValue({ name: "", member_user_ids: [] });
                                                                 setCreateGroupOpen(true);
                                                             }}
                                                         >
@@ -1029,7 +1143,7 @@ export function TeamPage() {
                                                                 key: "name",
                                                                 render: (_: unknown, g: SkillGroupItem) => (
                                                                     <Space size={10}>
-                                                                        <Avatar>{initials(g.name)}</Avatar>
+                                                                        <Avatar style={avatarStyle(g.id || g.name)}>{initials(g.name)}</Avatar>
                                                                         <div style={{ lineHeight: 1.2 }}>
                                                                             <Space size={8}>
                                                                                 <Typography.Text strong>{g.name}</Typography.Text>
@@ -1038,7 +1152,9 @@ export function TeamPage() {
                                                                                 </Tag>
                                                                             </Space>
                                                                             <div>
-                                                                                <Typography.Text type="secondary">{g.id}</Typography.Text>
+                                                                                <Typography.Text type="secondary">
+                                                                                    {t("team.members")}: {groupStats[g.id]?.total ?? "—"}
+                                                                                </Typography.Text>
                                                                             </div>
                                                                         </div>
                                                                     </Space>
@@ -1056,7 +1172,7 @@ export function TeamPage() {
                                                                         <Space size={10}>
                                                                             <Avatar.Group maxCount={3} size="small">
                                                                                 {ids.map((id) => (
-                                                                                    <Avatar key={id}>
+                                                                                    <Avatar key={id} style={avatarStyle(id)}>
                                                                                         {initials(agentById[id]?.username || id)}
                                                                                     </Avatar>
                                                                                 ))}
@@ -1095,6 +1211,72 @@ export function TeamPage() {
                                                                     );
                                                                 },
                                                             },
+                                                            {
+                                                                title: "",
+                                                                key: "actions",
+                                                                width: 48,
+                                                                align: "right",
+                                                                render: (_: unknown, g: SkillGroupItem) => {
+                                                                    const readonly = isSystemOrFallbackGroup(g);
+
+                                                                    return (
+                                                                        <Dropdown
+                                                                            trigger={["click"]}
+                                                                            menu={{
+                                                                                items: [
+                                                                                    {
+                                                                                        key: "edit_group",
+                                                                                        label: t("team.actions.editGroup"),
+                                                                                        disabled: !isAdmin || readonly,
+                                                                                    },
+                                                                                    {
+                                                                                        key: "view_group_reports",
+                                                                                        label: t("team.actions.viewGroupReports"),
+                                                                                    },
+                                                                                    { type: "divider" },
+                                                                                    {
+                                                                                        key: "delete",
+                                                                                        label: t("common.delete"),
+                                                                                        danger: true,
+                                                                                        disabled: deletingGroup || !isAdmin || readonly,
+                                                                                    },
+                                                                                ],
+                                                                                onClick: ({ key, domEvent }) => {
+                                                                                    domEvent?.stopPropagation();
+                                                                                    domEvent?.preventDefault();
+                                                                                    if (key === "edit_group") {
+                                                                                        navigate(`/team/groups/${encodeURIComponent(g.id)}/edit`, {
+                                                                                            state: { from: "team" },
+                                                                                        });
+                                                                                        return;
+                                                                                    }
+                                                                                    if (key === "view_group_reports") {
+                                                                                        notification.info({
+                                                                                            message: t("team.comingSoon"),
+                                                                                            description: t("team.actions.viewGroupReports"),
+                                                                                            placement: "bottomRight",
+                                                                                            duration: 2,
+                                                                                        });
+                                                                                        return;
+                                                                                    }
+                                                                                    if (key === "delete") {
+                                                                                        confirmDeleteGroup(g);
+                                                                                    }
+                                                                                },
+                                                                            }}
+                                                                        >
+                                                                            <Button
+                                                                                type="text"
+                                                                                size="small"
+                                                                                disabled={deletingGroup}
+                                                                                icon={<EllipsisOutlined />}
+                                                                                onMouseDown={(e) => e.stopPropagation()}
+                                                                                onClick={(e) => e.stopPropagation()}
+                                                                            />
+                                                                        </Dropdown>
+                                                                    );
+                                                                },
+                                                            },
                                                         ]}
                                                     />
                                                 </div>
@@ -1104,90 +1286,155 @@ export function TeamPage() {
                                         detail={
                                             selectedGroupId ? (
                                                 <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                                                    <Typography.Title level={5} style={{ margin: 0 }}>
-                                                        {selectedGroup?.name || selectedGroupId}
-                                                    </Typography.Title>
-
-                                                    <Descriptions size="small" column={1}>
-                                                        <Descriptions.Item label={t("team.fields.userId")}>
-                                                            {selectedGroupId}
-                                                        </Descriptions.Item>
-                                                        <Descriptions.Item label={t("team.members")}>{members.length}</Descriptions.Item>
-                                                    </Descriptions>
-
-                                                    {isAdmin ? (
-                                                        <Card size="small" title={t("team.addMember")} bodyStyle={{ padding: 12 }}>
-                                                            <Space direction="vertical" size={10} style={{ width: "100%" }}>
-                                                                <Select
-                                                                    placeholder={t("team.selectAgent")}
-                                                                    value={addMemberAgentId || undefined}
-                                                                    options={addMemberOptions}
-                                                                    onChange={(v) => setAddMemberAgentId(String(v || ""))}
-                                                                    showSearch
-                                                                    optionFilterProp="label"
-                                                                    disabled={selectedGroupReadonly}
-                                                                />
-                                                                <Space style={{ justifyContent: "space-between", width: "100%" }}>
-                                                                    <Typography.Text>{t("team.weight")}</Typography.Text>
-                                                                    <InputNumber
-                                                                        min={0}
-                                                                        max={100}
-                                                                        value={addMemberWeight}
-                                                                        onChange={(v) => setAddMemberWeight(Number(v || 0))}
-                                                                        disabled={selectedGroupReadonly}
-                                                                    />
-                                                                </Space>
-                                                                <Button
-                                                                    type="primary"
-                                                                    disabled={!addMemberAgentId || selectedGroupReadonly}
-                                                                    loading={addingMember}
-                                                                    onClick={() => void addOrUpdateMember()}
+                                                    <Space size={12} align="start" style={{ width: "100%" }}>
+                                                        <Avatar
+                                                            shape="square"
+                                                            size={56}
+                                                            style={{ borderRadius: 10, ...avatarStyle(selectedGroupId) }}
+                                                        >
+                                                            {initials(selectedGroup?.name || selectedGroupId)}
+                                                        </Avatar>
+                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <Typography.Title level={5} style={{ margin: 0 }}>
+                                                                {selectedGroup?.name || selectedGroupId}
+                                                            </Typography.Title>
+                                                            <div style={{ marginTop: 6 }}>
+                                                                <Typography.Text type="secondary">
+                                                                    {t("team.detailsGroupId")}:
+                                                                </Typography.Text>{" "}
+                                                                <Typography.Text
+                                                                    copyable={{ text: selectedGroupId }}
+                                                                    style={{ wordBreak: "break-all" }}
                                                                 >
-                                                                    {t("common.add")}
-                                                                </Button>
-                                                            </Space>
-                                                        </Card>
-                                                    ) : (
-                                                        <Typography.Text type="secondary">{t("team.adminOnlyHint")}</Typography.Text>
-                                                    )}
+                                                                    {selectedGroupId}
+                                                                </Typography.Text>
+                                                            </div>
+                                                        </div>
+                                                    </Space>
 
-                                                    <Card size="small" title={t("team.members")} bodyStyle={{ padding: 0 }}>
-                                                        <List
-                                                            loading={membersLoading}
-                                                            dataSource={members}
-                                                            renderItem={(m) => {
-                                                                const a = agentById[m.agent_user_id];
-                                                                const username = a?.username || m.agent_user_id;
-                                                                return (
-                                                                    <List.Item
-                                                                        actions={
-                                                                            isAdmin && !selectedGroupReadonly
-                                                                                ? [
-                                                                                      <Button
-                                                                                          key="remove"
-                                                                                          danger
-                                                                                          onClick={() => void removeMember(m.agent_user_id)}
-                                                                                      >
-                                                                                          {t("common.delete")}
-                                                                                      </Button>,
-                                                                                  ]
-                                                                                : []
-                                                                        }
+                                                    <Collapse
+                                                        size="small"
+                                                        defaultActiveKey={["members", "performance", "chat_assignment", "routing_rules"]}
+                                                        items={[
+                                                            {
+                                                                key: "members",
+                                                                label: `${t("team.members")} (${members.length})`,
+                                                                children: (
+                                                                    <List
+                                                                        loading={membersLoading}
+                                                                        dataSource={members}
+                                                                        locale={{ emptyText: t("team.noMembers") }}
+                                                                        renderItem={(m) => {
+                                                                            const a = agentById[m.agent_user_id];
+                                                                            const username = a?.username || m.agent_user_id;
+                                                                            const st = String(a?.status || "").toLowerCase();
+                                                                            const dotColor =
+                                                                                st === "online"
+                                                                                    ? "#16a34a"
+                                                                                    : st === "away"
+                                                                                        ? "#f59e0b"
+                                                                                        : st === "busy"
+                                                                                            ? "#f97316"
+                                                                                            : "#bfbfbf";
+                                                                            return (
+                                                                                <List.Item>
+                                                                                    <List.Item.Meta
+                                                                                        avatar={
+                                                                                            <div style={{ position: "relative", width: 32, height: 32 }}>
+                                                                                                <Avatar
+                                                                                                    style={avatarStyle(m.agent_user_id || username)}
+                                                                                                    size={32}
+                                                                                                >
+                                                                                                    {initials(username)}
+                                                                                                </Avatar>
+                                                                                                <span
+                                                                                                    style={{
+                                                                                                        position: "absolute",
+                                                                                                        left: -1,
+                                                                                                        top: -1,
+                                                                                                        width: 10,
+                                                                                                        height: 10,
+                                                                                                        borderRadius: 999,
+                                                                                                        background: dotColor,
+                                                                                                        border: "2px solid #fff",
+                                                                                                        boxSizing: "border-box",
+                                                                                                    }}
+                                                                                                />
+                                                                                            </div>
+                                                                                        }
+                                                                                        title={<Typography.Text>{username}</Typography.Text>}
+                                                                                    />
+                                                                                </List.Item>
+                                                                            );
+                                                                        }}
+                                                                    />
+                                                                ),
+                                                            },
+                                                            {
+                                                                key: "performance",
+                                                                label: t("team.detailsPerformance"),
+                                                                children: (
+                                                                    <Space direction="vertical" size={10} style={{ width: "100%" }}>
+                                                                        <Descriptions size="small" column={1}>
+                                                                            <Descriptions.Item label={t("team.detailsTotalChats")}>0</Descriptions.Item>
+                                                                            <Descriptions.Item label={t("team.detailsGoals")}>0</Descriptions.Item>
+                                                                            <Descriptions.Item label={t("team.detailsChatSatisfaction")}>
+                                                                                {t("team.detailsNA")}
+                                                                            </Descriptions.Item>
+                                                                        </Descriptions>
+                                                                        <Button
+                                                                            onClick={() => {
+                                                                                notification.info({
+                                                                                    message: t("team.comingSoon"),
+                                                                                    description: t("team.actions.viewGroupReports"),
+                                                                                    placement: "bottomRight",
+                                                                                    duration: 2,
+                                                                                });
+                                                                            }}
+                                                                        >
+                                                                            {t("team.detailsViewReports")}
+                                                                        </Button>
+                                                                    </Space>
+                                                                ),
+                                                            },
+                                                            {
+                                                                key: "chat_assignment",
+                                                                label: t("team.detailsChatAssignment"),
+                                                                children: (
+                                                                    <Typography.Link
+                                                                        onClick={() => {
+                                                                            notification.info({
+                                                                                message: t("team.comingSoon"),
+                                                                                description: t("team.detailsManageChatAssignment"),
+                                                                                placement: "bottomRight",
+                                                                                duration: 2,
+                                                                            });
+                                                                        }}
                                                                     >
-                                                                        <List.Item.Meta
-                                                                            avatar={<Avatar>{initials(username)}</Avatar>}
-                                                                            title={<Typography.Text strong>{username}</Typography.Text>}
-                                                                            description={
-                                                                                <Typography.Text type="secondary">
-                                                                                    {t("team.weight")}: {m.weight}
-                                                                                </Typography.Text>
-                                                                            }
-                                                                        />
-                                                                    </List.Item>
-                                                                );
-                                                            }}
-                                                        />
-                                                    </Card>
+                                                                        {t("team.detailsManageChatAssignment")}
+                                                                    </Typography.Link>
+                                                                ),
+                                                            },
+                                                            {
+                                                                key: "routing_rules",
+                                                                label: t("team.detailsRoutingRules"),
+                                                                children: (
+                                                                    <Typography.Link
+                                                                        onClick={() => {
+                                                                            notification.info({
+                                                                                message: t("team.comingSoon"),
+                                                                                description: t("team.detailsManageRoutingRules"),
+                                                                                placement: "bottomRight",
+                                                                                duration: 2,
+                                                                            });
+                                                                        }}
+                                                                    >
+                                                                        {t("team.detailsManageRoutingRules")}
+                                                                    </Typography.Link>
+                                                                ),
+                                                            },
+                                                        ]}
+                                                    />
                                                 </Space>
                                             ) : (
                                                 <Typography.Text type="secondary">{t("team.selectGroup")}</Typography.Text>
@@ -1214,7 +1461,11 @@ export function TeamPage() {
                 title={t("team.createGroup")}
                 open={createGroupOpen}
                 confirmLoading={createGroupLoading}
+                okText={t("common.create")}
                 onCancel={() => setCreateGroupOpen(false)}
+                okButtonProps={{
+                    disabled: !isAdmin || createGroupLoading || !(createGroupMembers?.length || 0),
+                }}
                 onOk={() => {
                     if (!isAdmin) {
                         setCreateGroupOpen(false);
@@ -1227,8 +1478,9 @@ export function TeamPage() {
                             // ignore
                         });
                 }}
+                width={520}
             >
-                <Form form={createGroupForm} layout="vertical" initialValues={{ enabled: true }}>
+                <Form form={createGroupForm} layout="vertical" initialValues={{ member_user_ids: [] }}>
                     <Form.Item
                         label={t("team.groupName")}
                         name="name"
@@ -1236,8 +1488,28 @@ export function TeamPage() {
                     >
                         <Input placeholder={t("team.groupNamePlaceholder")} />
                     </Form.Item>
-                    <Form.Item label={t("team.groupEnabled")} name="enabled" valuePropName="checked">
-                        <Switch />
+
+                    <Form.Item
+                        label={t("team.addMembers")}
+                        name="member_user_ids"
+                        rules={[{ required: true, type: "array", min: 1, message: t("team.addMembersRequired") }]}
+                    >
+                        <Select
+                            mode="multiple"
+                            placeholder={t("team.addMembersPlaceholder")}
+                            showSearch
+                            optionFilterProp="search"
+                            options={agents.map((a) => ({
+                                value: a.user_id,
+                                label: (
+                                    <div style={{ lineHeight: 1.2 }}>
+                                        <div>{a.username}</div>
+                                        {a.email ? <Typography.Text type="secondary">{a.email}</Typography.Text> : null}
+                                    </div>
+                                ),
+                                search: `${a.username || ""} ${a.email || ""}`.trim(),
+                            }))}
+                        />
                     </Form.Item>
                 </Form>
             </Modal>
@@ -1290,7 +1562,12 @@ export function TeamPage() {
                 {chatLimitAgent ? (
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
                         <Space size={12} style={{ minWidth: 0 }}>
-                            <Avatar size={48}>{initials(chatLimitAgent.username)}</Avatar>
+                            <Avatar
+                                size={48}
+                                style={avatarStyle(chatLimitAgent.user_id || chatLimitAgent.username)}
+                            >
+                                {initials(chatLimitAgent.username)}
+                            </Avatar>
                             <div style={{ minWidth: 0 }}>
                                 <Space size={8} wrap>
                                     <Typography.Text strong>{chatLimitAgent.username}</Typography.Text>

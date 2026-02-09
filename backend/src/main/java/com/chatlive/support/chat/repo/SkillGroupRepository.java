@@ -194,4 +194,53 @@ public class SkillGroupRepository {
                 rs.getInt("weight")
         ), groupId);
     }
+
+    public int countGroupsForAgent(String tenantId, String agentUserId) {
+        var sql = """
+                select count(1)
+                from skill_group_member m
+                join skill_group g on g.id = m.group_id
+                where g.tenant_id = ?
+                  and m.agent_user_id = ?
+                """;
+        Integer n = jdbcTemplate.queryForObject(sql, Integer.class, tenantId, agentUserId);
+        return n == null ? 0 : n;
+    }
+
+    public boolean hasActiveConversationsForGroup(String tenantId, String groupId) {
+        var sql = """
+                select count(1)
+                from conversation
+                where tenant_id = ?
+                  and skill_group_id = ?
+                  and status in ('open','queued','assigned')
+                """;
+        Integer n = jdbcTemplate.queryForObject(sql, Integer.class, tenantId, groupId);
+        return (n != null && n > 0);
+    }
+
+    public int clearConversationSkillGroup(String tenantId, String groupId) {
+        var sql = """
+                update conversation
+                set skill_group_id = null
+                where tenant_id = ?
+                  and skill_group_id = ?
+                """;
+        return jdbcTemplate.update(sql, tenantId, groupId);
+    }
+
+    public int removeAllMembers(String groupId) {
+        var sql = "delete from skill_group_member where group_id = ?";
+        return jdbcTemplate.update(sql, groupId);
+    }
+
+    public int deleteGroup(String tenantId, String groupId) {
+        var sql = "delete from skill_group where tenant_id = ? and id = ?";
+        return jdbcTemplate.update(sql, tenantId, groupId);
+    }
+
+    public int updateGroup(String tenantId, String groupId, String name, Boolean enabled) {
+        var sql = "update skill_group set name = ?, enabled = coalesce(?, enabled) where tenant_id = ? and id = ?";
+        return jdbcTemplate.update(sql, name, enabled, tenantId, groupId);
+    }
 }
